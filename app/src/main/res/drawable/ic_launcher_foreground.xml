@@ -1,0 +1,75 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+  <!-- Outer glow ring -->
+  <path
+      android:pathData="M54,54m-46,0a46,46 0,1 1,92 0a46,46 0,1 1,-92 0"
+      android:fillColor="#00000000"
+      android:strokeColor="#1AFFE5FF"
+      android:strokeWidth="0.5"/>
+  <!-- Main background circle with gradient -->
+  <path
+      android:pathData="M54,54m-40,0a40,40 0,1 1,80 0a40,40 0,1 1,-80 0">
+    <aapt:attr name="android:fillColor">
+      <gradient
+          android:type="radial"
+          android:centerX="54"
+          android:centerY="38"
+          android:gradientRadius="50">
+        <item android:offset="0" android:color="#FF0D2240"/>
+        <item android:offset="0.6" android:color="#FF060D18"/>
+        <item android:offset="1" android:color="#FF020608"/>
+      </gradient>
+    </aapt:attr>
+  </path>
+  <!-- Outer decorative ring -->
+  <path
+      android:pathData="M54,54m-38,0a38,38 0,1 1,76 0a38,38 0,1 1,-76 0"
+      android:fillColor="#00000000"
+      android:strokeColor="#3300E5FF"
+      android:strokeWidth="0.8"/>
+  <!-- Inner accent ring -->
+  <path
+      android:pathData="M54,54m-32,0a32,32 0,1 1,64 0a32,32 0,1 1,-64 0"
+      android:fillColor="#00000000"
+      android:strokeColor="#1AFFBF00"
+      android:strokeWidth="0.5"/>
+  <!-- Letter A - main shape -->
+  <path
+      android:pathData="M40,72 L54,30 L68,72 M45,58 L63,58"
+      android:fillColor="#00000000"
+      android:strokeColor="#FFFFFFFF"
+      android:strokeWidth="4"
+      android:strokeLineCap="round"
+      android:strokeLineJoin="round"/>
+  <!-- Dot above A for style -->
+  <path
+      android:pathData="M54,24m-2.5,0a2.5,2.5 0,1 1,5 0a2.5,2.5 0,1 1,-5 0"
+      android:fillColor="#FF00E5FF"/>
+  <!-- Corner accent triangles -->
+  <path
+      android:pathData="M18,18 L24,18 L18,24 Z"
+      android:fillColor="#3300E5FF"/>
+  <path
+      android:pathData="M90,18 L84,18 L90,24 Z"
+      android:fillColor="#3300E5FF"/>
+  <path
+      android:pathData="M18,90 L24,90 L18,84 Z"
+      android:fillColor="#2200E5FF"/>
+  <path
+      android:pathData="M90,90 L84,90 L90,84 Z"
+      android:fillColor="#2200E5FF"/>
+  <!-- Subtle glow dots -->
+  <path
+      android:pathData="M30,54m-1.5,0a1.5,1.5 0,1 1,3 0a1.5,1.5 0,1 1,-3 0"
+      android:fillColor="#4400E5FF"/>
+  <path
+      android:pathData="M78,54m-1.5,0a1.5,1.5 0,1 1,3 0a1.5,1.5 0,1 1,-3 0"
+      android:fillColor="#4400E5FF"/>
+  <path
+      android:pathData="M54,78m-1.5,0a1.5,1.5 0,1 1,3 0a1.5,1.5 0,1 1,-3 0"
+      android:fillColor="#44FFBF00"/>
+</vector>
