@@ -46,3 +46,4 @@ Get a free key from: https://aistudio.google.com/app/apikey
 - Fixed: Double sensor registration causing performance issues
 - Fixed: Location client now catches all exception types (not just SecurityException)
 - Fixed: Keystore setup automated via `setup.sh`
+# A.SYRIA
