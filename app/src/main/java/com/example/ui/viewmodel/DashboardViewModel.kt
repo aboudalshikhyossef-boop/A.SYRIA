@@ -486,17 +486,59 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
         val title = _forgeTitle.value.trim()
         val category = _forgeCategory.value.trim()
         val ideaRaw = _forgeIdea.value.trim()
-        if (title.isEmpty() || ideaRaw.isEmpty()) return
+        if (title.isEmpty() || ideaRaw.isEmpty() || _isThinking.value) return
+
         viewModelScope.launch {
             _isThinking.value = true
-            val generatedBlueprint = "[ ALERT ] Neural Blueprinting is offline. Local Encryption protocol used instead."
-            _isThinking.value = false
-            val encryptedEntity = InventorIdea.createEncrypted(title = title, category = category, originalIdea = ideaRaw, geminiBlueprint = generatedBlueprint)
-            repository.insertIdea(encryptedEntity)
-            _forgeBlueprint.value = generatedBlueprint
-            delay(500)
-            _isForgePanelOpen.value = false
-            _isVaultViewOpen.value = true
+            _forgeBlueprint.value = ""
+            try {
+                val responseLanguage = if (_isArabic.value) "Arabic" else "English"
+                val prompt = """
+                    You are the product architect for A.SYRIA.
+                    Produce a practical, privacy-first innovation blueprint in $responseLanguage.
+                    Idea title: $title
+                    Category: $category
+                    User's initial idea:
+                    $ideaRaw
+
+                    Return a structured, actionable plan with:
+                    1. Problem and intended users.
+                    2. Proposed solution and core user flow.
+                    3. System components and data flow.
+                    4. Privacy and security controls, including data minimization.
+                    5. A realistic MVP broken into ordered implementation steps.
+                    6. Main technical risks and mitigations.
+                    Be specific, avoid unsupported claims, and do not propose harmful cyber activity.
+                """.trimIndent()
+
+                val generatedBlueprint = generateGeminiText(prompt).trim()
+                check(generatedBlueprint.isNotBlank()) {
+                    "Gemini returned an empty blueprint."
+                }
+
+                val encryptedEntity = InventorIdea.createEncrypted(
+                    title = title,
+                    category = category,
+                    originalIdea = ideaRaw,
+                    geminiBlueprint = generatedBlueprint
+                )
+                repository.insertIdea(encryptedEntity)
+                _forgeBlueprint.value = generatedBlueprint
+                _isNeuralLinkOffline.value = false
+                _isForgePanelOpen.value = false
+                _isVaultViewOpen.value = true
+            } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                _isNeuralLinkOffline.value = true
+                _forgeBlueprint.value = if (_isArabic.value) {
+                    "تعذّر إنشاء المخطط ولم تُحفظ الفكرة. تحقق من اتصال Gemini ومفتاح API ثم أعد المحاولة.\n${error.message?.take(160).orEmpty()}"
+                } else {
+                    "The blueprint could not be generated, so the idea was not saved. Check the Gemini connection and API key, then retry.\n${error.message?.take(160).orEmpty()}"
+                }
+            } finally {
+                _isThinking.value = false
+            }
         }
     }
 

@@ -30,6 +30,14 @@ class PrayerViewModel(application: Application) : AndroidViewModel(application) 
     private val networkLocationRepository = NetworkLocationRepository()
     private val preferences = application.getSharedPreferences("prayer_prefs", Application.MODE_PRIVATE)
 
+    // Prayer times are stable for a local date and a coordinate pair.
+    private var cachedPrayerTimes: PrayerTimes? = null
+    private var cachedPrayerDateKey: String? = null
+    private var cachedLatitude = Double.NaN
+    private var cachedLongitude = Double.NaN
+    private var cachedTomorrowFajr: Date? = null
+    private var cachedTomorrowDateKey: String? = null
+
     private val _nextPrayerName = MutableStateFlow("...")
     val nextPrayerName: StateFlow<String> = _nextPrayerName.asStateFlow()
 
@@ -98,17 +106,12 @@ class PrayerViewModel(application: Application) : AndroidViewModel(application) 
 
     private fun calculatePrayerTimes() {
         val coordinates = _coordinates.value ?: DAMASCUS
-        val today = DateComponents.from(Date())
-        val parameters = CalculationMethod.UMM_AL_QURA.parameters.also {
-            it.madhab = Madhab.SHAFI
-        }
-        val prayerTimes = PrayerTimes(coordinates, today, parameters)
         val now = Date()
+        val prayerTimes = getTodayPrayerTimes(coordinates, now)
         val nextPrayer = prayerTimes.nextPrayer()
         val effectiveNextPrayer = if (nextPrayer == Prayer.NONE) Prayer.FAJR else nextPrayer
         val nextPrayerDate = if (nextPrayer == Prayer.NONE) {
-            val tomorrow = Calendar.getInstance().apply { add(Calendar.DAY_OF_YEAR, 1) }
-            PrayerTimes(coordinates, DateComponents.from(tomorrow.time), parameters).fajr
+            getTomorrowFajr(coordinates, now)
         } else {
             prayerTimes.timeForPrayer(effectiveNextPrayer)
         }
@@ -126,7 +129,6 @@ class PrayerViewModel(application: Application) : AndroidViewModel(application) 
 
         val formatter = SimpleDateFormat("hh:mm a", Locale.getDefault())
         _nextPrayerTime.value = formatter.format(nextPrayerDate)
-
         _allPrayerTimes.value = mapOf(
             "الفجر" to formatter.format(prayerTimes.fajr),
             "الشروق" to formatter.format(prayerTimes.sunrise),
@@ -153,6 +155,47 @@ class PrayerViewModel(application: Application) : AndroidViewModel(application) 
         } else 1f
     }
 
+    private fun getTodayPrayerTimes(coordinates: Coordinates, now: Date): PrayerTimes {
+        val dateKey = SimpleDateFormat("yyyy-MM-dd", Locale.ROOT).format(now)
+        val cached = cachedPrayerTimes
+        if (cached != null && cachedPrayerDateKey == dateKey &&
+            cachedLatitude == coordinates.latitude && cachedLongitude == coordinates.longitude
+        ) {
+            return cached
+        }
+
+        val parameters = CalculationMethod.UMM_AL_QURA.parameters.also {
+            it.madhab = Madhab.SHAFI
+        }
+        return PrayerTimes(coordinates, DateComponents.from(now), parameters).also { result ->
+            cachedPrayerTimes = result
+            cachedPrayerDateKey = dateKey
+            cachedLatitude = coordinates.latitude
+            cachedLongitude = coordinates.longitude
+            cachedTomorrowFajr = null
+            cachedTomorrowDateKey = null
+        }
+    }
+
+    private fun getTomorrowFajr(coordinates: Coordinates, now: Date): Date {
+        val todayKey = SimpleDateFormat("yyyy-MM-dd", Locale.ROOT).format(now)
+        cachedTomorrowFajr?.takeIf {
+            cachedTomorrowDateKey == todayKey &&
+                cachedLatitude == coordinates.latitude && cachedLongitude == coordinates.longitude
+        }?.let { return it }
+
+        val tomorrow = Calendar.getInstance().apply {
+            time = now
+            add(Calendar.DAY_OF_YEAR, 1)
+        }.time
+        val parameters = CalculationMethod.UMM_AL_QURA.parameters.also {
+            it.madhab = Madhab.SHAFI
+        }
+        return PrayerTimes(coordinates, DateComponents.from(tomorrow), parameters).fajr.also { fajr ->
+            cachedTomorrowFajr = fajr
+            cachedTomorrowDateKey = todayKey
+        }
+    }
     private companion object {
         val DAMASCUS = Coordinates(33.5138, 36.2765)
     }

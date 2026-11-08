@@ -19,7 +19,7 @@ import kotlinx.coroutines.Dispatchers
    *
    * This service is intentionally decoupled from Gemini / Google AI.
    * All LLM calls go through [GeminiRepository] using the user's dedicated Gemini API key.
-   * Gemini remains exclusively responsible for Quiz & Test generation (DashboardViewModel).
+   * The dashboard, chat, and feedback features share one Gemini integration layer.
    */
   class FeedbackService(private val context: Context) {
 
@@ -34,14 +34,6 @@ import kotlinx.coroutines.Dispatchers
        */
       suspend fun submitFeedback(feedbackText: String, geminiApiKey: String): FeedbackResult =
           withContext(Dispatchers.IO) {
-
-              // Rate-limit guard
-              if (!RateLimiter.tryAcquire(context)) {
-                  return@withContext FeedbackResult.RateLimited(
-                      resetSeconds = RateLimiter.getResetSeconds(context),
-                      remaining    = 0
-                  )
-              }
 
               // Gemini key validation
               if (geminiApiKey.isBlank()) {
@@ -61,6 +53,14 @@ import kotlinx.coroutines.Dispatchers
 
               if (sanitized.isBlank()) {
                   return@withContext FeedbackResult.Error("Input is empty.")
+              }
+
+              // Reserve quota only after validating the key and request payload.
+              if (!RateLimiter.tryAcquire(context)) {
+                  return@withContext FeedbackResult.RateLimited(
+                      resetSeconds = RateLimiter.getResetSeconds(context),
+                      remaining = 0
+                  )
               }
 
               try {

@@ -1,14 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <data-extraction-rules>
     <cloud-backup>
-        <!-- Chat history and vault database are private user data. -->
         <exclude domain="database" path="." />
-        <!-- Preferences DataStore contains the Gemini API credential. -->
         <exclude domain="file" path="datastore/" />
+        <exclude domain="sharedpref" path="prayer_prefs.xml" />
     </cloud-backup>
     <device-transfer>
-        <!-- Keystore keys are device-bound; do not transfer ciphertext without its key. -->
+        <!-- Android Keystore keys are device-bound; do not transfer their ciphertext. -->
         <exclude domain="database" path="." />
         <exclude domain="file" path="datastore/" />
+        <exclude domain="sharedpref" path="prayer_prefs.xml" />
     </device-transfer>
 </data-extraction-rules>

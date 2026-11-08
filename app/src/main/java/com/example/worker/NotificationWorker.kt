@@ -3,7 +3,8 @@ package com.example.worker
   import android.app.NotificationChannel
   import android.app.NotificationManager
   import android.content.Context
-  import android.content.pm.PackageManager
+  import android.Manifest
+import android.content.pm.PackageManager
   import android.os.Build
   import android.provider.Settings
   import androidx.core.app.NotificationCompat
@@ -34,7 +35,6 @@ package com.example.worker
           private const val KEY_LAST_SECURITY = "last_security_ms"
           private const val KEY_LAST_GEMINI = "last_gemini_ms"
           private const val KEY_LAST_WISDOM = "last_wisdom_ms"
-          private const val TWELVE_HOURS_MS = 24L * 60 * 60 * 1000 // Reduced frequency to avoid Play Protect flags
           private const val TWENTY_FOUR_HOURS_MS = 24L * 60 * 60 * 1000
 
           private val SHORT_DUAS = mapOf(
@@ -78,16 +78,16 @@ package com.example.worker
           // 1. Prayer alerts — always check every 15 min (has its own per-prayer deduplication)
           checkAndNotifyPrayer(isAr)
 
-          // 2. Device Security Scan — throttled to once every 12 hours
+          // 2. Device Security Scan — throttled to once every 24 hours
           val lastSecurity = throttlePrefs.getLong(KEY_LAST_SECURITY, 0L)
-          if (nowMs - lastSecurity >= TWELVE_HOURS_MS) {
+          if (nowMs - lastSecurity >= TWENTY_FOUR_HOURS_MS) {
               performDeviceSecurityScan(isAr)
               throttlePrefs.edit().putLong(KEY_LAST_SECURITY, nowMs).apply()
           }
 
-          // 3. Gemini Security Tip — throttled to once every 12 hours
+          // 3. Gemini Security Tip — throttled to once every 24 hours
           val lastGemini = throttlePrefs.getLong(KEY_LAST_GEMINI, 0L)
-          if (apiKey.isNotBlank() && nowMs - lastGemini >= TWELVE_HOURS_MS) {
+          if (apiKey.isNotBlank() && nowMs - lastGemini >= TWENTY_FOUR_HOURS_MS) {
               try {
                   val promptLocale = if (isAr) "Arabic" else "English"
                   val prompt = "Provide one very brief (12 words max) high-priority cybersecurity tip in $promptLocale. Be direct. No intro."
@@ -379,6 +379,13 @@ package com.example.worker
       }
 
       private fun showNotification(title: String, message: String, id: Int, channelId: String = CHANNEL_PRAYER) {
+          if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+              applicationContext.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) !=
+                  PackageManager.PERMISSION_GRANTED
+          ) {
+              return
+          }
+
           val notificationManager = applicationContext.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
 
           val icon = when (channelId) {
@@ -412,7 +419,7 @@ package com.example.worker
               .setAutoCancel(true)
               .build()
 
-          notificationManager.notify(id, notification)
+          runCatching { notificationManager.notify(id, notification) }
       }
   }
   

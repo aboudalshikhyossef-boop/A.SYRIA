@@ -1,7 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <full-backup-content>
-    <!-- Chat history and vault database are private user data. -->
+    <!-- User conversations and encrypted vault records are device-private. -->
     <exclude domain="database" path="." />
     <!-- Preferences DataStore contains the Gemini API credential. -->
     <exclude domain="file" path="datastore/" />
+    <!-- IP-derived prayer coordinates are private location metadata. -->
+    <exclude domain="sharedpref" path="prayer_prefs.xml" />
 </full-backup-content>

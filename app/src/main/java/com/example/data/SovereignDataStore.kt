@@ -7,6 +7,7 @@ import androidx.datastore.preferences.preferencesDataStore
 import com.example.data.database.SovereigntyCipher
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import java.time.LocalDate
 
 private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "sovereign_settings")
 
@@ -115,17 +116,17 @@ class SovereignDataStore(private val context: Context) {
     }
 
     suspend fun updateAcademyStreak() {
-        val sdf = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault())
-        val today = sdf.format(java.util.Date())
-        val yesterday = sdf.format(java.util.Date(System.currentTimeMillis() - 86_400_000L))
+        val today = LocalDate.now()
+        val todayKey = today.toString()
+        val yesterdayKey = today.minusDays(1).toString()
         context.dataStore.edit { prefs ->
             val lastDate = prefs[LAST_QUIZ_DATE] ?: ""
-            val current  = prefs[ACADEMY_STREAK] ?: 0
-            prefs[LAST_QUIZ_DATE] = today
+            val current = prefs[ACADEMY_STREAK] ?: 0
+            prefs[LAST_QUIZ_DATE] = todayKey
             prefs[ACADEMY_STREAK] = when {
-                lastDate == today     -> current
-                lastDate == yesterday -> current + 1
-                else                  -> 1
+                lastDate == todayKey -> current
+                lastDate == yesterdayKey -> current + 1
+                else -> 1
             }
         }
     }

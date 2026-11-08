@@ -28,7 +28,7 @@ class NetworkLocationRepository(
             .build()
 
         client.newCall(request).execute().use { response ->
-            check(response.isSuccessful) { "Network location lookup failed (\${response.code})." }
+            check(response.isSuccessful) { "Network location lookup failed (${response.code})." }
             val body = response.body?.string().orEmpty()
             parseCoordinates(body)
         }
