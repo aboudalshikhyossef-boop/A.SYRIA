@@ -3,25 +3,29 @@ package com.example.ui.viewmodel
   import android.app.Application
   import androidx.lifecycle.AndroidViewModel
   import androidx.lifecycle.viewModelScope
-  import com.example.adaptive.GroqRepository
+  import com.example.data.remote.GeminiRepository
   import com.example.adaptive.UIConfig
   import com.example.data.SovereignDataStore
   import com.example.data.chat.ChatMessage
   import com.example.data.database.AppDatabase
+  import kotlinx.coroutines.CancellationException
   import kotlinx.coroutines.Dispatchers
+  import kotlinx.coroutines.Job
+  import kotlinx.coroutines.cancelAndJoin
   import kotlinx.coroutines.flow.MutableStateFlow
   import kotlinx.coroutines.flow.SharingStarted
   import kotlinx.coroutines.flow.StateFlow
   import kotlinx.coroutines.flow.asStateFlow
+  import kotlinx.coroutines.flow.first
   import kotlinx.coroutines.flow.stateIn
   import kotlinx.coroutines.launch
 
-  class GroqChatViewModel(application: Application) : AndroidViewModel(application) {
+  class GeminiChatViewModel(application: Application) : AndroidViewModel(application) {
 
       private val db         = AppDatabase.getDatabase(application)
       private val dao        = db.chatMessageDao()
       private val dataStore  = SovereignDataStore(application)
-      private val groq       = GroqRepository()
+      private val gemini       = GeminiRepository()
 
       val messages: StateFlow<List<ChatMessage>> = dao.observe()
           .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
@@ -29,30 +33,35 @@ package com.example.ui.viewmodel
       private val _isTyping = MutableStateFlow(false)
       val isTyping: StateFlow<Boolean> = _isTyping.asStateFlow()
 
-      private val _groqKey = MutableStateFlow("")
+      private val _geminiKey = MutableStateFlow("")
 
-      private var analysisScheduled = false
+      private var analysisJob: Job? = null
+      private var sendJob: Job? = null
+      private var isClearingHistory = false
 
       init {
           viewModelScope.launch {
-              dataStore.groqApiKey.collect { _groqKey.value = it }
+              dataStore.migrateLegacyGeminiApiKey()
+              dataStore.geminiApiKey.collect { _geminiKey.value = it }
           }
       }
 
       fun sendMessage(text: String, uiConfig: UIConfig? = null) {
           val trimmed = text.trim()
-          if (trimmed.isBlank()) return
+          if (trimmed.isBlank() || isClearingHistory || _isTyping.value) return
 
-          viewModelScope.launch(Dispatchers.IO) {
-              dao.insert(ChatMessage(role = "user", content = trimmed))
-              _isTyping.value = true
-
+          // Set this synchronously on the caller thread so two rapid taps cannot start
+          // overlapping conversations whose replies would be inserted out of order.
+          _isTyping.value = true
+          sendJob = viewModelScope.launch(Dispatchers.IO) {
               try {
-                  val key = _groqKey.value
+                  dao.insert(ChatMessage(role = "user", content = trimmed))
+
+                  val key = dataStore.geminiApiKey.first().also { _geminiKey.value = it }
                   if (key.isBlank()) {
                       dao.insert(ChatMessage(
                           role = "assistant",
-                          content = "No Groq API key detected. Head to Settings and add your key to activate me."
+                          content = "No Gemini API key detected. Head to Settings and add your key to activate me."
                       ))
                       return@launch
                   }
@@ -62,17 +71,18 @@ package com.example.ui.viewmodel
                       .filter { it.role == "user" || it.role == "assistant" }
                       .map { it.role to it.content }
 
-                  val reply = groq.chat(
+                  val reply = gemini.chat(
                       systemPrompt = buildSystemPrompt(uiConfig),
-                      history      = history,
-                      groqApiKey   = key
+                      history = history,
+                      apiKey = key
                   )
                   dao.insert(ChatMessage(role = "assistant", content = reply))
-
-              } catch (e: Exception) {
+              } catch (cancelled: CancellationException) {
+                  throw cancelled
+              } catch (error: Exception) {
                   dao.insert(ChatMessage(
-                      role    = "assistant",
-                      content = "Connection error — ${e.message?.take(90) ?: "unknown"}"
+                      role = "assistant",
+                      content = "Connection error — ${error.message?.take(90) ?: "unknown"}"
                   ))
               } finally {
                   _isTyping.value = false
@@ -81,38 +91,53 @@ package com.example.ui.viewmodel
       }
 
       fun runBackgroundAnalysis(uiConfig: UIConfig) {
-          if (analysisScheduled) return
-          analysisScheduled = true
-
-          viewModelScope.launch(Dispatchers.IO) {
-              val key = _groqKey.value
-              if (key.isBlank()) return@launch
-
-              val recent = dao.getRecent(6)
-              if (recent.any { it.role == "suggestion" }) return@launch
-
+          if (isClearingHistory || _isTyping.value || analysisJob?.isActive == true) return
+          analysisJob = viewModelScope.launch(Dispatchers.IO) {
               try {
-                  val insight = groq.complete(
-                      systemPrompt = """You are an intelligent UI advisor embedded in A.SYRIA, a sovereign privacy-first app.
+                  val key = dataStore.geminiApiKey.first().also { _geminiKey.value = it }
+                  if (key.isBlank()) return@launch
+
+                  val recent = dao.getRecent(6)
+                  if (recent.any { it.role == "suggestion" }) return@launch
+
+                  val insight = gemini.generateText(
+                      systemInstruction = """You are an intelligent UI advisor embedded in A.SYRIA, a sovereign privacy-first app.
   Analyse the provided configuration and write ONE short, proactive suggestion (2-3 sentences max).
   Start with "I noticed..." and end with a clear, specific question asking if the user wants you to apply the change.
   Be warm, direct, and useful. Plain conversational text only — no JSON, no markdown, no lists.""",
-                      userContent = "Config — accent: ${uiConfig.accentColor}, " +
+                      input = "Config — accent: ${uiConfig.accentColor}, " +
                           "compact: ${uiConfig.compactMode}, " +
                           "fontSize: ${uiConfig.fontSize}sp, " +
                           "cardStyle: ${uiConfig.cardStyle}, " +
                           "animations: ${uiConfig.animationsEnabled}",
-                      groqApiKey = key
+                      apiKey = key
                   )
                   dao.insert(ChatMessage(role = "suggestion", content = insight))
-              } catch (_: Exception) { /* Silent — background analysis is best-effort */ }
+              } catch (cancelled: CancellationException) {
+                  throw cancelled
+              } catch (_: Exception) {
+                  // Best-effort analysis; a later explicit attempt may retry.
+              }
           }
       }
 
       fun clearHistory() {
+          if (isClearingHistory) return
+          isClearingHistory = true
+          val pendingSend = sendJob
+          val pendingAnalysis = analysisJob
+          sendJob = null
+          analysisJob = null
+
           viewModelScope.launch(Dispatchers.IO) {
-              dao.clear()
-              analysisScheduled = false
+              try {
+                  pendingSend?.cancelAndJoin()
+                  pendingAnalysis?.cancelAndJoin()
+                  dao.clear()
+              } finally {
+                  _isTyping.value = false
+                  isClearingHistory = false
+              }
           }
       }
 
@@ -123,7 +148,7 @@ package com.example.ui.viewmodel
           }.orEmpty()
 
           return "You are the Master Brain of A.SYRIA — a sovereign, privacy-first Android app for Syrians and Arabic-speaking users.\n" +
-              "Powered by LLaMA 3.3 70B via Groq. You are articulate, precise, and deeply helpful.\n\n" +
+              "Powered by Gemini 3.6 Flash. You are articulate, precise, and deeply helpful.\n\n" +
               "You can:\n" +
               "  • Customise the app UI (colors, fonts, layout, animations) by describing changes\n" +
               "  • Answer questions about app features, privacy, and cybersecurity\n" +

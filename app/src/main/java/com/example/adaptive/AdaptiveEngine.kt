@@ -93,6 +93,31 @@ class AdaptiveEngine(private val context: Context) {
             // Clock Format
             "is12HourFormat"    to { v -> v == "true" || v == "false" }
         )
+
+        /** Sanitizes persisted values as well as AI-proposed values before Compose consumes them. */
+        internal fun sanitizeConfig(config: UIConfig): UIConfig {
+            val defaults = UIConfig()
+            return config.copy(
+                accentColor = config.accentColor.takeIf {
+                    it in setOf("cyan", "amber", "green", "white", "red", "purple")
+                } ?: defaults.accentColor,
+                primaryHex = config.primaryHex.takeIf { it.isEmpty() || HEX_REGEX.matches(it) }
+                    ?: defaults.primaryHex,
+                backgroundHex = config.backgroundHex.takeIf { it.isEmpty() || HEX_REGEX.matches(it) }
+                    ?: defaults.backgroundHex,
+                fontSize = config.fontSize.takeIf { it.isFinite() && it in 10f..24f }
+                    ?: defaults.fontSize,
+                fontWeight = config.fontWeight.takeIf { it in setOf("light", "normal", "bold") }
+                    ?: defaults.fontWeight,
+                cornerRadius = config.cornerRadius.coerceIn(0, 32),
+                cardStyle = config.cardStyle.takeIf { it in setOf("glass", "solid", "outline", "flat") }
+                    ?: defaults.cardStyle,
+                tabStyle = config.tabStyle.takeIf { it in setOf("compact", "normal") }
+                    ?: defaults.tabStyle,
+                notificationLevel = config.notificationLevel.takeIf { it in setOf("silent", "normal", "active") }
+                    ?: defaults.notificationLevel
+            )
+        }
     }
 
     private val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -124,8 +149,9 @@ class AdaptiveEngine(private val context: Context) {
                 else                -> updated
             }
         }
-        saveToPrefs(updated)
-        _uiConfig.value = updated
+        val safeConfig = sanitizeConfig(updated)
+        saveToPrefs(safeConfig)
+        _uiConfig.value = safeConfig
     }
 
     /** Reset everything to factory defaults. */
@@ -139,7 +165,7 @@ class AdaptiveEngine(private val context: Context) {
         val json = prefs.getString(KEY_CONFIG, null) ?: return UIConfig()
         return try {
             val o = JSONObject(json)
-            UIConfig(
+            sanitizeConfig(UIConfig(
                 accentColor       = o.optString("accentColor", "cyan"),
                 primaryHex        = o.optString("primaryHex", ""),
                 backgroundHex     = o.optString("backgroundHex", ""),
@@ -155,7 +181,7 @@ class AdaptiveEngine(private val context: Context) {
                 animationsEnabled = o.optBoolean("animationsEnabled", true),
                 notificationLevel = o.optString("notificationLevel", "normal"),
                 is12HourFormat    = o.optBoolean("is12HourFormat", false)
-            )
+            ))
         } catch (e: Exception) { UIConfig() }
     }
 

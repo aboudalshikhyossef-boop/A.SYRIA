@@ -134,7 +134,7 @@ package com.example.ui.screens
                   )
               }
               Text(
-                  text = if (isBlocked) formatCountdown(resetSecs) else "${remaining} / 3",
+                  text = if (isBlocked) formatCountdown(resetSecs) else "${remaining} / 5",
                   color = if (isBlocked) Color.Red else CyberGreen,
                   fontSize = 12.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold
               )

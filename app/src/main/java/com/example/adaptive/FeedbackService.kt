@@ -1,7 +1,9 @@
 package com.example.adaptive
 
   import android.content.Context
-  import kotlinx.coroutines.Dispatchers
+  import com.example.data.remote.GeminiRepository
+  import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
   import kotlinx.coroutines.withContext
   import org.json.JSONArray
 
@@ -13,41 +15,33 @@ package com.example.adaptive
   }
 
   /**
-   * FeedbackService — Orchestrates UI-customisation requests through the Groq layer.
+   * FeedbackService — Orchestrates UI-customisation requests through the Gemini layer.
    *
    * This service is intentionally decoupled from Gemini / Google AI.
-   * All LLM calls go through [GroqRepository] using the user's dedicated Groq API key.
-   * Gemini remains exclusively responsible for Quiz & Test generation (DashboardViewModel).
+   * All LLM calls go through [GeminiRepository] using the user's dedicated Gemini API key.
+   * The dashboard, chat, and feedback features share one Gemini integration layer.
    */
   class FeedbackService(private val context: Context) {
 
-      private val groqRepository = GroqRepository()
+      private val geminiRepository = GeminiRepository()
 
       /**
        * Submit a UI-customisation request.
        *
        * @param feedbackText  Raw user input (e.g. "make it green", "bigger text").
-       * @param groqApiKey    The user's Groq API key loaded from DataStore.
+       * @param geminiApiKey    The user's Gemini API key loaded from DataStore.
        * @return [FeedbackResult.Success], [RateLimited], [Empty], or [Error].
        */
-      suspend fun submitFeedback(feedbackText: String, groqApiKey: String): FeedbackResult =
+      suspend fun submitFeedback(feedbackText: String, geminiApiKey: String): FeedbackResult =
           withContext(Dispatchers.IO) {
 
-              // Rate-limit guard
-              if (!RateLimiter.isAllowed(context)) {
-                  return@withContext FeedbackResult.RateLimited(
-                      resetSeconds = RateLimiter.getResetSeconds(context),
-                      remaining    = 0
-                  )
-              }
-
-              // Groq key validation
-              if (groqApiKey.isBlank()) {
+              // Gemini key validation
+              if (geminiApiKey.isBlank()) {
                   return@withContext FeedbackResult.Error(
                       if (context.resources.configuration.locales[0].language == "ar")
-                          "مفتاح Groq API غير متوفر. أضفه في الإعدادات أولاً."
+                          "مفتاح Gemini API غير متوفر. أضفه في الإعدادات أولاً."
                       else
-                          "Groq API key not configured. Add your key in Settings first."
+                          "Gemini API key not configured. Add your key in Settings first."
                   )
               }
 
@@ -61,15 +55,22 @@ package com.example.adaptive
                   return@withContext FeedbackResult.Error("Input is empty.")
               }
 
+              // Reserve quota only after validating the key and request payload.
+              if (!RateLimiter.tryAcquire(context)) {
+                  return@withContext FeedbackResult.RateLimited(
+                      resetSeconds = RateLimiter.getResetSeconds(context),
+                      remaining = 0
+                  )
+              }
+
               try {
-                  val aiText = groqRepository.complete(
-                      systemPrompt = buildSystemPrompt(),
-                      userContent  = sanitized,
-                      groqApiKey   = groqApiKey
+                  val aiText = geminiRepository.generateText(
+                      systemInstruction = buildSystemPrompt(),
+                      input = sanitized,
+                      apiKey = geminiApiKey
                   )
 
                   val changes = parseAndValidateChanges(aiText)
-                  RateLimiter.recordRequest(context)
 
                   if (changes.isEmpty()) {
                       FeedbackResult.Empty(
@@ -83,6 +84,7 @@ package com.example.adaptive
                   }
 
               } catch (e: Exception) {
+                  if (e is CancellationException) throw e
                   FeedbackResult.Error("Connection error: ${e.message?.take(100)}")
               }
           }

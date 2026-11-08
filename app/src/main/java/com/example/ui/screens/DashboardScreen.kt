@@ -2,7 +2,6 @@ package com.example.ui.screens
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.basicMarquee
-import com.example.data.database.InventorIdea
 import com.example.data.ContextualVerseEngine
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.CubicBezierEasing
@@ -86,7 +85,6 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -224,9 +222,7 @@ fun DashboardScreen(
     val terminalResponse by viewModel.terminalResponse.collectAsState()
     val isTerminalExpanded by viewModel.isTerminalExpanded.collectAsState()
 
-    // Phase 5 Vault & Forge states
-    val savedIdeas by viewModel.savedIdeas.collectAsState()
-    val isForgePanelOpen by viewModel.isForgePanelOpen.collectAsState()
+    // Secure vault state
     val isVaultViewOpen by viewModel.isVaultViewOpen.collectAsState()
 
     // Phase 11 states
@@ -237,10 +233,6 @@ fun DashboardScreen(
     val isAcademyOpen by viewModel.isAcademyOpen.collectAsState()
     val isResourcesOpen by viewModel.isResourcesOpen.collectAsState()
 
-    val forgeTitle by viewModel.forgeTitle.collectAsState()
-    val forgeCategory by viewModel.forgeCategory.collectAsState()
-    val forgeIdea by viewModel.forgeIdea.collectAsState()
-    val forgeBlueprint by viewModel.forgeBlueprint.collectAsState()
     val operatorName by viewModel.operatorName.collectAsState()
     val neuralRole by viewModel.neuralRole.collectAsState()
 
@@ -248,21 +240,17 @@ fun DashboardScreen(
     val linkAnalysisResult by viewModel.linkAnalysisResult.collectAsState()
     val isAnalyzingLink by viewModel.isAnalyzingLink.collectAsState()
 
-    val keyboardController = LocalSoftwareKeyboardController.current
 
     // Phase 20: Tactical Document Details
-    var selectedVaultIdea by remember { mutableStateOf<InventorIdea?>(null) }
 
     // Desktop Mode state
     var isDesktopModeOpen by remember { mutableStateOf(false) }
 
     // Navigation BackHandler logic for sovereign stability
-    BackHandler(enabled = isDesktopModeOpen || isTerminalExpanded || isForgePanelOpen || isVaultViewOpen || selectedVaultIdea != null) {
+    BackHandler(enabled = isDesktopModeOpen || isTerminalExpanded || isVaultViewOpen) {
         when {
             isDesktopModeOpen -> isDesktopModeOpen = false
-            selectedVaultIdea != null -> selectedVaultIdea = null
             isTerminalExpanded -> viewModel.setTerminalExpanded(false)
-            isForgePanelOpen -> viewModel.setForgePanelOpen(false)
             isVaultViewOpen -> viewModel.setVaultViewOpen(false)
         }
     }
@@ -483,53 +471,32 @@ fun DashboardScreen(
                         )
                     }
 
-                    // Phase 5 Action Matrix Integration (FORGE & VAULT controllers)
+                    // Secure vault entry
                     item {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 14.dp)
-                                .graphicsLayer {
-                                    rotationX = -cardPitchShift * 0.7f
-                                    rotationY = cardRollShift * 0.7f
-                                },
-                            horizontalArrangement = Arrangement.spacedBy(12.dp)
-                        ) {
-                            TacticalGridButton(
-                                text = if (isAr) "[ تشغيل المصنع ]" else "[ ACTIVATE FORGE ]",
-                                subtitle = if (isAr) "أنشئ أفكاراً وابتكارات بالذكاء الاصطناعي واحفظها" else "AI idea generator & innovation studio",
-                                color = dynamicAccent,
-                                onClick = {
-                                    haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
-                                    viewModel.setForgePanelOpen(true)
-                                },
-                                modifier = Modifier.weight(1f)
-                            )
-                            TacticalGridButton(
-                                text = if (isAr) "[ دخول الخزنة ]" else "[ ENTER VAULT ]",
-                                subtitle = if (isAr) "مخزن مشفر لأفكارك ومعلوماتك السرية" else "Encrypted vault for saved ideas & notes",
-                                color = dynamicAccent,
-                                onClick = {
-                                    haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
-                                    if (viewModel.isVaultAuthenticated.value) {
-                                        viewModel.setVaultViewOpen(true)
-                                    } else {
-                                        onVaultLockRequest(
-                                            if (isAr) "تأكيد الهوية السيادية" else "SOVEREIGN IDENTITY VERIFIED",
-                                            if (isAr) "مطلوب بصمة الدخول للوصول إلى الخزنة المركزية" else "Biometric uplink required for central vault access",
-                                            { 
-                                                viewModel.setVaultAuthenticated(true)
-                                                viewModel.setVaultViewOpen(true) 
-                                            }
-                                        )
-                                    }
-                                },
-                                modifier = Modifier.weight(1f)
-                            )
-                        }
+                        TacticalGridButton(
+                            text = if (isAr) "[ دخول الخزينة الآمنة ]" else "[ ENTER SECURE VAULT ]",
+                            subtitle = if (isAr) "حفظ الصور والملفات والنصوص بتشفير محلي" else "Encrypted storage for images, files and text",
+                            color = dynamicAccent,
+                            onClick = {
+                                haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
+                                if (viewModel.isVaultAuthenticated.value) {
+                                    viewModel.setVaultViewOpen(true)
+                                } else {
+                                    onVaultLockRequest(
+                                        if (isAr) "تأكيد الهوية السيادية" else "SOVEREIGN IDENTITY VERIFIED",
+                                        if (isAr) "مطلوب التحقق بالبصمة أو قفل الجهاز للوصول إلى الخزينة" else "Biometric or secure device authentication is required",
+                                        {
+                                            viewModel.setVaultAuthenticated(true)
+                                            viewModel.setVaultViewOpen(true)
+                                        }
+                                    )
+                                }
+                            },
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp)
+                        )
                     }
 
-                    // Secondary controllers (Forge + Vault + Nodes)
+                    // Academy and resource controllers
                     item {
                         Row(
                             modifier = Modifier
@@ -800,367 +767,12 @@ fun DashboardScreen(
         }
     }
 
-        // ==========================================
-        // PHASE 5 LAYER: INVENTOR'S FORGE PANEL
-        // ==========================================
-        AnimatedVisibility(
-            visible = isForgePanelOpen,
-            enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
-            exit = slideOutVertically(targetOffsetY = { it }) + fadeOut()
-        ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(Color.Black.copy(alpha = 0.88f))
-                    .padding(top = 30.dp)
-            ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .statusBarsPadding()
-                        .navigationBarsPadding()
-                        .imePadding()
-                        .background(
-                            Brush.linearGradient(
-                                colors = listOf(Color(0xFF04060C), VoidBlack)
-                            )
-                        )
-                        .border(
-                            width = 1.dp,
-                            brush = Brush.verticalGradient(listOf(AmberZen.copy(alpha = 0.4f), Color.Transparent)),
-                            shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
-                        )
-                        .padding(20.dp)
-                        .verticalScroll(rememberScrollState()),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    // Header Area
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column {
-                            Text(
-                                text = "\u0627\u0644\u0645\u0635\u0646\u0639 \u0627\u0644\u0630\u0643\u064A",
-                                color = AmberZen,
-                                fontSize = 20.sp,
-                                fontWeight = FontWeight.Bold,
-                                letterSpacing = 1.sp
-                            )
-                            Text(
-                                text = "\u0623\u0646\u0634\u0626 \u0623\u0641\u0643\u0627\u0631\u0643 \u0648\u0627\u062D\u0641\u0638\u0647\u0627 \u0628\u0623\u0645\u0627\u0646",
-                                color = Color.White.copy(alpha = 0.5f),
-                                fontSize = 10.sp,
-                                fontWeight = FontWeight.SemiBold
-                            )
-                        }
-
-                        Text(
-                            text = "\u2715",
-                            color = Color.White.copy(alpha = 0.6f),
-                            fontSize = 18.sp,
-                            modifier = Modifier
-                                .clickable { viewModel.setForgePanelOpen(false) }
-                                .padding(8.dp)
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.height(12.dp))
-
-                    // Instruction box
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .border(1.dp, AmberZen.copy(alpha = 0.25f), RoundedCornerShape(10.dp))
-                            .background(AmberZen.copy(alpha = 0.06f), RoundedCornerShape(10.dp))
-                            .padding(12.dp)
-                    ) {
-                        Text(
-                            text = "\uD83D\uDCA1 \u0643\u064A\u0641 \u062A\u0633\u062A\u062E\u062F\u0645 \u0627\u0644\u0645\u0635\u0646\u0639: \u0623\u062F\u062E\u0644 \u0627\u0633\u0645 \u0645\u0634\u0631\u0648\u0639\u0643\u060C \u0627\u062E\u062A\u0631 \u0627\u0644\u062A\u0635\u0646\u064A\u0641\u060C \u062B\u0645 \u0627\u0643\u062A\u0628 \u0641\u0643\u0631\u062A\u0643 \u0628\u0627\u0644\u062A\u0641\u0635\u064A\u0644. \u0633\u064A\u0642\u0648\u0645 \u0627\u0644\u0630\u0643\u0627\u0621 \u0627\u0644\u0627\u0635\u0637\u0646\u0627\u0639\u064A \u0628\u062A\u062D\u0644\u064A\u0644\u0647\u0627 \u0648\u0625\u0646\u0634\u0627\u0621 \u0645\u062E\u0637\u0637 \u0645\u062A\u0643\u0627\u0645\u0644 \u064A\u064F\u062D\u0641\u0638 \u0641\u064A \u0627\u0644\u062E\u0632\u064A\u0646\u0629.",
-                            color = Color.White.copy(alpha = 0.7f),
-                            fontSize = 11.sp,
-                            lineHeight = 18.sp
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    // Title Input Box
-                    OutlinedTextField(
-                        value = forgeTitle,
-                        onValueChange = { viewModel.updateForgeTitle(it) },
-                        modifier = Modifier.fillMaxWidth(),
-                        textStyle = TextStyle(color = Color.White, fontSize = 13.sp),
-                        label = { Text("\u0627\u0633\u0645 \u0627\u0644\u0645\u0634\u0631\u0648\u0639", color = AmberZen.copy(alpha = 0.7f), fontSize = 11.sp) },
-                        placeholder = { Text("\u0645\u062B\u0627\u0644: \u0646\u0638\u0627\u0645 \u062D\u0645\u0627\u064A\u0629 \u0630\u0643\u064A \u0644\u0644\u0645\u0646\u0632\u0644", color = Color.White.copy(alpha = 0.3f), fontSize = 12.sp) },
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = AmberZen,
-                            unfocusedBorderColor = AmberZen.copy(alpha = 0.35f),
-                            cursorColor = AmberZen
-                        ),
-                        singleLine = true
-                    )
-
-                    Spacer(modifier = Modifier.height(10.dp))
-
-                    // Category Selector Box
-                    OutlinedTextField(
-                        value = forgeCategory,
-                        onValueChange = { viewModel.updateForgeCategory(it) },
-                        modifier = Modifier.fillMaxWidth(),
-                        textStyle = TextStyle(color = Color.White, fontSize = 13.sp),
-                        label = { Text("\u0627\u0644\u062A\u0635\u0646\u064A\u0641", color = AmberZen.copy(alpha = 0.7f), fontSize = 11.sp) },
-                        placeholder = { Text("\u0645\u062B\u0627\u0644: \u0623\u0645\u0646 \u0633\u064A\u0628\u0631\u0627\u0646\u064A\u060C \u0630\u0643\u0627\u0621 \u0627\u0635\u0637\u0646\u0627\u0639\u064A\u060C \u062A\u0642\u0646\u064A\u0629 \u0631\u0648\u062D\u0627\u0646\u064A\u0629", color = Color.White.copy(alpha = 0.3f), fontSize = 11.sp) },
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = AmberZen,
-                            unfocusedBorderColor = AmberZen.copy(alpha = 0.35f),
-                            cursorColor = AmberZen
-                        ),
-                        singleLine = true
-                    )
-
-                    Spacer(modifier = Modifier.height(10.dp))
-
-                    // Raw Idea Details Text Area
-                    OutlinedTextField(
-                        value = forgeIdea,
-                        onValueChange = { viewModel.updateForgeIdea(it) },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(110.dp),
-                        textStyle = TextStyle(color = Color.White, fontSize = 13.sp),
-                        label = { Text("\u0648\u0635\u0641 \u0627\u0644\u0641\u0643\u0631\u0629 \u0628\u0627\u0644\u062A\u0641\u0635\u064A\u0644", color = AmberZen.copy(alpha = 0.7f), fontSize = 11.sp) },
-                        placeholder = { Text("\u0627\u0643\u062A\u0628 \u0641\u0643\u0631\u062A\u0643 \u0647\u0646\u0627... \u064A\u0645\u0643\u0646\u0643 \u0648\u0635\u0641 \u0627\u0644\u0645\u0634\u0643\u0644\u0629 \u0627\u0644\u062A\u064A \u062A\u0631\u064A\u062F \u062D\u0644\u0647\u0627 \u0623\u0648 \u0627\u0644\u0627\u0628\u062A\u0643\u0627\u0631 \u0627\u0644\u0630\u064A \u062A\u0631\u064A\u062F \u062A\u0637\u0648\u064A\u0631\u0647", color = Color.White.copy(alpha = 0.3f), fontSize = 12.sp) },
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = AmberZen,
-                            unfocusedBorderColor = AmberZen.copy(alpha = 0.35f),
-                            cursorColor = AmberZen
-                        ),
-                        maxLines = 5
-                    )
-
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    // Action Forge Reactor Button
-                    Button(
-                        onClick = {
-                            keyboardController?.hide()
-                            viewModel.forgeAndSaveIdea()
-                        },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(48.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = AmberZen,
-                            contentColor = VoidBlack
-                        ),
-                        shape = RoundedCornerShape(8.dp),
-                        enabled = !isThinking && forgeTitle.isNotBlank() && forgeIdea.isNotBlank()
-                    ) {
-                        Text(
-                            text = if (isThinking) "\u062C\u0627\u0631\u064A \u0627\u0644\u062A\u062D\u0644\u064A\u0644 \u0648\u0627\u0644\u0628\u0646\u0627\u0621..." else "\u0625\u0646\u0634\u0627\u0621 \u0648\u062D\u0641\u0638 \u0627\u0644\u0645\u062E\u0637\u0637",
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 14.sp
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.height(18.dp))
-
-                    // Display Resulting Formatted AI Blueprint Output in elegant gold card
-                    if (forgeBlueprint.isNotEmpty() || isThinking) {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .border(1.dp, AmberZen.copy(alpha = 0.4f), RoundedCornerShape(12.dp))
-                                .background(GlassWhite, RoundedCornerShape(12.dp))
-                                .padding(14.dp)
-                        ) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(
-                                    text = "\u0646\u062A\u064A\u062C\u0629 \u0627\u0644\u062A\u062D\u0644\u064A\u0644 \u0627\u0644\u0630\u0643\u064A",
-                                    color = AmberZen,
-                                    fontSize = 13.sp,
-                                    fontWeight = FontWeight.Bold
-                                )
-                                Text(
-                                    text = "\u0645\u062A\u0635\u0644",
-                                    color = CyberCyan,
-                                    fontSize = 10.sp
-                                )
-                            }
-
-                            Spacer(modifier = Modifier.height(10.dp))
-
-                            Text(
-                                text = forgeBlueprint.ifEmpty { "\u062C\u0627\u0631\u064A \u062A\u062D\u0644\u064A\u0644 \u0627\u0644\u0641\u0643\u0631\u0629 \u0648\u0628\u0646\u0627\u0621 \u0627\u0644\u0645\u062E\u0637\u0637..." },
-                                color = Color.White,
-                                fontSize = 12.sp,
-                                lineHeight = 18.sp,
-                                modifier = Modifier.fillMaxWidth()
-                            )
-                        }
-                    }
-                }
-            }
-        }
-
-        // ==========================================
-        // PHASE 5 LAYER: SECURE VAULT LIBRARY (SAVED)
-        // ==========================================
-        AnimatedVisibility(
-            visible = isVaultViewOpen,
-            enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
-            exit = slideOutVertically(targetOffsetY = { it }) + fadeOut()
-        ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(Color.Black.copy(alpha = 0.9f))
-            ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .statusBarsPadding()
-                        .navigationBarsPadding()
-                        .padding(18.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    // Header Menu
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column {
-                            Text(
-                                text = "الخزينة الآمنة",
-                                color = CyberCyan,
-                                fontSize = 18.sp,
-                                fontWeight = FontWeight.Bold,
-                                letterSpacing = 3.sp,
-                                fontFamily = FontFamily.Monospace
-                            )
-                            Text(
-                                text = "مخزن أفكارك المشفرة",
-                                color = Color.White.copy(alpha = 0.5f),
-                                fontSize = 8.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                letterSpacing = 1.sp
-                            )
-                        }
-
-                        Text(
-                            text = "[ رجوع ]",
-                            color = CyberCyan,
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold,
-                            fontFamily = FontFamily.Monospace,
-                            modifier = Modifier
-                                .clickable { viewModel.setVaultViewOpen(false) }
-                                .padding(8.dp)
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.height(14.dp))
-
-                    // Vault statistics summary
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .border(0.5.dp, CyberCyan.copy(alpha = 0.15f), RoundedCornerShape(6.dp))
-                            .background(GlassWhite, RoundedCornerShape(6.dp))
-                            .padding(10.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = "الحالة: نشطة ومؤمنة",
-                            color = Color.White.copy(alpha = 0.6f),
-                            fontSize = 9.sp,
-                            fontFamily = FontFamily.Monospace
-                        )
-                        Text(
-                            text = "${savedIdeas.size} فكرة محفوظة",
-                            color = CyberCyan,
-                            fontSize = 9.sp,
-                            fontWeight = FontWeight.Bold,
-                            fontFamily = FontFamily.Monospace
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    if (savedIdeas.isEmpty()) {
-                        // Ambient Cryptographic Empty State
-                        Column(
-                            modifier = Modifier
-                                .weight(1f)
-                                .fillMaxWidth(),
-                            verticalArrangement = Arrangement.Center,
-                            horizontalAlignment = Alignment.CenterHorizontally
-                        ) {
-                            Text(
-                                text = "\uD83D\uDCE6",
-                                color = CyberCyan.copy(alpha = 0.35f),
-                                fontSize = 55.sp,
-                                textAlign = TextAlign.Center
-                            )
-                            Spacer(modifier = Modifier.height(10.dp))
-                            Text(
-                                text = "الخزينة فارغة",
-                                color = Color.White,
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.Bold,
-                                fontFamily = FontFamily.Monospace,
-                                letterSpacing = 2.sp
-                            )
-                            Text(
-                                text = "لم تقم بإنشاء أي مخطط بعد. اذهب إلى المصنع الذكي وابدأ بإنشاء أفكارك وسيتم حفظها هنا بشكل مشفر وآمن.",
-                                color = Color.White.copy(alpha = 0.4f),
-                                fontSize = 10.sp,
-                                textAlign = TextAlign.Center,
-                                modifier = Modifier.padding(horizontal = 24.dp, vertical = 6.dp),
-                                lineHeight = 16.sp
-                            )
-                        }
-                    } else {
-                        // Phase 20: Tactical Engineering Blueprint Vertical List
-                        LazyColumn(
-                            modifier = Modifier.weight(1f),
-                            verticalArrangement = Arrangement.spacedBy(16.dp)
-                        ) {
-                            items(savedIdeas, key = { it.id }) { idea ->
-                                BlueprintEngineeringCard(
-                                    idea = idea,
-                                    onClick = { 
-                                        haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
-                                        selectedVaultIdea = idea 
-                                    }
-                                )
-                            }
-                        }
-                    }
-                    
-                    if (savedIdeas.isNotEmpty()) {
-                        Spacer(modifier = Modifier.height(10.dp))
-                        Text(
-                            text = "حذف جميع المحفوظات",
-                            color = Color.Red.copy(alpha = 0.6f),
-                            fontSize = 10.sp,
-                            fontFamily = FontFamily.Monospace,
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier
-                                .clickable { viewModel.wipeVault() }
-                                .padding(10.dp)
-                        )
-                    }
-                }
-            }
+        if (isVaultViewOpen) {
+            SecureVaultScreen(
+                viewModel = viewModel,
+                isArabic = isAr,
+                onClose = { viewModel.setVaultViewOpen(false) }
+            )
         }
 
         // ==========================================
@@ -1212,7 +824,6 @@ fun DashboardScreen(
                 contentAlignment = Alignment.Center
             ) {
                 var keyInput by remember { mutableStateOf(customApiKey) }
-                var showPurgeConfirmation by remember { mutableStateOf(false) }
 
                 Column(
                     modifier = Modifier
@@ -1306,46 +917,6 @@ fun DashboardScreen(
 
                     Spacer(modifier = Modifier.height(14.dp))
 
-                    // Purge Vault button
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .border(0.5.dp, Color.Red.copy(alpha = 0.4f), RoundedCornerShape(8.dp))
-                            .background(Color.Red.copy(alpha = 0.05f), RoundedCornerShape(8.dp))
-                            .padding(12.dp)
-                            .clickable {
-                                haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
-                                showPurgeConfirmation = true
-                            },
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Column {
-                            Text(
-                                text = if (isAr) "مسح الخزينة بالكامل" else "PURGE VAULT ARCHIVE",
-                                color = Color.Red.copy(alpha = 0.8f),
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold,
-                                fontFamily = FontFamily.Monospace
-                            )
-                            Text(
-                                text = if (isAr) "حذف جميع المخططات المحفوظة نهائياً" else "Irreversibly wipe all forged blueprints",
-                                color = Color.White.copy(alpha = 0.4f),
-                                fontSize = 8.5.sp,
-                                fontFamily = FontFamily.Monospace
-                            )
-                        }
-                        Text(
-                            text = "[ ERASE ]",
-                            color = Color.Red.copy(alpha = 0.8f),
-                            fontSize = 10.sp,
-                            fontFamily = FontFamily.Monospace,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.height(24.dp))
-
                     // Dialog Actions (Save & Close)
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -1380,73 +951,6 @@ fun DashboardScreen(
                     }
                 }
 
-                // Inner confirmation overlay for Purge
-                if (showPurgeConfirmation) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .background(Color.Black.copy(alpha = 0.85f)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth(0.85f)
-                                .border(1.dp, Color.Red.copy(alpha = 0.5f), RoundedCornerShape(12.dp))
-                                .background(VoidBlack, RoundedCornerShape(12.dp))
-                                .padding(20.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally
-                        ) {
-                            Text(
-                                text = if (isAr) "تأكيد مسح الخزينة" else "CONFIRM VAULT PURGE",
-                                color = Color.Red,
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.Bold,
-                                fontFamily = FontFamily.Monospace
-                            )
-                            Spacer(modifier = Modifier.height(10.dp))
-                            Text(
-                                text = if (isAr) "هذه العملية لا يمكن التراجع عنها. سيتم حذف جميع المخططات المشفرة المحفوظة نهائياً." else "This operation cannot be undone. All encrypted blueprints within the local Room persistence drive will be permanently atomized.",
-                                color = Color.White.copy(alpha = 0.7f),
-                                fontSize = 10.sp,
-                                textAlign = TextAlign.Center,
-                                lineHeight = 16.sp,
-                                fontFamily = FontFamily.Monospace
-                            )
-                            Spacer(modifier = Modifier.height(20.dp))
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(10.dp)
-                            ) {
-                                Button(
-                                    onClick = { 
-                                        haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove)
-                                        showPurgeConfirmation = false 
-                                    },
-                                    colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent),
-                                    border = BorderStroke(0.5.dp, Color.White.copy(alpha = 0.3f)),
-                                    shape = RoundedCornerShape(8.dp),
-                                    modifier = Modifier.weight(1f)
-                                ) {
-                                    Text("ABORT", color = Color.White, fontSize = 11.sp, fontFamily = FontFamily.Monospace)
-                                }
-                                Button(
-                                    onClick = {
-                                        haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
-                                        viewModel.wipeVault()
-                                        showPurgeConfirmation = false
-                                        viewModel.setSettingsOpen(false)
-                                    },
-                                    colors = ButtonDefaults.buttonColors(containerColor = Color.Red.copy(alpha = 0.15f)),
-                                    border = BorderStroke(0.75.dp, Color.Red),
-                                    shape = RoundedCornerShape(8.dp),
-                                    modifier = Modifier.weight(1f)
-                                ) {
-                                    Text("CONFIRM", color = Color.Red, fontSize = 11.sp, fontFamily = FontFamily.Monospace)
-                                }
-                            }
-                        }
-                    }
-                }
             }
         }
 
@@ -1476,218 +980,6 @@ fun DashboardScreen(
 // ==========================================
 // COMPOSE SUB-COMPONENTS & LAYOUTS
 // ==========================================
-
-// Phase 5: Glowing Data Crystal holographic card tilting and shining via Gyro metrics
-// Phase 20: Engineering Blueprint Card for the Vault
-@Composable
-fun BlueprintEngineeringCard(
-    idea: InventorIdea,
-    onClick: () -> Unit
-) {
-    val title = idea.getDecryptedTitle()
-    val category = idea.getDecryptedCategory()
-    
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(90.dp)
-            .border(0.5.dp, CyberCyan.copy(alpha = 0.3f), RoundedCornerShape(2.dp))
-            .background(VoidBlack)
-            .clickable { onClick() }
-            .padding(16.dp)
-    ) {
-        // Grid pattern background effect
-        Canvas(modifier = Modifier.fillMaxSize().alpha(0.1f)) {
-            val step = 10.dp.toPx()
-            for (x in 0..size.width.toInt() step step.toInt()) {
-                drawLine(CyberCyan, Offset(x.toFloat(), 0f), Offset(x.toFloat(), size.height), strokeWidth = 0.5f)
-            }
-            for (y in 0..size.height.toInt() step step.toInt()) {
-                drawLine(CyberCyan, Offset(0f, y.toFloat()), Offset(size.width, y.toFloat()), strokeWidth = 0.5f)
-            }
-        }
-
-        Row(
-            modifier = Modifier.fillMaxSize(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Column {
-                Text(
-                    text = "\uD83D\uDCCB $title",
-                    color = CyberCyan,
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.Bold,
-                    fontFamily = FontFamily.Monospace,
-                    letterSpacing = 1.sp
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = "التصنيف: $category \u2022 محفوظ بأمان",
-                    color = Color.White.copy(alpha = 0.5f),
-                    fontSize = 9.sp,
-                    fontFamily = FontFamily.Monospace
-                )
-            }
-            
-            Icon(
-                imageVector = Icons.Default.Search,
-                contentDescription = null,
-                tint = CyberCyan.copy(alpha = 0.6f),
-                modifier = Modifier.size(20.dp)
-            )
-        }
-    }
-}
-
-// Phase 20: Tactical Document Detail Overlay
-@Composable
-fun TacticalDocumentDetail(
-    idea: InventorIdea?,
-    isAr: Boolean,
-    onClose: () -> Unit,
-    onDelete: () -> Unit,
-    onExport: (InventorIdea) -> Unit
-) {
-    if (idea == null) return
-    
-    val title = idea.getDecryptedTitle()
-    val category = idea.getDecryptedCategory()
-    val rawConcept = idea.getDecryptedOriginalIdea()
-    val analysis = idea.getDecryptedGeminiBlueprint()
-
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color.Black.copy(alpha = 0.95f))
-            .clickable(enabled = false) { }
-            .statusBarsPadding()
-            .navigationBarsPadding()
-            .padding(20.dp)
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .border(1.dp, CyberCyan.copy(alpha = 0.4f), RoundedCornerShape(4.dp))
-                .background(VoidBlack)
-                .padding(24.dp)
-                .verticalScroll(rememberScrollState())
-        ) {
-            // Document Header
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.Top
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = "TACTICAL_BLUEPRINT // ${title.uppercase()}",
-                        color = CyberCyan,
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Black,
-                        fontFamily = FontFamily.Monospace
-                    )
-                    Text(
-                        text = "CATEGORY: $category // REF: #SOV-${idea.id}",
-                        color = AmberZen,
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Bold,
-                        fontFamily = FontFamily.Monospace
-                    )
-                }
-                Text(
-                    text = "[ CLOSE ]",
-                    color = CyberCyan,
-                    fontSize = 12.sp,
-                    fontFamily = FontFamily.Monospace,
-                    modifier = Modifier.clickable { onClose() }.padding(4.dp)
-                )
-            }
-
-            Spacer(modifier = Modifier.height(24.dp))
-            HorizontalDivider(color = CyberCyan.copy(alpha = 0.2f))
-            Spacer(modifier = Modifier.height(24.dp))
-
-            // Section 1: RAW CONCEPT
-            TacticalSectionHeader(if (isAr) "[ المسودة الأولية ]" else "[ RAW CONCEPT ]")
-            Text(
-                text = rawConcept,
-                color = Color.White,
-                fontSize = 13.sp,
-                lineHeight = 20.sp,
-                fontFamily = FontFamily.Monospace,
-                modifier = Modifier.padding(bottom = 24.dp)
-            )
-
-            // Section 2: NEURAL ANALYSIS
-            TacticalSectionHeader(if (isAr) "[ التحليل العصبي ]" else "[ NEURAL ANALYSIS ]")
-            Text(
-                text = analysis,
-                color = Color.White.copy(alpha = 0.9f),
-                fontSize = 13.sp,
-                lineHeight = 20.sp,
-                fontFamily = FontFamily.Monospace,
-                modifier = Modifier.padding(bottom = 24.dp)
-            )
-
-            TacticalSectionHeader("[ TECHNICAL COMPONENTS ]")
-            Text(
-                text = "NEURAL_CORE_v4\nASYMMETRIC_CIPHER_ENGINE\nDISTRIBUTED_PERSISTENCE_GRID",
-                color = GlassWhite,
-                fontSize = 11.sp,
-                fontFamily = FontFamily.Monospace,
-                modifier = Modifier.padding(bottom = 24.dp)
-            )
-
-            TacticalSectionHeader("[ SECURITY RISK ASSESSMENT ]")
-            Text(
-                text = "THREAT_LEVEL: LOW (LOCAL_ISOLATION_ACTIVE)\nVECTOR_VULNERABILITY: MINIMAL\nMITIGATION: ENFORCE_ZERO_TRUST",
-                color = Color.Red.copy(alpha = 0.7f),
-                fontSize = 11.sp,
-                fontFamily = FontFamily.Monospace,
-                modifier = Modifier.padding(bottom = 32.dp)
-            )
-
-            Spacer(modifier = Modifier.weight(1f))
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                Button(
-                    onClick = { onExport(idea) },
-                    modifier = Modifier.weight(1f),
-                    colors = ButtonDefaults.buttonColors(containerColor = CyberCyan.copy(alpha = 0.1f)),
-                    border = BorderStroke(1.dp, CyberCyan),
-                    shape = RoundedCornerShape(2.dp)
-                ) {
-                    Text("EXPORT", color = CyberCyan, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                }
-                Button(
-                    onClick = { onDelete() },
-                    modifier = Modifier.weight(1f),
-                    colors = ButtonDefaults.buttonColors(containerColor = Color.Red.copy(alpha = 0.1f)),
-                    border = BorderStroke(1.dp, Color.Red),
-                    shape = RoundedCornerShape(2.dp)
-                ) {
-                    Text("PURGE", color = Color.Red, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun TacticalSectionHeader(text: String) {
-    Text(
-        text = text,
-        color = AmberZen,
-        fontSize = 10.sp,
-        fontWeight = FontWeight.Black,
-        letterSpacing = 2.sp,
-        modifier = Modifier.padding(bottom = 8.dp)
-    )
-}
 
 // Phase 6 Contextual Wisdom Ambient Insight Typewriter Board
 @Composable

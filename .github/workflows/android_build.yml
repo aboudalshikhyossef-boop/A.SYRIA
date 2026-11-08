@@ -1,74 +1,42 @@
-name: Android CI/CD
+name: Android CI
 
 on:
   push:
-    branches: [ "main" ]
+    branches: ["main"]
   pull_request:
-    branches: [ "main" ]
+    branches: ["main"]
+
+permissions:
+  contents: read
 
 jobs:
-  build:
+  build-and-test:
     runs-on: ubuntu-latest
-    env:
-      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-      GRADLE_OPTS: "-Dorg.gradle.daemon=false -Dorg.gradle.jvmargs=-Xmx4g -Dorg.gradle.parallel=true"
     steps:
       - name: Checkout source
         uses: actions/checkout@v4
 
       - name: Set up JDK 17
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
-          java-version: '17'
-          distribution: 'temurin'
+          java-version: "17"
+          distribution: temurin
 
-      - name: Setup Gradle 8.7
-        uses: gradle/actions/setup-gradle@v4
+      - name: Set up Gradle 8.7
+        uses: gradle/actions/setup-gradle@v6
         with:
-          gradle-version: '8.7'
+          gradle-version: "8.7"
           validate-wrappers: false
 
-      - name: Regenerate Gradle Wrapper (ensures correct gradle-wrapper.jar)
-        run: |
-          gradle wrapper --gradle-version=8.7 --distribution-type=bin
-          chmod +x gradlew
+      # Run the installed Gradle distribution directly. This avoids executing
+      # the unverified wrapper JAR currently present in the repository.
+      - name: Run unit tests and build debug APK
+        run: gradle testDebugUnitTest compileDebugAndroidTestKotlin assembleDebug --no-configuration-cache --stacktrace --build-cache
 
-      - name: Cache Gradle dependencies
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.gradle/caches
-            ~/.gradle/wrapper
-          key: gradle-${{ runner.os }}-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
-          restore-keys: |
-            gradle-${{ runner.os }}-
-
-      - name: Cache Android debug keystore
-        uses: actions/cache@v4
-        with:
-          path: ~/.android/debug.keystore
-          key: debug-keystore-v1
-
-      - name: Display Gradle version
-        run: ./gradlew --version
-
-      - name: Build Debug APK
-        run: ./gradlew assembleDebug --no-configuration-cache --stacktrace --build-cache
-
-      - name: Upload Debug APK
+      - name: Upload debug APK
         uses: actions/upload-artifact@v4
         with:
-          name: A_SYRIA_V6_DEBUG
+          name: a-syria-debug
           path: app/build/outputs/apk/debug/app-debug.apk
-          retention-days: 30
+          retention-days: 14
           if-no-files-found: error
-
-      - name: Build Summary
-        if: success()
-        run: |
-          APK_SIZE=$(du -sh app/build/outputs/apk/debug/app-debug.apk | cut -f1)
-          echo "## ✅ Build Successful" >> $GITHUB_STEP_SUMMARY
-          echo "| Property | Value |" >> $GITHUB_STEP_SUMMARY
-          echo "|----------|-------|" >> $GITHUB_STEP_SUMMARY
-          echo "| APK Size | $APK_SIZE |" >> $GITHUB_STEP_SUMMARY
-          echo "| Branch | ${{ github.ref_name }} |" >> $GITHUB_STEP_SUMMARY

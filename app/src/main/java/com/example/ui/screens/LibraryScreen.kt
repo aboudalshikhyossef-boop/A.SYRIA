@@ -52,9 +52,9 @@ fun LibraryScreen(viewModel: DashboardViewModel, onBack: () -> Unit) {
     val allData = remember(context) { loadLibraryData(context) }
 
     val tabs = if (isAr)
-        listOf("الأدعية" to "duas", "الأحاديث" to "hadiths", "نصائح أمنية" to "security_tips")
+        listOf("الأدعية" to "duas", "الأحاديث" to "hadiths")
     else
-        listOf("Duas" to "duas", "Hadiths" to "hadiths", "Security Tips" to "security_tips")
+        listOf("Duas" to "duas", "Hadiths" to "hadiths")
 
     var selectedTab by remember { mutableStateOf("duas") }
     var searchQuery by remember { mutableStateOf("") }
@@ -112,7 +112,7 @@ fun LibraryScreen(viewModel: DashboardViewModel, onBack: () -> Unit) {
                                 fontWeight = FontWeight.Bold
                             )
                             Text(
-                                text = if (isAr) "أدعية · أحاديث · أمن رقمي" else "Duas · Hadiths · Cybersecurity",
+                                text = if (isAr) "أدعية · أحاديث" else "Duas · Hadiths",
                                 color = CyberCyan.copy(alpha = 0.6f),
                                 fontSize = 10.sp,
                                 fontFamily = FontFamily.Monospace,
@@ -156,8 +156,7 @@ fun LibraryScreen(viewModel: DashboardViewModel, onBack: () -> Unit) {
                         val isSelected = selectedTab == key
                         val tabColor = when (key) {
                             "duas" -> AmberGold
-                            "hadiths" -> NeonGreen
-                            else -> CyberCyan
+                            else -> NeonGreen
                         }
                         val tabGlow by infiniteTransition.animateFloat(
                             initialValue = if (isSelected) 0.3f else 0f, targetValue = if (isSelected) 0.6f else 0f,
@@ -203,13 +202,11 @@ fun LibraryScreen(viewModel: DashboardViewModel, onBack: () -> Unit) {
 fun LibraryItemCard(item: LibraryItem, category: String, isAr: Boolean, glowPulse: Float) {
     val accentColor = when (category) {
         "duas" -> AmberGold
-        "hadiths" -> NeonGreen
-        else -> CyberCyan
+        else -> NeonGreen
     }
     val icon = when (category) {
         "duas" -> "🤲"
-        "hadiths" -> "📖"
-        else -> "🛡️"
+        else -> "📖"
     }
     var expanded by remember { mutableStateOf(false) }
 
@@ -273,83 +270,55 @@ fun LibraryItemCard(item: LibraryItem, category: String, isAr: Boolean, glowPuls
 
 fun loadLibraryData(context: Context): Map<String, List<LibraryItem>> {
     return try {
-        val json = JSONObject(context.assets.open("sovereign_knowledge.json").bufferedReader().use { it.readText() })
+        val json = JSONObject(
+            context.assets.open("islamic_library.json")
+                .bufferedReader()
+                .use { it.readText() }
+        )
         mapOf(
             "duas" to parseDuas(json.optJSONArray("duas")),
-            "hadiths" to parseHadiths(json.optJSONArray("hadiths")),
-            "security_tips" to parseSecurityTips(json.optJSONArray("security_tips"))
+            "hadiths" to parseHadiths(json.optJSONArray("hadiths"))
         )
-    } catch (e: Exception) {
-        mapOf("duas" to emptyList(), "hadiths" to emptyList(), "security_tips" to emptyList())
+    } catch (_: Exception) {
+        mapOf("duas" to emptyList(), "hadiths" to emptyList())
     }
 }
 
 private fun parseDuas(arr: JSONArray?): List<LibraryItem> {
     if (arr == null) return emptyList()
-    return (0 until arr.length()).map { i ->
-        val obj = arr.getJSONObject(i)
-        // JSON keys: arabic, transliteration, occasion, source, category
-        val arabic   = obj.optString("arabic", "")
+    return (0 until arr.length()).mapNotNull { index ->
+        val obj = arr.optJSONObject(index) ?: return@mapNotNull null
+        val arabic = obj.optString("arabic").trim()
+        if (arabic.isBlank()) return@mapNotNull null
+
         val occasion = obj.optString("occasion", obj.optString("category", "دعاء"))
-        val source   = obj.optString("source", "")
+            .ifBlank { "دعاء" }
+        val source = obj.optString("source").trim()
         LibraryItem(
-            id = i,
-            title = occasion.ifBlank { "دعاء" },
+            id = obj.optInt("id", index),
+            title = occasion,
             subtitle = if (source.isNotBlank()) "المصدر: $source" else "",
-            body = arabic,                       // Arabic text only — no transliteration
+            body = arabic,
             tag = "دعاء مأثور"
         )
-    }
+    }.distinctBy { listOf(it.body, it.title, it.subtitle) }
 }
 
 private fun parseHadiths(arr: JSONArray?): List<LibraryItem> {
     if (arr == null) return emptyList()
-    return (0 until arr.length()).map { i ->
-        val obj = arr.getJSONObject(i)
-        // JSON keys: arabic, narrator, grade, topic
-        val arabic   = obj.optString("arabic", "")
-        val narrator = obj.optString("narrator", "")
-        val topic    = obj.optString("topic", "")
+    return (0 until arr.length()).mapNotNull { index ->
+        val obj = arr.optJSONObject(index) ?: return@mapNotNull null
+        val arabic = obj.optString("arabic").trim()
+        if (arabic.isBlank()) return@mapNotNull null
+
+        val narrator = obj.optString("narrator").trim()
+        val topic = obj.optString("topic").trim()
         LibraryItem(
-            id = i,
-            title = if (topic.isNotBlank()) topic else arabic.take(50),
+            id = obj.optInt("id", index),
+            title = topic.ifBlank { arabic.take(50) },
             subtitle = if (narrator.isNotBlank()) "رواه $narrator" else "",
             body = arabic,
-            tag = obj.optString("grade", "")
+            tag = obj.optString("grade").trim()
         )
-    }
-}
-
-// Boilerplate suffix appended to every Arabic tip in the dataset — strip it
-// so tips don't look duplicated.
-private val TIP_BOILERPLATE_AR = Regex(
-    "\\s*هذا توجيه حيوي للحفاظ على وضعك الأمني الرقمي في ظل تهديدات متصاعدة\\.?\\s*$"
-)
-private val TIP_NUMBER_TAG_AR  = Regex("\\s*\\[نصيحة\\s*#?\\d+\\]\\s*")
-
-private fun cleanTip(text: String): String =
-    text.replace(TIP_NUMBER_TAG_AR, " ")
-        .replace(TIP_BOILERPLATE_AR, "")
-        .trim()
-
-private fun parseSecurityTips(arr: JSONArray?): List<LibraryItem> {
-    if (arr == null) return emptyList()
-    val seen = HashSet<String>()
-    val out  = mutableListOf<LibraryItem>()
-    for (i in 0 until arr.length()) {
-        val obj  = arr.getJSONObject(i)
-        val body = cleanTip(obj.optString("tip_ar", obj.optString("tip_en", "")))
-        if (body.isBlank()) continue
-        // De-duplicate identical tips (after boilerplate stripping)
-        val key = body.take(80)
-        if (!seen.add(key)) continue
-        out += LibraryItem(
-            id = i,
-            title = body.take(60).let { if (body.length > 60) "$it…" else it },
-            subtitle = obj.optString("category_ar", obj.optString("category_en", "")),
-            body = body,
-            tag = obj.optString("category_en", "Security")
-        )
-    }
-    return out
+    }.distinctBy { listOf(it.body, it.title, it.subtitle, it.tag) }
 }

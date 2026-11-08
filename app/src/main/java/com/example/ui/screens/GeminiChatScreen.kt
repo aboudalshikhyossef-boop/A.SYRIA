@@ -45,7 +45,7 @@ import com.example.ui.theme.DeepNavy
 import com.example.ui.theme.SurfaceCard
 import com.example.ui.theme.SurfaceDark
 import com.example.ui.theme.TextMuted
-import com.example.ui.viewmodel.GroqChatViewModel
+import com.example.ui.viewmodel.GeminiChatViewModel
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -58,8 +58,8 @@ private fun formatTime(ts: Long): String =
     SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(ts))
 
 @Composable
-fun GroqChatScreen(
-    viewModel: GroqChatViewModel,
+fun GeminiChatScreen(
+    viewModel: GeminiChatViewModel,
     uiConfig: UIConfig,
     isArabic: Boolean
 ) {
@@ -168,7 +168,7 @@ private fun ChatTopBar(onClear: () -> Unit, borderColor: Color, glowAlpha: Float
         }
         Column(modifier = Modifier.align(Alignment.Center), horizontalAlignment = Alignment.CenterHorizontally) {
             Text("المساعد الذكي", color = borderColor, fontSize = 13.sp, fontWeight = FontWeight.Black, fontFamily = FontFamily.Monospace, letterSpacing = 2.5.sp)
-            Text("LLaMA 3.3 · Groq", color = borderColor.copy(alpha = 0.45f), fontSize = 10.sp, fontFamily = FontFamily.Monospace)
+            Text("Gemini 3.6 Flash", color = borderColor.copy(alpha = 0.45f), fontSize = 10.sp, fontFamily = FontFamily.Monospace)
         }
         Box(modifier = Modifier.align(Alignment.CenterEnd).size(34.dp).background(Color.White.copy(alpha = 0.04f), CircleShape).border(1.dp, borderColor.copy(alpha = 0.2f), CircleShape), contentAlignment = Alignment.Center) {
             IconButton(onClick = onClear, modifier = Modifier.size(34.dp)) {

@@ -20,7 +20,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalLayoutDirection
-import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -46,10 +45,8 @@ fun SettingsScreen(
     val isAr by viewModel.isArabic.collectAsState()
     val isStealth by viewModel.isStealthMode.collectAsState()
     val apiKey by viewModel.customApiKey.collectAsState()
-    val groqApiKey by viewModel.groqApiKey.collectAsState()
     val operatorName by viewModel.operatorName.collectAsState()
     val neuralRole by viewModel.neuralRole.collectAsState()
-    val uriHandler = LocalUriHandler.current
     val layoutDirection = if (isAr) LayoutDirection.Rtl else LayoutDirection.Ltr
 
     BackHandler { onClose() }
@@ -57,9 +54,7 @@ fun SettingsScreen(
     var tempOperatorName by remember(operatorName) { mutableStateOf(operatorName) }
     var tempNeuralRole by remember(neuralRole) { mutableStateOf(neuralRole) }
     var tempApiKey by remember(apiKey) { mutableStateOf(apiKey) }
-    var tempGroqApiKey by remember(groqApiKey) { mutableStateOf(groqApiKey) }
     var showGeminiKey by remember { mutableStateOf(false) }
-    var showGroqKey by remember { mutableStateOf(false) }
 
     val infiniteTransition = rememberInfiniteTransition(label = "settings_glow")
     val borderGlow by infiniteTransition.animateFloat(initialValue = 0.3f, targetValue = 0.8f, animationSpec = infiniteRepeatable(tween(2500), RepeatMode.Reverse), label = "glow")
@@ -95,39 +90,32 @@ fun SettingsScreen(
                         SettingsToggleRow(label = if (isAr) "اللغة العربية" else "Arabic Language", checked = isAr, onCheckedChange = { viewModel.setArabic(it) }, icon = Icons.Default.Language, color = CyberCyan)
                     }
 
-                    // ── AI KEYS ───────────────────────────────────────────────────────
-                    SettingsCard(title = if (isAr) "مفاتيح الذكاء الاصطناعي" else "AI NEURAL KEYS", icon = Icons.Default.Key, color = AmberZen, glowAlpha = borderGlow) {
-                        // Groq key
-                        Row(modifier = Modifier.fillMaxWidth().background(Color(0xFFFFAA00).copy(alpha = 0.04f), RoundedCornerShape(10.dp)).border(1.dp, Color(0xFFFFAA00).copy(alpha = 0.2f), RoundedCornerShape(10.dp)).padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.FlashOn, null, tint = AmberZen, modifier = Modifier.size(16.dp))
-                            Spacer(Modifier.width(8.dp))
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(if (isAr) "🔥 Groq — سريع ومجاني" else "🔥 Groq — Fast & Free", color = AmberZen, fontSize = 11.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
-                                Text(if (isAr) "المفتاح الأساسي للدردشة والتحليل" else "Primary key for chat & analysis", color = Color.White.copy(alpha = 0.5f), fontSize = 9.sp)
-                            }
-                            TextButton(onClick = { uriHandler.openUri("https://console.groq.com/keys") }) {
-                                Text("احصل عليه", color = AmberZen, fontSize = 9.sp, fontFamily = FontFamily.Monospace)
-                            }
-                        }
-                        Spacer(Modifier.height(8.dp))
-                        PasswordField(label = if (isAr) "مفتاح Groq API" else "GROQ API KEY", value = tempGroqApiKey, onValueChange = { tempGroqApiKey = it; viewModel.updateGroqApiKey(it) }, show = showGroqKey, onToggleShow = { showGroqKey = !showGroqKey }, color = AmberZen, isAr = isAr)
-                        Spacer(Modifier.height(12.dp))
-                        HorizontalDivider(color = Color.White.copy(alpha = 0.07f))
-                        Spacer(Modifier.height(12.dp))
-                        // Gemini key
-                        Row(modifier = Modifier.fillMaxWidth().background(CyberCyan.copy(alpha = 0.04f), RoundedCornerShape(10.dp)).border(1.dp, CyberCyan.copy(alpha = 0.2f), RoundedCornerShape(10.dp)).padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.AutoAwesome, null, tint = CyberCyan, modifier = Modifier.size(16.dp))
-                            Spacer(Modifier.width(8.dp))
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(if (isAr) "✨ Gemini — تحليل الروابط" else "✨ Gemini — Link Analysis", color = CyberCyan, fontSize = 11.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
-                                Text(if (isAr) "مفتاح ثانوي لتحليل الروابط والتلميحات الأمنية" else "Secondary key for link analysis & security tips", color = Color.White.copy(alpha = 0.5f), fontSize = 9.sp)
-                            }
-                            TextButton(onClick = { uriHandler.openUri("https://aistudio.google.com/app/apikey") }) {
-                                Text(if (isAr) "احصل عليه" else "Get Key", color = CyberCyan, fontSize = 9.sp, fontFamily = FontFamily.Monospace)
-                            }
-                        }
-                        Spacer(Modifier.height(8.dp))
-                        PasswordField(label = if (isAr) "مفتاح Gemini API" else "GEMINI API KEY", value = tempApiKey, onValueChange = { tempApiKey = it; viewModel.updateCustomApiKey(it) }, show = showGeminiKey, onToggleShow = { showGeminiKey = !showGeminiKey }, color = CyberCyan, isAr = isAr)
+                    // ── GEMINI API ────────────────────────────────────────────────
+                    SettingsCard(
+                        title = if (isAr) "الذكاء الاصطناعي — Gemini" else "AI ENGINE — GEMINI",
+                        icon = Icons.Default.Key,
+                        color = CyberCyan,
+                        glowAlpha = borderGlow
+                    ) {
+                        Text(
+                            text = if (isAr)
+                                "يستخدم التطبيق Gemini 3.6 Flash للدردشة والتحليل وتوليد محتوى الأكاديمية."
+                            else
+                                "Gemini 3.6 Flash powers chat, analysis, and academy content generation.",
+                            color = Color.White.copy(alpha = 0.55f),
+                            fontSize = 10.sp,
+                            lineHeight = 15.sp
+                        )
+                        Spacer(Modifier.height(10.dp))
+                        PasswordField(
+                            label = if (isAr) "مفتاح Gemini API" else "GEMINI API KEY",
+                            value = tempApiKey,
+                            onValueChange = { tempApiKey = it; viewModel.updateCustomApiKey(it) },
+                            show = showGeminiKey,
+                            onToggleShow = { showGeminiKey = !showGeminiKey },
+                            color = CyberCyan,
+                            isAr = isAr
+                        )
                     }
 
                     // ── SECURITY ──────────────────────────────────────────────────────
@@ -167,15 +155,6 @@ fun SettingsScreen(
                                 Text(if (isAr) "شرح كامل لجميع ميزات وقدرات التطبيق" else "Complete guide to all app features & capabilities", color = Color.White.copy(alpha = 0.4f), fontSize = 10.sp)
                             }
                             Icon(Icons.Default.ChevronRight, null, tint = Color(0xFF00FF88).copy(alpha = 0.6f), modifier = Modifier.size(18.dp))
-                        }
-                    }
-
-                    // ── DATA MANAGEMENT ───────────────────────────────────────────────
-                    SettingsCard(title = if (isAr) "إدارة البيانات" else "DATA MANAGEMENT", icon = Icons.Default.Storage, color = Color(0xFFFF6B35), glowAlpha = borderGlow) {
-                        Text(if (isAr) "⚠️ يحذف جميع الأفكار المحفوظة نهائياً ولا يمكن التراجع عنه" else "⚠️ Permanently deletes all saved records. Cannot be undone.", color = Color(0xFFFF6B35).copy(alpha = 0.7f), fontSize = 10.sp, lineHeight = 15.sp, modifier = Modifier.padding(bottom = 10.dp))
-                        Row(modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(Color.Red.copy(alpha = 0.08f)).border(1.dp, Color.Red.copy(alpha = 0.3f), RoundedCornerShape(10.dp)).clickable { haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress); viewModel.wipeVault() }.padding(14.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                            Icon(Icons.Default.DeleteForever, null, tint = Color.Red, modifier = Modifier.size(20.dp))
-                            Text(if (isAr) "حذف جميع البيانات المحفوظة" else "DELETE ALL SAVED DATA", color = Color.Red, fontSize = 13.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
                         }
                     }
 
