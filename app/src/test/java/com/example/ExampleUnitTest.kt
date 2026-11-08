@@ -79,7 +79,7 @@ class ExampleUnitTest {
 
     @Test
     fun invalidPersistedUiConfigFallsBackToSafeValues() {
-        val context = RuntimeEnvironment.getApplication<Application>()
+        val context = RuntimeEnvironment.getApplication()
         val preferences = context.getSharedPreferences(
             "sovereign_adaptive_ui",
             Context.MODE_PRIVATE
