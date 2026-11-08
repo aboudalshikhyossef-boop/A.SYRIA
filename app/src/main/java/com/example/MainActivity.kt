@@ -4,6 +4,7 @@ import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
+import android.widget.Toast
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
@@ -57,11 +58,17 @@ import androidx.lifecycle.LifecycleEventObserver
 
 class MainActivity : FragmentActivity() {
 
-    private var isSessionAuthenticated = false
+    private var hasCompletedStartupGate = false
     private var isAuthInProgress       = false
     private var hasRequestedPermissions = false
 
     private val permissionLauncher = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { }
+
+    private fun requestEssentialPermissionsOnce() {
+        if (hasRequestedPermissions) return
+        hasRequestedPermissions = true
+        requestEssentialPermissions()
+    }
 
     private fun requestEssentialPermissions() {
         val needed = mutableListOf<String>()
@@ -100,23 +107,56 @@ class MainActivity : FragmentActivity() {
                     fun triggerBiometricAuth(title: String, subtitle: String, onSuccess: () -> Unit, closeOnCancel: Boolean = false) {
                         if (isAuthInProgress) return
                         val manager = BiometricManager.from(this@MainActivity)
-                        if (manager.canAuthenticate(BiometricManager.Authenticators.BIOMETRIC_STRONG or BiometricManager.Authenticators.DEVICE_CREDENTIAL) != BiometricManager.BIOMETRIC_SUCCESS) {
-                            isSessionAuthenticated = true; onSuccess(); return
+                        val authenticators =
+                            BiometricManager.Authenticators.BIOMETRIC_STRONG or
+                                BiometricManager.Authenticators.DEVICE_CREDENTIAL
+                        val availability = manager.canAuthenticate(authenticators)
+                        if (availability != BiometricManager.BIOMETRIC_SUCCESS) {
+                            // An unavailable authenticator must never be treated as a successful unlock.
+                            Toast.makeText(
+                                this@MainActivity,
+                                if (isAr) {
+                                    "للوصول إلى هذه المنطقة، فعّل قفل شاشة آمن (PIN أو نمط أو كلمة مرور) أو بصمة قوية."
+                                } else {
+                                    "Set up a secure screen lock (PIN, pattern, or password) or strong biometrics to unlock this area."
+                                },
+                                Toast.LENGTH_LONG
+                            ).show()
+                            if (closeOnCancel) {
+                                hasCompletedStartupGate = true
+                                requestEssentialPermissionsOnce()
+                            }
+                            return
                         }
                         isAuthInProgress = true
                         val executor = ContextCompat.getMainExecutor(this@MainActivity)
                         val prompt = BiometricPrompt(this@MainActivity, executor, object : BiometricPrompt.AuthenticationCallback() {
-                            override fun onAuthenticationError(code: Int, msg: CharSequence) { isAuthInProgress = false; if ((code == BiometricPrompt.ERROR_USER_CANCELED || code == BiometricPrompt.ERROR_NEGATIVE_BUTTON) && closeOnCancel) finish() }
-                            override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) { isAuthInProgress = false; isSessionAuthenticated = true; onSuccess() }
+                            override fun onAuthenticationError(code: Int, msg: CharSequence) {
+                                isAuthInProgress = false
+                                if ((code == BiometricPrompt.ERROR_USER_CANCELED || code == BiometricPrompt.ERROR_NEGATIVE_BUTTON) && closeOnCancel) finish()
+                            }
+
+                            override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
+                                isAuthInProgress = false
+                                hasCompletedStartupGate = true
+                                if (closeOnCancel) requestEssentialPermissionsOnce()
+                                onSuccess()
+                            }
                         })
-                        prompt.authenticate(BiometricPrompt.PromptInfo.Builder().setTitle(title).setSubtitle(subtitle).setAllowedAuthenticators(BiometricManager.Authenticators.BIOMETRIC_STRONG or BiometricManager.Authenticators.DEVICE_CREDENTIAL).build())
+                        prompt.authenticate(
+                            BiometricPrompt.PromptInfo.Builder()
+                                .setTitle(title)
+                                .setSubtitle(subtitle)
+                                .setAllowedAuthenticators(authenticators)
+                                .build()
+                        )
                     }
 
                     DisposableEffect(Unit) {
                         val observer = LifecycleEventObserver { _, event ->
                             when (event) {
-                                Lifecycle.Event.ON_START -> { if (!isSessionAuthenticated && !isAuthInProgress) triggerBiometricAuth(if (isAr) "تأكيد الهوية" else "Identity Verified", if (isAr) "مطلوب بصمة الدخول" else "Biometric uplink required", { }, true) }
-                                Lifecycle.Event.ON_RESUME -> { vm.startSensors(); if (isSessionAuthenticated) { if (!hasRequestedPermissions) { hasRequestedPermissions = true; requestEssentialPermissions() } } }
+                                Lifecycle.Event.ON_START -> { if (!hasCompletedStartupGate && !isAuthInProgress) triggerBiometricAuth(if (isAr) "تأكيد الهوية" else "Identity Verified", if (isAr) "مطلوب بصمة الدخول" else "Biometric uplink required", { }, true) }
+                                Lifecycle.Event.ON_RESUME -> vm.startSensors()
                                 Lifecycle.Event.ON_PAUSE  -> vm.stopSensors()
                                 else -> {}
                             }

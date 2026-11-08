@@ -463,7 +463,10 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
         if (!open) { clearForgeFields() }
     }
 
-    fun setVaultViewOpen(open: Boolean) { _isVaultViewOpen.value = open }
+    fun setVaultViewOpen(open: Boolean) {
+        _isVaultViewOpen.value = open
+        if (!open) _isVaultAuthenticated.value = false
+    }
 
     fun updateTerminalInput(input: String) { _terminalInput.value = input }
     fun updateForgeTitle(title: String) { _forgeTitle.value = title }
@@ -528,8 +531,8 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
                 repository.insertIdea(encryptedEntity)
                 _forgeBlueprint.value = generatedBlueprint
                 _isNeuralLinkOffline.value = false
-                _isForgePanelOpen.value = false
-                _isVaultViewOpen.value = true
+                // Keep the generated blueprint visible in the Forge panel.
+                // The vault itself must only open through its authentication gate.
             } catch (cancelled: kotlinx.coroutines.CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
