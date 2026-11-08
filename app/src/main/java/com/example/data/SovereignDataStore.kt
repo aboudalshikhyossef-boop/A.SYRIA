@@ -15,14 +15,12 @@ class SovereignDataStore(private val context: Context) {
         val OPERATOR_NAME       = stringPreferencesKey("operator_name")
         val NEURAL_ROLE         = stringPreferencesKey("neural_role")
         val GEMINI_API_KEY      = stringPreferencesKey("gemini_api_key")
-        val GROQ_API_KEY        = stringPreferencesKey("groq_api_key")
         val PROJECT_NAME        = stringPreferencesKey("project_name")
         val PROJECT_ID          = stringPreferencesKey("project_id")
         val PROJECT_NUMBER      = stringPreferencesKey("project_number")
         val IS_ARABIC           = booleanPreferencesKey("is_arabic")
         val STEALTH_MODE        = booleanPreferencesKey("stealth_mode")
         val CYBER_SCORE         = intPreferencesKey("cyber_score")
-        val NEURAL_PROXY        = booleanPreferencesKey("neural_proxy")
         val USER_LEVEL          = stringPreferencesKey("user_level")
         val USER_INTERESTS      = stringSetPreferencesKey("user_interests")
         val CALIBRATION_COMPLETED = booleanPreferencesKey("calibration_completed")
@@ -41,14 +39,12 @@ class SovereignDataStore(private val context: Context) {
     val operatorName: Flow<String>  = context.dataStore.data.map { it[OPERATOR_NAME]  ?: "Sovereign_Operator" }
     val neuralRole: Flow<String>    = context.dataStore.data.map { it[NEURAL_ROLE]    ?: "Sovereign Node v5" }
     val geminiApiKey: Flow<String>  = context.dataStore.data.map { it[GEMINI_API_KEY] ?: "" }
-    val groqApiKey: Flow<String>    = context.dataStore.data.map { it[GROQ_API_KEY]   ?: "" }
     val projectName: Flow<String>   = context.dataStore.data.map { it[PROJECT_NAME]   ?: "" }
     val projectId: Flow<String>     = context.dataStore.data.map { it[PROJECT_ID]     ?: "" }
     val projectNumber: Flow<String> = context.dataStore.data.map { it[PROJECT_NUMBER] ?: "" }
     val isArabic: Flow<Boolean>     = context.dataStore.data.map { it[IS_ARABIC]      ?: true }
     val stealthMode: Flow<Boolean>  = context.dataStore.data.map { it[STEALTH_MODE]   ?: false }
     val cyberScore: Flow<Int>       = context.dataStore.data.map { it[CYBER_SCORE]    ?: 0 }
-    val neuralProxy: Flow<Boolean>  = context.dataStore.data.map { it[NEURAL_PROXY]   ?: false }
     val userLevel: Flow<String>     = context.dataStore.data.map { it[USER_LEVEL]     ?: "Beginner" }
     val userInterests: Flow<Set<String>> = context.dataStore.data.map { it[USER_INTERESTS] ?: emptySet() }
     val calibrationCompleted: Flow<Boolean> = context.dataStore.data.map { it[CALIBRATION_COMPLETED] ?: false }
@@ -63,17 +59,22 @@ class SovereignDataStore(private val context: Context) {
     val userProfileAnalysis: Flow<String> = context.dataStore.data.map { it[USER_PROFILE_ANALYSIS] ?: "" }
     val profileCompleted: Flow<Boolean>   = context.dataStore.data.map { it[PROFILE_COMPLETED] ?: false }
 
+    suspend fun clearLegacyAiSettings() {
+        context.dataStore.edit { preferences ->
+            preferences.remove(stringPreferencesKey("groq_api_key"))
+            preferences.remove(booleanPreferencesKey("neural_proxy"))
+        }
+    }
+
     suspend fun saveOperatorName(name: String) { context.dataStore.edit { it[OPERATOR_NAME] = name } }
     suspend fun saveNeuralRole(role: String)   { context.dataStore.edit { it[NEURAL_ROLE]   = role } }
     suspend fun saveGeminiApiKey(key: String)  { context.dataStore.edit { it[GEMINI_API_KEY] = key } }
-    suspend fun saveGroqApiKey(key: String)    { context.dataStore.edit { it[GROQ_API_KEY]   = key } }
     suspend fun saveProjectName(name: String)  { context.dataStore.edit { it[PROJECT_NAME]   = name } }
     suspend fun saveProjectId(id: String)      { context.dataStore.edit { it[PROJECT_ID]     = id } }
     suspend fun saveProjectNumber(n: String)   { context.dataStore.edit { it[PROJECT_NUMBER] = n } }
     suspend fun saveIsArabic(v: Boolean)       { context.dataStore.edit { it[IS_ARABIC]      = v } }
     suspend fun saveStealthMode(v: Boolean)    { context.dataStore.edit { it[STEALTH_MODE]   = v } }
     suspend fun saveCyberScore(score: Int)     { context.dataStore.edit { it[CYBER_SCORE]    = score } }
-    suspend fun saveNeuralProxy(v: Boolean)    { context.dataStore.edit { it[NEURAL_PROXY]   = v } }
     suspend fun saveUserLevel(level: String)   { context.dataStore.edit { it[USER_LEVEL]     = level } }
     suspend fun saveUserInterests(s: Set<String>) { context.dataStore.edit { it[USER_INTERESTS] = s } }
     suspend fun saveCalibrationCompleted(v: Boolean) { context.dataStore.edit { it[CALIBRATION_COMPLETED] = v } }

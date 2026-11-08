@@ -13,24 +13,24 @@ package com.example.adaptive
   }
 
   /**
-   * FeedbackService — Orchestrates UI-customisation requests through the Groq layer.
+   * FeedbackService — Orchestrates UI-customisation requests through the Gemini layer.
    *
    * This service is intentionally decoupled from Gemini / Google AI.
-   * All LLM calls go through [GroqRepository] using the user's dedicated Groq API key.
+   * All LLM calls go through [GeminiRepository] using the user's dedicated Gemini API key.
    * Gemini remains exclusively responsible for Quiz & Test generation (DashboardViewModel).
    */
   class FeedbackService(private val context: Context) {
 
-      private val groqRepository = GroqRepository()
+      private val geminiRepository = GeminiRepository()
 
       /**
        * Submit a UI-customisation request.
        *
        * @param feedbackText  Raw user input (e.g. "make it green", "bigger text").
-       * @param groqApiKey    The user's Groq API key loaded from DataStore.
+       * @param geminiApiKey    The user's Gemini API key loaded from DataStore.
        * @return [FeedbackResult.Success], [RateLimited], [Empty], or [Error].
        */
-      suspend fun submitFeedback(feedbackText: String, groqApiKey: String): FeedbackResult =
+      suspend fun submitFeedback(feedbackText: String, geminiApiKey: String): FeedbackResult =
           withContext(Dispatchers.IO) {
 
               // Rate-limit guard
@@ -41,13 +41,13 @@ package com.example.adaptive
                   )
               }
 
-              // Groq key validation
-              if (groqApiKey.isBlank()) {
+              // Gemini key validation
+              if (geminiApiKey.isBlank()) {
                   return@withContext FeedbackResult.Error(
                       if (context.resources.configuration.locales[0].language == "ar")
-                          "مفتاح Groq API غير متوفر. أضفه في الإعدادات أولاً."
+                          "مفتاح Gemini API غير متوفر. أضفه في الإعدادات أولاً."
                       else
-                          "Groq API key not configured. Add your key in Settings first."
+                          "Gemini API key not configured. Add your key in Settings first."
                   )
               }
 
@@ -62,10 +62,10 @@ package com.example.adaptive
               }
 
               try {
-                  val aiText = groqRepository.complete(
-                      systemPrompt = buildSystemPrompt(),
-                      userContent  = sanitized,
-                      groqApiKey   = groqApiKey
+                  val aiText = geminiRepository.generateText(
+                      systemInstruction = buildSystemPrompt(),
+                      input = sanitized,
+                      apiKey = geminiApiKey
                   )
 
                   val changes = parseAndValidateChanges(aiText)

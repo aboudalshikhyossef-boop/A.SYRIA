@@ -1,49 +1,29 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://ai.google.dev/static/site-assets/images/share-ais-513315318.png" />
-</div>
-
-# A.SYRIA SOVEREIGN OS v4.0.0
-
-A cybersecurity-focused Android app with Gemini AI integration, prayer times, biometric authentication, and an encrypted vault.
-
-## Quick Setup
-
-### 1. Clone the repo
-```bash
-git clone https://github.com/abdelkadersovereign-commits/V4-.git
-cd V4-
-```
-
-### 2. Run the setup script
-```bash
-bash setup.sh
-```
-This will:
-- Decode `debug.keystore.base64` → `debug.keystore` automatically
-- Create a `.env` file from the template
-
-### 3. Add your Gemini API key
-Open `.env` and replace `MY_GEMINI_API_KEY` with your real key:
-```
-GEMINI_API_KEY=your_actual_key_here
-```
-Get a free key from: https://aistudio.google.com/app/apikey
-
-### 4. Open in Android Studio
-- Select **Open** and choose this project directory
-- Allow Gradle to sync
-- Run on an emulator or physical device (Android 8.0+ required)
-
-## Features
-- 🔐 Biometric authentication on launch
-- 🕌 Real-time prayer times (GPS-based, Damascus fallback)
-- 🧠 Gemini AI cybersecurity academy
-- 🔒 Encrypted vault with AES-128
-- 📡 Sensor-powered parallax UI
-- 🌙 Full Arabic/English support
-
-## Fixes Applied (v4.0.1)
-- Fixed: Double sensor registration causing performance issues
-- Fixed: Location client now catches all exception types (not just SecurityException)
-- Fixed: Keystore setup automated via `setup.sh`
 # A.SYRIA
+
+A native Android application written in Kotlin with Jetpack Compose.
+
+## Technology
+
+- Kotlin and Android Gradle Plugin
+- Jetpack Compose and Material 3
+- Navigation Compose
+- Room and Preferences DataStore
+- Gemini API — pinned to `gemini-3.6-flash`
+- WorkManager for scheduled notifications
+- Adhan library for prayer-time calculations
+
+## Project setup
+
+Open the repository root in Android Studio and allow Gradle to synchronize.
+
+Add the Gemini API key in the app's Settings screen. The app uses this one key for chat, cybersecurity assistance, academy content generation, link analysis, notifications, and UI customization.
+
+Prayer-time coordinates are estimated through an HTTPS IP-based network lookup. The app does not request Android location permission and does not use GPS or fused-location services. If the lookup fails, calculations fall back to Damascus coordinates.
+
+## Verification
+
+Run the Gradle tasks `testDebugUnitTest` and `assembleDebug` from Android Studio's Gradle tool window or the Gradle integration in your development environment.
+
+## Security notes
+
+Do not commit API keys, signing keystores, or generated signing files. Release signing values must be supplied through protected environment variables or CI secrets. Removing a previously committed signing file does not remove it from Git history; rotate any release key that may have been exposed.

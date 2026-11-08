@@ -75,9 +75,9 @@ fun OnboardingScreen(onFinish: (UserProfileData?) -> Unit) {
                         accentColor = CyberCyan, glowAlpha = glowAlpha)
                     1 -> InfoPage(icon = Icons.Default.Lock, iconTint = CyberAmber,
                         title = "AI BRAIN REQUIRED", titleAr = "مفتاح الذكاء الاصطناعي",
-                        subtitleAr = "فعّل العقل الاصطناعي بمفتاح Groq مجاني. يتيح لك الدردشة والتحليل والتخصيص.",
-                        subtitle = "Get a free Groq API key from console.groq.com for unlimited AI chat and security analysis.",
-                        features = listOf("1. console.groq.com للحصول على المفتاح", "2. أنشئ مفتاحاً مجانياً", "⚡ سريع جداً — LLaMA 3.3 70B"),
+                        subtitleAr = "استخدم Gemini للدردشة والتحليل والتخصيص بعد إضافة مفتاح API من الإعدادات.",
+                        subtitle = "Add your Gemini API key in Settings to enable AI chat and security analysis.",
+                        features = listOf("1. أضف مفتاح Gemini من الإعدادات", "2. استخدم مفتاح API الخاص بك", "⚡ Gemini 3.6 Flash"),
                         accentColor = CyberAmber, glowAlpha = glowAlpha)
                     2 -> InfoPage(icon = Icons.Default.School, iconTint = CyberGreen,
                         title = "PERSONALIZED FOR YOU", titleAr = "مخصص لك تماماً",

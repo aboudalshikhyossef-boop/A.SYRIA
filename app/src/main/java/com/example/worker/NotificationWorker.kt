@@ -16,12 +16,14 @@ package com.example.worker
   import com.batoulapps.adhan.PrayerTimes
   import com.batoulapps.adhan.data.DateComponents
   import com.example.data.SovereignDataStore
-  import com.google.ai.client.generativeai.GenerativeModel
+  import com.example.data.remote.GeminiRepository
   import kotlinx.coroutines.flow.first
   import java.util.Calendar
   import java.util.Date
 
   class NotificationWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
+
+      private val geminiRepository = GeminiRepository()
 
       companion object {
           const val CHANNEL_PRAYER = "prayer_alerts"
@@ -67,9 +69,7 @@ package com.example.worker
       override suspend fun doWork(): Result {
           val dataStore = SovereignDataStore(applicationContext)
           val isAr = dataStore.isArabic.first()
-          val apiKey = dataStore.geminiApiKey.first().ifBlank {
-              com.asyria.v4.BuildConfig.GEMINI_API_KEY
-          }
+          val apiKey = dataStore.geminiApiKey.first()
           val throttlePrefs = applicationContext.getSharedPreferences(PREFS_THROTTLE, Context.MODE_PRIVATE)
           val nowMs = System.currentTimeMillis()
 
@@ -87,12 +87,15 @@ package com.example.worker
 
           // 3. Gemini Security Tip — throttled to once every 12 hours
           val lastGemini = throttlePrefs.getLong(KEY_LAST_GEMINI, 0L)
-          if (apiKey.isNotEmpty() && apiKey != "MY_GEMINI_API_KEY" && nowMs - lastGemini >= TWELVE_HOURS_MS) {
+          if (apiKey.isNotBlank() && nowMs - lastGemini >= TWELVE_HOURS_MS) {
               try {
-                  val model = GenerativeModel(modelName = "gemini-2.5-flash-lite", apiKey = apiKey)
                   val promptLocale = if (isAr) "Arabic" else "English"
                   val prompt = "Provide one very brief (12 words max) high-priority cybersecurity tip in $promptLocale. Be direct. No intro."
-                  val res = model.generateContent(prompt).text ?: ""
+                  val res = geminiRepository.generateText(
+                      systemInstruction = "You are a concise cybersecurity educator.",
+                      input = prompt,
+                      apiKey = apiKey
+                  )
                   if (res.isNotBlank()) {
                       showNotification(
                           title = if (isAr) "تنبيه أمني سيادي" else "Sovereign Intelligence Alert",
@@ -186,8 +189,8 @@ package com.example.worker
 
       private fun checkAndNotifyPrayerPrecise(isAr: Boolean) {
           val prefs = applicationContext.getSharedPreferences("prayer_prefs", Context.MODE_PRIVATE)
-          val lat = prefs.getFloat("last_lat", 33.5138f).toDouble()
-          val lon = prefs.getFloat("last_lon", 36.2765f).toDouble()
+          val lat = prefs.getFloat("network_lat", 33.5138f).toDouble()
+          val lon = prefs.getFloat("network_lon", 36.2765f).toDouble()
 
           val coords = Coordinates(lat, lon)
           val date = DateComponents.from(Date())

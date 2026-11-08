@@ -1,7 +1,6 @@
 package com.example.ui.viewmodel
 
 import android.app.Application
-import android.location.Location
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.batoulapps.adhan.CalculationMethod
@@ -10,22 +9,26 @@ import com.batoulapps.adhan.Madhab
 import com.batoulapps.adhan.Prayer
 import com.batoulapps.adhan.PrayerTimes
 import com.batoulapps.adhan.data.DateComponents
-import com.google.android.gms.location.FusedLocationProviderClient
-import com.google.android.gms.location.LocationServices
-import com.google.android.gms.location.Priority
+import com.example.data.location.NetworkLocationRepository
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
-import java.util.TimeZone
+import java.util.Locale
 
+/**
+ * Prayer calculations use approximate coordinates derived from the public IP
+ * address over HTTPS. No Android location provider or GPS permission is used.
+ * Damascus remains the deterministic fallback when network lookup is unavailable.
+ */
 class PrayerViewModel(application: Application) : AndroidViewModel(application) {
 
-    private val fusedLocationClient: FusedLocationProviderClient =
-        LocationServices.getFusedLocationProviderClient(application)
+    private val networkLocationRepository = NetworkLocationRepository()
+    private val preferences = application.getSharedPreferences("prayer_prefs", Application.MODE_PRIVATE)
 
     private val _nextPrayerName = MutableStateFlow("...")
     val nextPrayerName: StateFlow<String> = _nextPrayerName.asStateFlow()
@@ -42,83 +45,75 @@ class PrayerViewModel(application: Application) : AndroidViewModel(application) 
     private val _nextPrayerProgress = MutableStateFlow(0f)
     val nextPrayerProgress: StateFlow<Float> = _nextPrayerProgress.asStateFlow()
 
-    private val _currentLocation = MutableStateFlow<Coordinates?>(null)
-    val currentLocation: StateFlow<Coordinates?> = _currentLocation.asStateFlow()
+    private val _coordinates = MutableStateFlow(
+        run {
+            preferences.edit().remove("last_lat").remove("last_lon").apply()
+            readCachedCoordinates()
+        }
+    )
+    val coordinates: StateFlow<Coordinates?> = _coordinates.asStateFlow()
 
     private val _qiblaDirection = MutableStateFlow(0.0)
     val qiblaDirection: StateFlow<Double> = _qiblaDirection.asStateFlow()
 
     init {
-        updateLocation()
+        publishCoordinates(_coordinates.value ?: DAMASCUS)
+        refreshNetworkCoordinates()
         startTimer()
     }
 
-    fun updateLocation() {
-        try {
-            fusedLocationClient.getCurrentLocation(Priority.PRIORITY_BALANCED_POWER_ACCURACY, null)
-                .addOnSuccessListener { location: Location? ->
-                    val coords = if (location != null) {
-                        // Save location to SharedPreferences for NotificationWorker
-                        getApplication<android.app.Application>()
-                            .getSharedPreferences("prayer_prefs", android.content.Context.MODE_PRIVATE)
-                            .edit()
-                            .putFloat("last_lat", location.latitude.toFloat())
-                            .putFloat("last_lon", location.longitude.toFloat())
-                            .apply()
-                        Coordinates(location.latitude, location.longitude)
-                    } else {
-                        Coordinates(33.5138, 36.2765) // Damascus fallback
-                    }
-                    _currentLocation.value = coords
-                    _qiblaDirection.value = com.batoulapps.adhan.Qibla(coords).direction
-                }
-                .addOnFailureListener { e ->
-                    // Handle failure (e.g. Google Play Services unavailable)
-                    val fallback = Coordinates(33.5138, 36.2765)
-                    _currentLocation.value = fallback
-                    _qiblaDirection.value = com.batoulapps.adhan.Qibla(fallback).direction
-                }
-        } catch (e: Exception) {
-            // Catch SecurityException, IllegalStateException, or any Play Services error
-            val fallback = Coordinates(33.5138, 36.2765)
-            _currentLocation.value = fallback
-            _qiblaDirection.value = com.batoulapps.adhan.Qibla(fallback).direction
+    private fun refreshNetworkCoordinates() {
+        viewModelScope.launch {
+            val coordinates = runCatching { networkLocationRepository.getCoordinates() }
+                .getOrElse { _coordinates.value ?: DAMASCUS }
+            preferences.edit()
+                .putFloat("network_lat", coordinates.latitude.toFloat())
+                .putFloat("network_lon", coordinates.longitude.toFloat())
+                .apply()
+            publishCoordinates(coordinates)
         }
+    }
+
+    private fun publishCoordinates(coordinates: Coordinates) {
+        _coordinates.value = coordinates
+        _qiblaDirection.value = com.batoulapps.adhan.Qibla(coordinates).direction
+    }
+
+    private fun readCachedCoordinates(): Coordinates? {
+        val latitude = preferences.getFloat("network_lat", Float.NaN).toDouble()
+        val longitude = preferences.getFloat("network_lon", Float.NaN).toDouble()
+        return if (latitude.isFinite() && longitude.isFinite() &&
+            latitude in -90.0..90.0 && longitude in -180.0..180.0
+        ) Coordinates(latitude, longitude) else null
     }
 
     private fun startTimer() {
         viewModelScope.launch {
             while (true) {
                 calculatePrayerTimes()
-                delay(1000)
+                delay(1_000)
             }
         }
     }
 
     private fun calculatePrayerTimes() {
-        val coords = _currentLocation.value ?: Coordinates(33.5138, 36.2765)
-        val date = DateComponents.from(Date())
-        // Use Umm Al-Qura for better accuracy in many regions, or keep MWL but allow customization
-        // For now, let's ensure we use a robust method. 
-        val params = CalculationMethod.UMM_AL_QURA.parameters
-        params.madhab = Madhab.SHAFI
-
-        val prayerTimes = PrayerTimes(coords, date, params)
-        
+        val coordinates = _coordinates.value ?: DAMASCUS
+        val today = DateComponents.from(Date())
+        val parameters = CalculationMethod.UMM_AL_QURA.parameters.also {
+            it.madhab = Madhab.SHAFI
+        }
+        val prayerTimes = PrayerTimes(coordinates, today, parameters)
         val now = Date()
         val nextPrayer = prayerTimes.nextPrayer()
-        
-        // Handle case where next prayer is Fajr tomorrow
         val effectiveNextPrayer = if (nextPrayer == Prayer.NONE) Prayer.FAJR else nextPrayer
-        val finalNextPrayerTime = if (nextPrayer == Prayer.NONE) {
-             val tomorrow = Calendar.getInstance()
-             tomorrow.add(Calendar.DAY_OF_YEAR, 1)
-             PrayerTimes(coords, DateComponents.from(tomorrow.time), params).fajr
+        val nextPrayerDate = if (nextPrayer == Prayer.NONE) {
+            val tomorrow = Calendar.getInstance().apply { add(Calendar.DAY_OF_YEAR, 1) }
+            PrayerTimes(coordinates, DateComponents.from(tomorrow.time), parameters).fajr
         } else {
             prayerTimes.timeForPrayer(effectiveNextPrayer)
         }
 
-        val prayerNameAr = when(effectiveNextPrayer) {
+        val arabicName = when (effectiveNextPrayer) {
             Prayer.FAJR -> "الفجر"
             Prayer.SUNRISE -> "الشروق"
             Prayer.DHUHR -> "الظهر"
@@ -127,42 +122,38 @@ class PrayerViewModel(application: Application) : AndroidViewModel(application) 
             Prayer.ISHA -> "العشاء"
             else -> effectiveNextPrayer.name
         }
-        _nextPrayerName.value = prayerNameAr
-        
-        val timeFormat = java.text.SimpleDateFormat("hh:mm a", java.util.Locale.getDefault())
-        _nextPrayerTime.value = timeFormat.format(finalNextPrayerTime)
+        _nextPrayerName.value = arabicName
 
-        // Calculate all prayer times for display
-        val allTimes = mutableMapOf<String, String>()
-        allTimes["الفجر"] = timeFormat.format(prayerTimes.fajr)
-        allTimes["الشروق"] = timeFormat.format(prayerTimes.sunrise)
-        allTimes["الظهر"] = timeFormat.format(prayerTimes.dhuhr)
-        allTimes["العصر"] = timeFormat.format(prayerTimes.asr)
-        allTimes["المغرب"] = timeFormat.format(prayerTimes.maghrib)
-        allTimes["العشاء"] = timeFormat.format(prayerTimes.isha)
-        _allPrayerTimes.value = allTimes
+        val formatter = SimpleDateFormat("hh:mm a", Locale.getDefault())
+        _nextPrayerTime.value = formatter.format(nextPrayerDate)
 
-        val diffMillis = finalNextPrayerTime.time - now.time
-        if (diffMillis > 0) {
-            val h = (diffMillis / 3600000).toInt()
-            val m = ((diffMillis % 3600000) / 60000).toInt()
-            val s = ((diffMillis % 60000) / 1000).toInt()
-            _nextPrayerCountdown.value = String.format("%02d:%02d:%02d", h, m, s)
-        } else {
-            _nextPrayerCountdown.value = "00:00:00"
-        }
+        _allPrayerTimes.value = mapOf(
+            "الفجر" to formatter.format(prayerTimes.fajr),
+            "الشروق" to formatter.format(prayerTimes.sunrise),
+            "الظهر" to formatter.format(prayerTimes.dhuhr),
+            "العصر" to formatter.format(prayerTimes.asr),
+            "المغرب" to formatter.format(prayerTimes.maghrib),
+            "العشاء" to formatter.format(prayerTimes.isha)
+        )
 
-        // Calculate progress based on prayer intervals
+        val remainingMillis = (nextPrayerDate.time - now.time).coerceAtLeast(0L)
+        val hours = remainingMillis / 3_600_000
+        val minutes = (remainingMillis % 3_600_000) / 60_000
+        val seconds = (remainingMillis % 60_000) / 1_000
+        _nextPrayerCountdown.value = String.format(
+            Locale.getDefault(), "%02d:%02d:%02d", hours, minutes, seconds
+        )
+
         val currentPrayer = prayerTimes.currentPrayer()
-        val currentPrayerTime = prayerTimes.timeForPrayer(currentPrayer) ?: Date()
-        
-        val totalInterval = finalNextPrayerTime.time - currentPrayerTime.time
-        val elapsed = now.time - currentPrayerTime.time
-        
-        if (totalInterval > 0) {
-            _nextPrayerProgress.value = (elapsed.toFloat() / totalInterval.toFloat()).coerceIn(0f, 1f)
-        } else {
-            _nextPrayerProgress.value = 1f
-        }
+        val currentPrayerDate = prayerTimes.timeForPrayer(currentPrayer) ?: now
+        val interval = nextPrayerDate.time - currentPrayerDate.time
+        val elapsed = now.time - currentPrayerDate.time
+        _nextPrayerProgress.value = if (interval > 0L) {
+            (elapsed.toFloat() / interval.toFloat()).coerceIn(0f, 1f)
+        } else 1f
+    }
+
+    private companion object {
+        val DAMASCUS = Coordinates(33.5138, 36.2765)
     }
 }

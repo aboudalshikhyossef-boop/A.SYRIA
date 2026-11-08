@@ -51,7 +51,7 @@ import com.example.ui.theme.CyberCyan
 import com.example.ui.theme.AmberZen
 import com.example.ui.theme.VoidBlack
 import com.example.ui.viewmodel.DashboardViewModel
-import com.example.ui.viewmodel.GroqChatViewModel
+import com.example.ui.viewmodel.GeminiChatViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 
@@ -69,8 +69,6 @@ class MainActivity : FragmentActivity() {
             if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED)
                 needed.add(Manifest.permission.POST_NOTIFICATIONS)
         }
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED)
-            needed.add(Manifest.permission.ACCESS_FINE_LOCATION)
         if (needed.isNotEmpty()) permissionLauncher.launch(needed.toTypedArray())
     }
 
@@ -85,7 +83,7 @@ class MainActivity : FragmentActivity() {
 
         setContent {
             val vm: DashboardViewModel    = viewModel()
-            val chatVm: GroqChatViewModel = viewModel()
+            val chatVm: GeminiChatViewModel = viewModel()
             val prayerVm: com.example.ui.viewmodel.PrayerViewModel = viewModel()
 
             val uiConfig             by vm.uiConfig.collectAsState()
@@ -118,7 +116,7 @@ class MainActivity : FragmentActivity() {
                         val observer = LifecycleEventObserver { _, event ->
                             when (event) {
                                 Lifecycle.Event.ON_START -> { if (!isSessionAuthenticated && !isAuthInProgress) triggerBiometricAuth(if (isAr) "تأكيد الهوية" else "Identity Verified", if (isAr) "مطلوب بصمة الدخول" else "Biometric uplink required", { }, true) }
-                                Lifecycle.Event.ON_RESUME -> { vm.startSensors(); if (isSessionAuthenticated) { prayerVm.updateLocation(); if (!hasRequestedPermissions) { hasRequestedPermissions = true; requestEssentialPermissions() } } }
+                                Lifecycle.Event.ON_RESUME -> { vm.startSensors(); if (isSessionAuthenticated) { if (!hasRequestedPermissions) { hasRequestedPermissions = true; requestEssentialPermissions() } } }
                                 Lifecycle.Event.ON_PAUSE  -> vm.stopSensors()
                                 else -> {}
                             }
@@ -172,7 +170,7 @@ class MainActivity : FragmentActivity() {
 
                                 // Only redirect to settings if API key is KNOWN to be blank (after data loaded)
                                 LaunchedEffect(isDataLoaded, customApiKey) {
-                                    if (isDataLoaded && customApiKey.isBlank() && vm.groqApiKey.value.isBlank()) {
+                                    if (isDataLoaded && customApiKey.isBlank()) {
                                         activeTab = "settings"; vm.setSettingsOpen(true)
                                     }
                                 }
@@ -212,7 +210,7 @@ class MainActivity : FragmentActivity() {
                                                 "academy"   -> AcademyScreen(vm, onNavigateToGlossary = { navController.navigate("glossary") }, onNavigateToChecklist = { navController.navigate("checklist") })
                                                 "resources" -> ResourcesScreen(vm) { activeTab = "home" }
                                                 "library"   -> LibraryScreen(vm) { activeTab = "home" }
-                                                "chat"      -> GroqChatScreen(chatVm, uiConfig, isArLocal)
+                                                "chat"      -> GeminiChatScreen(chatVm, uiConfig, isArLocal)
                                                 "settings"  -> SettingsScreen(vm, { activeTab = "home" }, { navController.navigate("about") }, { navController.navigate("adaptive_feedback") }) { t, s, ok -> triggerBiometricAuth(t, s, ok) }
                                             }
                                         }

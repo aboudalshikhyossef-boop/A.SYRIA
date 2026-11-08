@@ -16,3 +16,12 @@
 local.properties
 .env
 debug.keystore
+
+# Signing material
+*.jks
+*.keystore
+my-upload-key.jks
+
+# Encoded signing keys
+*-keystore.base64
+*.keystore.base64

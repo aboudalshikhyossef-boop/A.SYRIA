@@ -30,19 +30,16 @@ import com.example.adaptive.AdaptiveEngine
   import com.example.adaptive.FeedbackService
   import com.example.adaptive.UIChange
   import com.example.data.SovereignDataStore
+import com.example.data.remote.GeminiRepository
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
-import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
-import okhttp3.RequestBody.Companion.toRequestBody
-import org.json.JSONObject
 import java.net.Inet4Address
 import java.net.NetworkInterface
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 import kotlin.random.Random
 
 class DashboardViewModel(application: Application) : AndroidViewModel(application), SensorEventListener {
@@ -152,6 +149,7 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
       val adaptiveEngine   = AdaptiveEngine(application)
       val uiConfig         = adaptiveEngine.uiConfig
       private val feedbackService = FeedbackService(application)
+      private val geminiRepository = GeminiRepository()
 
     private val _isArabic = MutableStateFlow(true)
     val isArabic: StateFlow<Boolean> = _isArabic.asStateFlow()
@@ -223,9 +221,9 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
           }
       }
 
-      /** Submit UI-customization feedback via Groq (Master Brain). Gemini key is NOT used here. */
+          /** Submit UI-customization feedback using the app's single Gemini API key. */
       suspend fun submitFeedback(text: String): FeedbackResult {
-          return feedbackService.submitFeedback(text, _groqApiKey.value)
+          return feedbackService.submitFeedback(text, _customApiKey.value)
       }
 
       /** Apply a confirmed list of UIChange items via AdaptiveEngine. */
@@ -262,14 +260,8 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
     private val _isStealthMode = MutableStateFlow(false)
     val isStealthMode: StateFlow<Boolean> = _isStealthMode.asStateFlow()
 
-    private val _isNeuralProxy = MutableStateFlow(false)
-    val isNeuralProxy: StateFlow<Boolean> = _isNeuralProxy.asStateFlow()
-
     private val _customApiKey = MutableStateFlow("")
     val customApiKey: StateFlow<String> = _customApiKey.asStateFlow()
-
-    private val _groqApiKey = MutableStateFlow("")
-    val groqApiKey: StateFlow<String> = _groqApiKey.asStateFlow()
 
     private val _projectName = MutableStateFlow("")
     val projectName: StateFlow<String> = _projectName.asStateFlow()
@@ -321,74 +313,24 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
         .connectTimeout(30, TimeUnit.SECONDS).readTimeout(45, TimeUnit.SECONDS)
         .writeTimeout(30, TimeUnit.SECONDS).retryOnConnectionFailure(true).build()
 
-    private suspend fun generateContentSafely(prompt: String): String {
-        return withContext(Dispatchers.IO) {
-            val apiKey = _customApiKey.value.ifBlank { com.asyria.v4.BuildConfig.GEMINI_API_KEY }
-            if (apiKey.isEmpty() || apiKey == "MY_GEMINI_API_KEY") throw Exception("Error 401: Invalid Key")
-            try {
-                executeNeuralProxyRequest(prompt, apiKey)
-            } catch (e: Exception) {
-                throw e
-            }
+    private suspend fun generateGeminiText(prompt: String): String {
+        val apiKey = _customApiKey.value
+        if (apiKey.isBlank()) {
+            throw IllegalStateException("Gemini API key is missing. Add it in Settings.")
         }
-    }
-
-    private fun executeNeuralProxyRequest(prompt: String, apiKey: String): String {
-        val json = JSONObject().apply {
-            put("contents", org.json.JSONArray().put(JSONObject().apply {
-                put("parts", org.json.JSONArray().put(JSONObject().put("text", prompt)))
-            }))
-        }
-        val body = json.toString().toRequestBody("application/json".toMediaType())
-        val proxyEnabled = _isNeuralProxy.value
-        val endpointUrls = listOf(
-            "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent",
-            "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent"
+        return geminiRepository.generateText(
+            systemInstruction = "You are the AI assistant inside A.SYRIA. Follow the task in the user input and respond in the requested language.",
+            input = prompt,
+            apiKey = apiKey
         )
-        val activeClient = if (proxyEnabled) {
-            OkHttpClient.Builder().connectTimeout(45, TimeUnit.SECONDS).readTimeout(60, TimeUnit.SECONDS).retryOnConnectionFailure(true).build()
-        } else {
-            okHttpClient
-        }
-        var lastException: Exception? = null
-        for (url in endpointUrls) {
-            try {
-                val requestBuilder = Request.Builder().url(url).post(body).header("x-goog-api-key", apiKey)
-                val request = requestBuilder.build()
-                val response = activeClient.newCall(request).execute()
-                if (!response.isSuccessful) {
-                    val code = response.code
-                    val errBody = response.body?.string() ?: ""
-                    if (code == 429) throw Exception("Neural Buffer Full (Error 429) - يتم الآن إعادة شحن الطاقة العصبية.. يرجى الانتظار دقيقة")
-                    if (code == 503) throw Exception("UPLINK BUSY - السيرفر مشغول حالياً، يرجى المحاولة بعد قليل")
-                    lastException = Exception(if (code == 403) "Regional Block - Enable Neural Proxy" else if (code == 401) "Invalid API Key or Project ID" else "Error $code: $errBody")
-                    continue
-                }
-                val resBody = response.body?.string() ?: ""
-                val jsonRes = JSONObject(resBody)
-                return jsonRes.getJSONArray("candidates").getJSONObject(0).getJSONObject("content").getJSONArray("parts").getJSONObject(0).getString("text")
-            } catch (e: Exception) {
-                if (e.message?.contains("429") == true || e.message?.contains("UPLINK BUSY") == true) throw e
-                lastException = e
-            }
-        }
-        throw lastException ?: Exception("Neural link failed")
     }
 
     fun setStealthMode(enabled: Boolean) {
         viewModelScope.launch { dataStore.saveStealthMode(enabled).also { _isStealthMode.value = enabled } }
     }
 
-    fun setNeuralProxy(enabled: Boolean) {
-        viewModelScope.launch { dataStore.saveNeuralProxy(enabled).also { _isNeuralProxy.value = enabled } }
-    }
-
     fun updateCustomApiKey(key: String) {
         viewModelScope.launch { dataStore.saveGeminiApiKey(key) }
-    }
-
-    fun updateGroqApiKey(key: String) {
-        viewModelScope.launch { dataStore.saveGroqApiKey(key) }
     }
 
     fun updateProjectName(name: String) {
@@ -447,16 +389,16 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
     fun testNeuralLink() {
         viewModelScope.launch {
             _isTestingKey.value = true
-            val apiKey = _customApiKey.value.ifBlank { com.asyria.v4.BuildConfig.GEMINI_API_KEY }
+            val apiKey = _customApiKey.value
             if (apiKey.isEmpty() || apiKey.contains("MY_GEMINI_API_KEY")) {
                 _isNeuralLinkOffline.value = true
-                _terminalResponse.value = "[ TERMINAL ALERT ] Gemini API Key is required. Get yours free at: aistudio.google.com/app/apikey"
+                _terminalResponse.value = "[ TERMINAL ALERT ] Gemini API Key is required. Add your Gemini API key in Settings."
                 _isTestingKey.value = false
                 return@launch
             }
             try {
                 kotlinx.coroutines.withTimeout(15000L) {
-                    generateContentSafely("ping")
+                    generateGeminiText("ping")
                 }
                 _isNeuralLinkOffline.value = false
                 _terminalResponse.value = "FULL NEURAL LINK ESTABLISHED ✅"
@@ -470,19 +412,18 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
     }
 
     init {
+        viewModelScope.launch { dataStore.clearLegacyAiSettings() }
         application.registerReceiver(batteryReceiver, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
         monitorConnectivity()
         viewModelScope.launch { dataStore.isArabic.collect { _isArabic.value = it } }
         viewModelScope.launch { dataStore.stealthMode.collect { _isStealthMode.value = it } }
         viewModelScope.launch { dataStore.cyberScore.collect { _cyberScore.value = it } }
         viewModelScope.launch { dataStore.geminiApiKey.collect { _customApiKey.value = it } }
-        viewModelScope.launch { dataStore.groqApiKey.collect { _groqApiKey.value = it } }
         viewModelScope.launch { dataStore.projectName.collect { _projectName.value = it } }
         viewModelScope.launch { dataStore.projectId.collect { _projectId.value = it } }
         viewModelScope.launch { dataStore.projectNumber.collect { _projectNumber.value = it } }
         viewModelScope.launch { dataStore.operatorName.collect { _operatorName.value = it } }
         viewModelScope.launch { dataStore.neuralRole.collect { _neuralRole.value = it } }
-        viewModelScope.launch { dataStore.neuralProxy.collect { _isNeuralProxy.value = it } }
         // Collect user profile data
         viewModelScope.launch { dataStore.userLevel.collect { _userLevel.value = it } }
         viewModelScope.launch { dataStore.userInterests.collect { _userInterests.value = it } }
@@ -616,7 +557,7 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
                     "أنت نظام ذكاء اصطناعي للأمن السيبراني باسم A.SYRIA SOVEREIGN OS v4. أجب بأسلوب تقني احترافي وموجز. الاستعلام: $query"
                 else
                     "You are A.SYRIA SOVEREIGN OS v4 cybersecurity AI assistant. Respond concisely in professional technical style. Query: $query"
-                val result = generateContentSafely(sysContext)
+                val result = generateGeminiText(sysContext)
                 _terminalResponse.value = result
                 _isNeuralLinkOffline.value = false
                 addCyberScore(5)
@@ -639,8 +580,8 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
     ) {
         viewModelScope.launch {
             _isAcademyGenerating.value = true
-            val apiKey = _customApiKey.value.ifBlank { com.asyria.v4.BuildConfig.GEMINI_API_KEY }
-            if (apiKey.isNotBlank() && apiKey != "MY_GEMINI_API_KEY") {
+            val apiKey = _customApiKey.value.ifBlank { _customApiKey.value }
+            if (apiKey.isNotBlank()) {
                 try {
                     val promptLocale = if (useArabic) "Arabic (العربية)" else "English"
                     val seed = System.currentTimeMillis()
@@ -705,7 +646,7 @@ Every scenario you produce MUST be on a COMPLETELY DIFFERENT situation, attack v
                         Output ONLY valid JSON. No markdown. No extra text outside JSON.
                     """.trimIndent()
                     
-                    val cleanRes = generateContentSafely(prompt).replace("```json", "").replace("```", "").trim()
+                    val cleanRes = generateGeminiText(prompt).replace("```json", "").replace("```", "").trim()
                     if (cleanRes.isNotBlank()) {
                         onSuccess(cleanRes)
                         _isAcademyGenerating.value = false
@@ -735,7 +676,7 @@ Every scenario you produce MUST be on a COMPLETELY DIFFERENT situation, attack v
                   } else {
                       """You are a cybersecurity expert. Scenario: "$scenario". User choice: "$choiceText". Provide a concise strategic debrief of this choice — whether it was correct, why, and how to improve."""
                   }
-                  val result = generateContentSafely(prompt)
+                  val result = generateGeminiText(prompt)
                   onResponse(result)
               } catch (e: Exception) {
                   onResponse("")
@@ -753,7 +694,7 @@ Every scenario you produce MUST be on a COMPLETELY DIFFERENT situation, attack v
                 } else {
                     """You are an expert cybersecurity analyst. Analyze this link: "$url". Provide: 1. Security Rating (SAFE/SUSPICIOUS/DANGEROUS). 2. Domain analysis. 3. Actionable user recommendation. Be concise."""
                 }
-                val result = generateContentSafely(prompt)
+                val result = generateGeminiText(prompt)
                 _linkAnalysisResult.value = result
                 addCyberScore(10)
             } catch (e: Exception) {
