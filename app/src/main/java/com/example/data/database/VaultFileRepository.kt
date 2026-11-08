@@ -50,8 +50,10 @@ class VaultFileRepository(
 
     suspend fun exportToUri(id: String, destination: Uri) = withContext(Dispatchers.IO) {
         val item = dao.getById(id) ?: throw IOException("The vault item no longer exists.")
-        val encryptedFile = File(vaultDirectory, item.storedFileName)
+        val encryptedFile = resolveVaultFile(item.storedFileName)
         if (!encryptedFile.isFile) throw IOException("The encrypted vault file is missing.")
+        // Verify the authentication tag before any plaintext is written to an export destination.
+        verifyEncryptedFile(encryptedFile)
         val output = resolver.openOutputStream(destination, "w")
             ?: throw IOException("The destination could not be opened.")
         output.use { decryptInto(encryptedFile, it) }
@@ -59,7 +61,7 @@ class VaultFileRepository(
 
     suspend fun delete(id: String) = withContext(Dispatchers.IO) {
         val item = dao.getById(id) ?: return@withContext
-        val file = File(vaultDirectory, item.storedFileName)
+        val file = resolveVaultFile(item.storedFileName)
         if (file.exists() && !file.delete()) {
             throw IOException("The encrypted file could not be removed.")
         }
@@ -69,12 +71,30 @@ class VaultFileRepository(
     suspend fun clearAll() = withContext(Dispatchers.IO) {
         val all = dao.getAll()
         all.forEach { item ->
-            val file = File(vaultDirectory, item.storedFileName)
+            val file = resolveVaultFile(item.storedFileName)
             if (file.exists() && !file.delete()) {
                 throw IOException("Could not securely remove " + item.getDisplayName() + ".")
             }
         }
         dao.deleteAll()
+    }
+
+    private fun resolveVaultFile(storedFileName: String): File {
+        require(storedFileName.matches(Regex("[0-9a-fA-F-]{36}\\.asv"))) {
+            "Invalid encrypted vault file reference."
+        }
+        return File(vaultDirectory, storedFileName)
+    }
+
+    /** Remove abandoned temporary files and encrypted files without a metadata row. */
+    suspend fun removeOrphanedFiles() = withContext(Dispatchers.IO) {
+        if (!vaultDirectory.isDirectory) return@withContext
+        val referenced = dao.getAll().map { it.storedFileName }.toSet()
+        vaultDirectory.listFiles()?.forEach { candidate ->
+            val isTemporary = candidate.name.endsWith(".tmp")
+            val isUnreferenced = candidate.name.endsWith(".asv") && candidate.name !in referenced
+            if ((isTemporary || isUnreferenced) && candidate.isFile) candidate.delete()
+        }
     }
 
     private suspend fun storeEncrypted(

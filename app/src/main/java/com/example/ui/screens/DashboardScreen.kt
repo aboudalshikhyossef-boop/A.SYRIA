@@ -223,7 +223,7 @@ fun DashboardScreen(
     val terminalResponse by viewModel.terminalResponse.collectAsState()
     val isTerminalExpanded by viewModel.isTerminalExpanded.collectAsState()
 
-    // Phase 5 Vault & Forge states
+    // Secure vault state
     val isVaultViewOpen by viewModel.isVaultViewOpen.collectAsState()
 
     // Phase 11 states
@@ -497,7 +497,7 @@ fun DashboardScreen(
                         )
                     }
 
-                    // Secondary controllers (Forge + Vault + Nodes)
+                    // Academy and resource controllers
                     item {
                         Row(
                             modifier = Modifier

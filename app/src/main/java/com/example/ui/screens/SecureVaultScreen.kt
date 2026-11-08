@@ -103,7 +103,7 @@ fun SecureVaultScreen(viewModel: DashboardViewModel, isArabic: Boolean, onClose:
                 if (uri.authority == "media") uri else runCatching { MediaStore.getMediaUri(context, uri) }.getOrNull()
             } else null
 
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && mediaUri?.authority == "media") {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && mediaUri != null && mediaUri.authority == "media") {
                 val request = MediaStore.createDeleteRequest(context.contentResolver, listOf(mediaUri))
                 message = if (isArabic) "بانتظار تأكيد Android لحذف الأصل..." else "Waiting for Android approval to delete the original..."
                 deleteRequestLauncher.launch(IntentSenderRequest.Builder(request.intentSender).build())
@@ -182,6 +182,14 @@ fun SecureVaultScreen(viewModel: DashboardViewModel, isArabic: Boolean, onClose:
             Spacer(Modifier.height(8.dp))
             Text(if (isArabic) "العناصر المشفّرة: ${vaultItems.size}" else "ENCRYPTED ITEMS: ${vaultItems.size}", color = CyberCyan, fontSize = 10.sp, fontWeight = FontWeight.Bold)
             HorizontalDivider(color = CyberCyan.copy(alpha = 0.2f), modifier = Modifier.padding(vertical = 7.dp))
+            Text(
+                if (isArabic) "تُخزّن البيانات على هذا الجهاز فقط. حذف التطبيق أو مسح بياناته يزيل الخزينة؛ صدّر نسخة خارجية عند الحاجة."
+                else "Vault data stays on this device. Uninstalling the app or clearing its data removes it; export a copy when needed.",
+                color = Color.White.copy(alpha = 0.42f),
+                fontSize = 9.sp,
+                lineHeight = 13.sp,
+                modifier = Modifier.padding(bottom = 6.dp)
+            )
             LazyColumn(Modifier.weight(1f).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 if (vaultItems.isEmpty() && legacyIdeas.isEmpty()) {
                     item {

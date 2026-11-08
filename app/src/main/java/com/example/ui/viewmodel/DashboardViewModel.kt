@@ -132,13 +132,20 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
     val vaultItems: StateFlow<List<VaultItem>> = vaultFileRepository.items
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
-    suspend fun importVaultFile(uri: Uri): VaultItem = vaultFileRepository.importFromUri(uri)
+    suspend fun importVaultFile(uri: Uri): VaultItem {
+        check(_isVaultAuthenticated.value) { "Vault authentication is required." }
+        return vaultFileRepository.importFromUri(uri)
+    }
 
-    suspend fun saveVaultText(title: String, text: String): VaultItem =
-        vaultFileRepository.saveText(title, text)
+    suspend fun saveVaultText(title: String, text: String): VaultItem {
+        check(_isVaultAuthenticated.value) { "Vault authentication is required." }
+        return vaultFileRepository.saveText(title, text)
+    }
 
-    suspend fun exportVaultFile(id: String, destination: Uri) =
+    suspend fun exportVaultFile(id: String, destination: Uri) {
+        check(_isVaultAuthenticated.value) { "Vault authentication is required." }
         vaultFileRepository.exportToUri(id, destination)
+    }
 
     suspend fun deleteVaultItem(id: String) {
         check(_isVaultAuthenticated.value) { "Vault authentication is required." }
@@ -164,6 +171,12 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
     val isSettingsAuthenticated: StateFlow<Boolean> = _isSettingsAuthenticated.asStateFlow()
 
     fun setVaultAuthenticated(auth: Boolean) { _isVaultAuthenticated.value = auth }
+
+    fun setVaultViewOpen(open: Boolean) {
+        if (open && !_isVaultAuthenticated.value) return
+        _isVaultViewOpen.value = open
+        if (!open) _isVaultAuthenticated.value = false
+    }
     fun setSettingsAuthenticated(auth: Boolean) { _isSettingsAuthenticated.value = auth }
 
     private val dataStore = SovereignDataStore(application)
