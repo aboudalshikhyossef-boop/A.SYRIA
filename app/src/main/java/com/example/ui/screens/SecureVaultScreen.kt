@@ -39,6 +39,17 @@ import java.util.Locale
 @Composable
 fun SecureVaultScreen(viewModel: DashboardViewModel, isArabic: Boolean, onClose: () -> Unit) {
     val context = LocalContext.current
+    val activity = context as? Activity
+    DisposableEffect(activity) {
+        val window = activity?.window
+        val wasSecure = window?.attributes?.flags?.and(android.view.WindowManager.LayoutParams.FLAG_SECURE) != 0
+        window?.addFlags(android.view.WindowManager.LayoutParams.FLAG_SECURE)
+        onDispose {
+            if (window != null && wasSecure != true) {
+                window.clearFlags(android.view.WindowManager.LayoutParams.FLAG_SECURE)
+            }
+        }
+    }
     val scope = rememberCoroutineScope()
     val vaultItems by viewModel.vaultItems.collectAsState()
     val legacyIdeas by viewModel.savedIdeas.collectAsState()

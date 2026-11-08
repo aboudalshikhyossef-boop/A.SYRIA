@@ -439,6 +439,15 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
     }
 
     init {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                vaultFileRepository.removeOrphanedFiles()
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                // Keep the app usable when storage cleanup is temporarily unavailable.
+            }
+        }
         viewModelScope.launch { dataStore.clearLegacyAiSettings() }
         viewModelScope.launch(Dispatchers.IO) { dataStore.migrateLegacyGeminiApiKey() }
         application.registerReceiver(batteryReceiver, IntentFilter(Intent.ACTION_BATTERY_CHANGED))

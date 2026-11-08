@@ -4,7 +4,11 @@ import android.util.Base64
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.example.data.database.SovereigntyCipher
+import java.io.ByteArrayInputStream
+import java.io.ByteArrayOutputStream
 import javax.crypto.Cipher
+import javax.crypto.CipherInputStream
+import javax.crypto.CipherOutputStream
 import javax.crypto.spec.SecretKeySpec
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
@@ -31,6 +35,50 @@ class ExampleInstrumentedTest {
         assertNotEquals(first, second)
         assertEquals(plainText, SovereigntyCipher.decrypt(first))
         assertEquals(plainText, SovereigntyCipher.decrypt(second))
+    }
+
+    @Test
+    fun vaultFileStreamUsesAuthenticatedEncryption() {
+        val original = ByteArray(256 * 1024) { index -> (index % 251).toByte() }
+        val encryptor = SovereigntyCipher.newVaultFileEncryptCipher()
+        val encryptedOutput = ByteArrayOutputStream()
+        encryptedOutput.write(encryptor.iv)
+        CipherOutputStream(encryptedOutput, encryptor).use { it.write(original) }
+
+        val payload = encryptedOutput.toByteArray()
+        val iv = payload.copyOfRange(0, 12)
+        val ciphertext = payload.copyOfRange(12, payload.size)
+        val decryptedOutput = ByteArrayOutputStream()
+        CipherInputStream(
+            ByteArrayInputStream(ciphertext),
+            SovereigntyCipher.newVaultFileDecryptCipher(iv)
+        ).use { it.copyTo(decryptedOutput) }
+
+        assertTrue(original.contentEquals(decryptedOutput.toByteArray()))
+    }
+
+    @Test
+    fun vaultFileStreamRejectsTamperedCiphertext() {
+        val encryptor = SovereigntyCipher.newVaultFileEncryptCipher()
+        val encryptedOutput = ByteArrayOutputStream()
+        encryptedOutput.write(encryptor.iv)
+        CipherOutputStream(encryptedOutput, encryptor).use { it.write("private".toByteArray()) }
+
+        val payload = encryptedOutput.toByteArray()
+        val iv = payload.copyOfRange(0, 12)
+        val ciphertext = payload.copyOfRange(12, payload.size)
+        ciphertext[ciphertext.lastIndex] = (ciphertext.last().toInt() xor 0x01).toByte()
+
+        var rejected = false
+        try {
+            CipherInputStream(
+                ByteArrayInputStream(ciphertext),
+                SovereigntyCipher.newVaultFileDecryptCipher(iv)
+            ).use { it.copyTo(ByteArrayOutputStream()) }
+        } catch (_: Exception) {
+            rejected = true
+        }
+        assertTrue("Modified ciphertext must fail GCM authentication", rejected)
     }
 
     @Test

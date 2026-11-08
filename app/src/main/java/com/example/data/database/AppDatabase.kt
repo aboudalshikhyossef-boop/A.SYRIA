@@ -1,6 +1,7 @@
 package com.example.data.database
 
 import android.content.ContentValues
+import android.database.sqlite.SQLiteDatabase
 import android.content.Context
 import androidx.room.Database
 import androidx.room.Room
@@ -70,7 +71,7 @@ abstract class AppDatabase : RoomDatabase() {
                         put("encryptedGeminiBlueprint", SovereigntyCipher.reencryptLegacyVaultValue(row.blueprint))
                     }
                     check(
-                        database.update("inventor_ideas", values, "id = ?", arrayOf(row.id.toString())) == 1
+                        database.update("inventor_ideas", SQLiteDatabase.CONFLICT_ABORT, values, "id = ?", arrayOf(row.id.toString())) == 1
                     ) { "Failed to migrate encrypted vault record ${row.id}." }
                 }
             }
