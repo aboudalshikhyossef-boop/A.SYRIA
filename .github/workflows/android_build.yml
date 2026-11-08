@@ -17,18 +17,21 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Set up JDK 17
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           java-version: "17"
           distribution: temurin
 
-      - name: Set up Gradle
+      - name: Set up Gradle 8.7
         uses: gradle/actions/setup-gradle@v6
         with:
           gradle-version: "8.7"
+          validate-wrappers: false
 
+      # Run the installed Gradle distribution directly. This avoids executing
+      # the unverified wrapper JAR currently present in the repository.
       - name: Run unit tests and build debug APK
-        run: ./gradlew testDebugUnitTest assembleDebug --no-configuration-cache --stacktrace --build-cache
+        run: gradle testDebugUnitTest assembleDebug --no-configuration-cache --stacktrace --build-cache
 
       - name: Upload debug APK
         uses: actions/upload-artifact@v4
