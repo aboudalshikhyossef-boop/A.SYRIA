@@ -17,7 +17,6 @@ import java.io.InputStream
 import java.io.OutputStream
 import java.io.IOException
 import java.util.UUID
-import javax.crypto.CipherInputStream
 import javax.crypto.CipherOutputStream
 
 /**
@@ -187,13 +186,16 @@ class VaultFileRepository(
             if (!magic.contentEquals(FILE_MAGIC)) throw IOException("Unknown vault file format.")
             val iv = ByteArray(IV_LENGTH_BYTES)
             input.readFully(iv)
-            val decryptor = SovereigntyCipher.newVaultFileDecryptCipher(iv)
-            CipherInputStream(input, decryptor).use { decrypted ->
-                val buffer = ByteArray(COPY_BUFFER_SIZE)
-                while (decrypted.read(buffer) >= 0) {
-                    // Consume the full stream so the GCM authentication tag is checked.
-                }
+            val cipher = SovereigntyCipher.newVaultFileDecryptCipher(iv)
+            val buffer = ByteArray(COPY_BUFFER_SIZE)
+            while (true) {
+                val count = input.read(buffer)
+                if (count < 0) break
+                if (count == 0) continue
+                // GCM may emit plaintext here; discard it until doFinal authenticates the tag.
+                cipher.update(buffer, 0, count)
             }
+            cipher.doFinal() // Throws on a truncated or modified authentication tag.
         }
     }
 
@@ -205,10 +207,15 @@ class VaultFileRepository(
             if (!magic.contentEquals(FILE_MAGIC)) throw IOException("Unknown vault file format.")
             val iv = ByteArray(IV_LENGTH_BYTES)
             input.readFully(iv)
-            val decryptor = SovereigntyCipher.newVaultFileDecryptCipher(iv)
-            CipherInputStream(input, decryptor).use { decrypted ->
-                decrypted.copyTo(destination, COPY_BUFFER_SIZE)
+            val cipher = SovereigntyCipher.newVaultFileDecryptCipher(iv)
+            val buffer = ByteArray(COPY_BUFFER_SIZE)
+            while (true) {
+                val count = input.read(buffer)
+                if (count < 0) break
+                if (count == 0) continue
+                cipher.update(buffer, 0, count)?.let(destination::write)
             }
+            cipher.doFinal().let(destination::write)
         }
     }
 

@@ -4,10 +4,8 @@ import android.util.Base64
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.example.data.database.SovereigntyCipher
-import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import javax.crypto.Cipher
-import javax.crypto.CipherInputStream
 import javax.crypto.CipherOutputStream
 import javax.crypto.spec.SecretKeySpec
 import org.junit.Assert.assertEquals
@@ -48,11 +46,15 @@ class ExampleInstrumentedTest {
         val payload = encryptedOutput.toByteArray()
         val iv = payload.copyOfRange(0, 12)
         val ciphertext = payload.copyOfRange(12, payload.size)
+        val decryptor = SovereigntyCipher.newVaultFileDecryptCipher(iv)
         val decryptedOutput = ByteArrayOutputStream()
-        CipherInputStream(
-            ByteArrayInputStream(ciphertext),
-            SovereigntyCipher.newVaultFileDecryptCipher(iv)
-        ).use { it.copyTo(decryptedOutput) }
+        var offset = 0
+        while (offset < ciphertext.size) {
+            val count = minOf(4096, ciphertext.size - offset)
+            decryptor.update(ciphertext, offset, count)?.let(decryptedOutput::write)
+            offset += count
+        }
+        decryptor.doFinal().let(decryptedOutput::write)
 
         assertTrue(original.contentEquals(decryptedOutput.toByteArray()))
     }
@@ -71,10 +73,9 @@ class ExampleInstrumentedTest {
 
         var rejected = false
         try {
-            CipherInputStream(
-                ByteArrayInputStream(ciphertext),
-                SovereigntyCipher.newVaultFileDecryptCipher(iv)
-            ).use { it.copyTo(ByteArrayOutputStream()) }
+            val decryptor = SovereigntyCipher.newVaultFileDecryptCipher(iv)
+            decryptor.update(ciphertext)
+            decryptor.doFinal()
         } catch (_: Exception) {
             rejected = true
         }
