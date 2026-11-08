@@ -1,0 +1,135 @@
+{
+  "metadata": {
+    "version": "1.0",
+    "app": "A.SYRIA Islamic Library",
+    "total_duas": 8,
+    "total_hadiths": 8,
+    "language_support": [
+      "Arabic"
+    ]
+  },
+  "duas": [
+    {
+      "arabic": "اللّهمّ إنّي أسألك العافية في ديني ودنياي وأهلي ومالي",
+      "transliteration": "Allahumma inni asaluka al-afiyah fi dini wa dunyaya",
+      "occasion": "صباح ومساء",
+      "source": "أبو داود",
+      "id": 0,
+      "category": "صباح"
+    },
+    {
+      "arabic": "بسم الله توكّلت على الله ولا حول ولا قوّة إلّا بالله",
+      "transliteration": "Bismillah, tawakkaltu ala-Allah, wa la hawla wa la quwwata illa billah",
+      "occasion": "عند الخروج من المنزل",
+      "source": "أبو داود والترمذي",
+      "id": 1,
+      "category": "مساء"
+    },
+    {
+      "arabic": "أعوذ بكلمات الله التّامّات من شرّ ما خلق",
+      "transliteration": "Aoudhu bi kalimatillahi at-tammati min sharri ma khalaq",
+      "occasion": "عند الوصول إلى مكان جديد",
+      "source": "مسلم",
+      "id": 2,
+      "category": "صلاة"
+    },
+    {
+      "arabic": "اللّهمّ اكفني بحلالك عن حرامك وأغنني بفضلك عمّن سواك",
+      "transliteration": "Allahumma ikfini bi halalika an haramika",
+      "occasion": "دعاء قضاء الدين",
+      "source": "الترمذي",
+      "id": 3,
+      "category": "عام"
+    },
+    {
+      "arabic": "حسبي الله لا إله إلّا هو عليه توكّلت وهو ربّ العرش العظيم",
+      "transliteration": "Hasbiya Allah la ilaha illa huwa, alayhi tawakkaltu",
+      "occasion": "عند الضيق والهم",
+      "source": "أبو داود",
+      "id": 4,
+      "category": "ضيق"
+    },
+    {
+      "arabic": "ربّنا آتنا في الدنيا حسنة وفي الآخرة حسنة وقنا عذاب النّار",
+      "transliteration": "Rabbana atina fid-dunya hasanatan wa fil-akhirati hasanatan",
+      "occasion": "دعاء جامع",
+      "source": "البخاري ومسلم",
+      "id": 5,
+      "category": "صباح"
+    },
+    {
+      "arabic": "اللّهمّ إنّي أعوذ بك من الهمّ والحزن والعجز والكسل",
+      "transliteration": "Allahumma inni aoudhu bika minal-hammi wal-hazan",
+      "occasion": "دعاء دفع الهم والحزن",
+      "source": "البخاري",
+      "id": 6,
+      "category": "مساء"
+    },
+    {
+      "arabic": "سبحان الله وبحمده سبحان الله العظيم",
+      "transliteration": "Subhanallahi wa bihamdihi, subhanallahil-azim",
+      "occasion": "ذكر خفيف ثقيل في الميزان",
+      "source": "البخاري ومسلم",
+      "id": 7,
+      "category": "صلاة"
+    }
+  ],
+  "hadiths": [
+    {
+      "arabic": "طلب العلم فريضة على كل مسلم",
+      "narrator": "ابن ماجه",
+      "grade": "صحيح",
+      "topic": "العلم",
+      "id": 0
+    },
+    {
+      "arabic": "من سلك طريقاً يلتمس فيه علماً سهّل الله له به طريقاً إلى الجنة",
+      "narrator": "مسلم",
+      "grade": "صحيح",
+      "topic": "فضل العلم",
+      "id": 1
+    },
+    {
+      "arabic": "المؤمن القوي خير وأحب إلى الله من المؤمن الضعيف",
+      "narrator": "مسلم",
+      "grade": "صحيح",
+      "topic": "القوة والإيمان",
+      "id": 2
+    },
+    {
+      "arabic": "إن الله يحب أحدكم إذا عمل عملاً أن يُتقنه",
+      "narrator": "البيهقي",
+      "grade": "حسن",
+      "topic": "الإتقان",
+      "id": 3
+    },
+    {
+      "arabic": "خير الناس أنفعهم للناس",
+      "narrator": "الطبراني",
+      "grade": "حسن",
+      "topic": "الخير والنفع",
+      "id": 4
+    },
+    {
+      "arabic": "الدال على الخير كفاعله",
+      "narrator": "الترمذي",
+      "grade": "صحيح",
+      "topic": "الدلالة على الخير",
+      "id": 5
+    },
+    {
+      "arabic": "لا يؤمن أحدكم حتى يحب لأخيه ما يحب لنفسه",
+      "narrator": "البخاري ومسلم",
+      "grade": "متفق عليه",
+      "topic": "الأخوة",
+      "id": 6
+    },
+    {
+      "arabic": "كل ابن آدم خطاء وخير الخطائين التوابون",
+      "narrator": "الترمذي",
+      "grade": "حسن",
+      "topic": "التوبة",
+      "id": 7
+    }
+  ]
+}

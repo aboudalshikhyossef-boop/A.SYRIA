@@ -1,11 +1,16 @@
 package com.example
 
+import android.app.Application
+import android.content.Context
+import com.example.adaptive.AdaptiveEngine
 import com.example.data.remote.GeminiRepository
+import com.example.ui.screens.loadLibraryData
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 
 @RunWith(RobolectricTestRunner::class)
@@ -60,5 +65,54 @@ class ExampleUnitTest {
         """.trimIndent()
 
         assertEquals("Fallback text", GeminiRepository.extractOutputText(response))
+    }
+
+    @Test
+    fun libraryLoadsOnlyUniqueDuasAndHadiths() {
+        val context = RuntimeEnvironment.getApplication<Application>()
+        val data = loadLibraryData(context)
+
+        assertEquals(setOf("duas", "hadiths"), data.keys)
+        assertEquals(8, data["duas"]?.size)
+        assertEquals(8, data["hadiths"]?.size)
+        assertTrue(data.values.flatten().all { it.body.isNotBlank() })
+    }
+
+    @Test
+    fun invalidPersistedUiConfigFallsBackToSafeValues() {
+        val context = RuntimeEnvironment.getApplication<Application>()
+        val preferences = context.getSharedPreferences(
+            "sovereign_adaptive_ui",
+            Context.MODE_PRIVATE
+        )
+        preferences.edit().putString(
+            "ui_config_json_v3",
+            """{
+                "accentColor":"not-a-color",
+                "primaryHex":"javascript:alert(1)",
+                "backgroundHex":"#0D1117",
+                "fontSize":999,
+                "fontWeight":"ultra",
+                "cornerRadius":99,
+                "cardStyle":"injected",
+                "tabStyle":"unknown",
+                "notificationLevel":"LOUD"
+            }"""
+        ).commit()
+
+        try {
+            val config = AdaptiveEngine(context).uiConfig.value
+            assertEquals("cyan", config.accentColor)
+            assertEquals("", config.primaryHex)
+            assertEquals("#0D1117", config.backgroundHex)
+            assertEquals(14f, config.fontSize, 0f)
+            assertEquals("normal", config.fontWeight)
+            assertEquals(32, config.cornerRadius)
+            assertEquals("glass", config.cardStyle)
+            assertEquals("normal", config.tabStyle)
+            assertEquals("normal", config.notificationLevel)
+        } finally {
+            preferences.edit().clear().commit()
+        }
     }
 }
