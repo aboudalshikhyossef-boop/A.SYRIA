@@ -1,6 +1,7 @@
 package com.example.adaptive
 
   import android.content.Context
+  import com.example.data.remote.GeminiRepository
   import kotlinx.coroutines.Dispatchers
   import kotlinx.coroutines.withContext
   import org.json.JSONArray

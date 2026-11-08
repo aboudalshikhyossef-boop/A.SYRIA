@@ -3,7 +3,7 @@ package com.example.ui.viewmodel
   import android.app.Application
   import androidx.lifecycle.AndroidViewModel
   import androidx.lifecycle.viewModelScope
-  import com.example.adaptive.GeminiRepository
+  import com.example.data.remote.GeminiRepository
   import com.example.adaptive.UIConfig
   import com.example.data.SovereignDataStore
   import com.example.data.chat.ChatMessage
