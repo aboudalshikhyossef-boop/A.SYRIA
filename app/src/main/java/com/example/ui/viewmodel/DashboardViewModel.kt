@@ -15,7 +15,9 @@ import android.os.BatteryManager
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.data.database.AppDatabase
-import com.example.data.database.InventorIdea
+import android.net.Uri
+import com.example.data.database.VaultFileRepository
+import com.example.data.database.VaultItem
 import com.example.data.database.InventorIdeaRepository
 import com.example.data.ContextualVerseEngine
 import kotlinx.coroutines.CancellationException
@@ -123,6 +125,23 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
 
     private val database = AppDatabase.getDatabase(application)
     private val repository = InventorIdeaRepository(database.inventorIdeaDao())
+    private val vaultFileRepository = VaultFileRepository(application, database.vaultItemDao())
+
+    val vaultItems: StateFlow<List<VaultItem>> = vaultFileRepository.items
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    suspend fun importVaultFile(uri: Uri): VaultItem = vaultFileRepository.importFromUri(uri)
+
+    suspend fun saveVaultText(title: String, text: String): VaultItem =
+        vaultFileRepository.saveText(title, text)
+
+    suspend fun exportVaultFile(id: String, destination: Uri) =
+        vaultFileRepository.exportToUri(id, destination)
+
+    fun deleteVaultItem(id: String) {
+        if (!_isVaultAuthenticated.value) return
+        viewModelScope.launch(Dispatchers.IO) { vaultFileRepository.delete(id) }
+    }
 
     val savedIdeas: StateFlow<List<InventorIdea>> = repository.allIdeas
         .stateIn(scope = viewModelScope, started = SharingStarted.WhileSubscribed(5000), initialValue = emptyList())
@@ -132,9 +151,6 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
     ) { battery, charging, connection ->
         ContextualVerseEngine.getInsight(battery, charging == "CHARGING", connection)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), ContextualVerseEngine.getInsight(100, false, "Determining..."))
-
-    private val _isForgePanelOpen = MutableStateFlow(false)
-    val isForgePanelOpen: StateFlow<Boolean> = _isForgePanelOpen.asStateFlow()
 
     private val _isVaultViewOpen = MutableStateFlow(false)
     val isVaultViewOpen: StateFlow<Boolean> = _isVaultViewOpen.asStateFlow()
@@ -369,15 +385,6 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
         }
     }
 
-    private val _forgeTitle = MutableStateFlow("")
-    val forgeTitle: StateFlow<String> = _forgeTitle.asStateFlow()
-    private val _forgeCategory = MutableStateFlow("SecOps")
-    val forgeCategory: StateFlow<String> = _forgeCategory.asStateFlow()
-    private val _forgeIdea = MutableStateFlow("")
-    val forgeIdea: StateFlow<String> = _forgeIdea.asStateFlow()
-    private val _forgeBlueprint = MutableStateFlow("")
-    val forgeBlueprint: StateFlow<String> = _forgeBlueprint.asStateFlow()
-
     private val batteryReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
             intent?.let {
@@ -458,34 +465,17 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
         if (!expanded) { _terminalInput.value = ""; _terminalResponse.value = "" }
     }
 
-    fun setForgePanelOpen(open: Boolean) {
-        _isForgePanelOpen.value = open
-        if (!open) { clearForgeFields() }
-    }
-
-    fun setVaultViewOpen(open: Boolean) {
-        _isVaultViewOpen.value = open
-        if (!open) _isVaultAuthenticated.value = false
-    }
-
-    fun updateTerminalInput(input: String) { _terminalInput.value = input }
-    fun updateForgeTitle(title: String) { _forgeTitle.value = title }
-    fun updateForgeCategory(category: String) { _forgeCategory.value = category }
-    fun updateForgeIdea(idea: String) { _forgeIdea.value = idea }
-
-    private fun clearForgeFields() {
-        _forgeTitle.value = ""
-        _forgeCategory.value = "SecOps"
-        _forgeIdea.value = ""
-        _forgeBlueprint.value = ""
-    }
-
     fun deleteIdea(ideaId: Int) {
-        viewModelScope.launch { repository.deleteIdeaById(ideaId) }
+        if (!_isVaultAuthenticated.value) return
+        viewModelScope.launch(Dispatchers.IO) { repository.deleteIdeaById(ideaId) }
     }
 
     fun wipeVault() {
-        viewModelScope.launch { repository.clearAll() }
+        if (!_isVaultAuthenticated.value) return
+        viewModelScope.launch(Dispatchers.IO) {
+            vaultFileRepository.clearAll()
+            repository.clearAll()
+        }
     }
 
     fun forgeAndSaveIdea() {

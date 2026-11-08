@@ -4,6 +4,8 @@
     <exclude domain="database" path="." />
     <!-- Preferences DataStore contains the Gemini API credential. -->
     <exclude domain="file" path="datastore/" />
+    <!-- Vault ciphertext is encrypted with a device-bound Android Keystore key. -->
+    <exclude domain="file" path="vault_items/" />
     <!-- IP-derived prayer coordinates are private location metadata. -->
     <exclude domain="sharedpref" path="prayer_prefs.xml" />
 </full-backup-content>

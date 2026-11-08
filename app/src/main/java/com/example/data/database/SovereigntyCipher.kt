@@ -19,6 +19,7 @@ object SovereigntyCipher {
     private const val KEYSTORE_PROVIDER = "AndroidKeyStore"
     private const val VAULT_KEY_ALIAS = "asyria.vault.aes.gcm.v2"
     private const val API_KEY_ALIAS = "asyria.api-key.aes.gcm.v1"
+    private const val VAULT_FILE_KEY_ALIAS = "asyria.vault.files.aes.gcm.v1"
     private const val VAULT_PREFIX = "vault:v2:"
     private const val SECRET_PREFIX = "secret:v1:"
     private const val TRANSFORMATION = "AES/GCM/NoPadding"
@@ -70,6 +71,24 @@ object SovereigntyCipher {
     fun reencryptLegacyVaultValue(value: String?): String {
         if (value.isNullOrEmpty() || isVaultEncrypted(value)) return value.orEmpty()
         return encrypt(decryptLegacy(value))
+    }
+
+    /** Creates a fresh GCM cipher for streaming file encryption. Each file gets a random IV. */
+    fun newVaultFileEncryptCipher(): Cipher =
+        Cipher.getInstance(TRANSFORMATION).apply {
+            init(Cipher.ENCRYPT_MODE, getOrCreateKey(VAULT_FILE_KEY_ALIAS))
+        }
+
+    /** Creates a GCM decryptor for a previously stored file IV. */
+    fun newVaultFileDecryptCipher(iv: ByteArray): Cipher {
+        require(iv.size == IV_LENGTH_BYTES) { "Invalid vault file IV." }
+        return Cipher.getInstance(TRANSFORMATION).apply {
+            init(
+                Cipher.DECRYPT_MODE,
+                getOrCreateKey(VAULT_FILE_KEY_ALIAS),
+                GCMParameterSpec(TAG_LENGTH_BITS, iv)
+            )
+        }
     }
 
     private fun encryptWithAlias(value: String, alias: String, prefix: String): String {

@@ -6,7 +6,6 @@ package com.example.worker
   import android.Manifest
 import android.content.pm.PackageManager
   import android.os.Build
-  import android.provider.Settings
   import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
   import androidx.work.CoroutineWorker
@@ -34,8 +33,7 @@ import kotlinx.coroutines.flow.first
           const val CHANNEL_WISDOM = "daily_wisdom"
 
           private const val PREFS_THROTTLE = "sovereign_notif_throttle"
-          private const val KEY_LAST_SECURITY = "last_security_ms"
-          private const val KEY_LAST_GEMINI = "last_gemini_ms"
+          private const val KEY_LAST_GEMINI_ATTEMPT = "last_gemini_attempt_ms"
           private const val KEY_LAST_WISDOM = "last_wisdom_ms"
           private const val TWENTY_FOUR_HOURS_MS = 24L * 60 * 60 * 1000
 
@@ -81,22 +79,17 @@ import kotlinx.coroutines.flow.first
 
           createNotificationChannels()
 
-          // 1. Prayer alerts — always check every 15 min (has its own per-prayer deduplication)
+          // 1. Prayer alerts — WorkManager is inexact and may be deferred by the OS.
           checkAndNotifyPrayer(isAr)
 
-          // 2. Device Security Scan — throttled to once every 24 hours
-          val lastSecurity = throttlePrefs.getLong(KEY_LAST_SECURITY, 0L)
-          if (nowMs - lastSecurity >= TWENTY_FOUR_HOURS_MS) {
-              performDeviceSecurityScan(isAr)
-              throttlePrefs.edit().putLong(KEY_LAST_SECURITY, nowMs).apply()
-          }
-
-          // 3. Gemini Security Tip — throttled to once every 24 hours
-          val lastGemini = throttlePrefs.getLong(KEY_LAST_GEMINI, 0L)
-          if (apiKey.isNotBlank() && nowMs - lastGemini >= TWENTY_FOUR_HOURS_MS) {
+          // 2. Optional Gemini tip. Throttle attempts, not only successes, to avoid repeating
+          // paid requests every 15 minutes while the provider is unavailable.
+          val lastGeminiAttempt = throttlePrefs.getLong(KEY_LAST_GEMINI_ATTEMPT, 0L)
+          if (apiKey.isNotBlank() && nowMs - lastGeminiAttempt >= TWENTY_FOUR_HOURS_MS) {
+              throttlePrefs.edit().putLong(KEY_LAST_GEMINI_ATTEMPT, nowMs).apply()
               try {
                   val promptLocale = if (isAr) "Arabic" else "English"
-                  val prompt = "Provide one very brief (12 words max) high-priority cybersecurity tip in $promptLocale. Be direct. No intro."
+                  val prompt = "Provide one very brief (12 words max) practical cybersecurity tip in $promptLocale. Be direct. No intro."
                   val res = geminiRepository.generateText(
                       systemInstruction = "You are a concise cybersecurity educator.",
                       input = prompt,
@@ -104,20 +97,19 @@ import kotlinx.coroutines.flow.first
                   )
                   if (res.isNotBlank()) {
                       showNotification(
-                          title = if (isAr) "تنبيه أمني سيادي" else "Sovereign Intelligence Alert",
+                          title = if (isAr) "نصيحة أمنية يومية" else "Daily Security Tip",
                           message = res.trim(),
                           id = 1002,
                           channelId = CHANNEL_SECURITY
                       )
-                      throttlePrefs.edit().putLong(KEY_LAST_GEMINI, nowMs).apply()
                   }
               } catch (e: Exception) {
                   if (e is CancellationException) throw e
-                  e.printStackTrace()
+                  // A failed request is not retried on every 15-minute worker run.
               }
           }
 
-          // 4. Daily Quranic Wisdom — throttled to once every 24 hours
+          // 3. Daily Quranic Wisdom — throttled to once every 24 hours
           val lastWisdom = throttlePrefs.getLong(KEY_LAST_WISDOM, 0L)
           if (nowMs - lastWisdom >= TWENTY_FOUR_HOURS_MS) {
               sendDailyWisdom(isAr)
@@ -196,187 +188,82 @@ import kotlinx.coroutines.flow.first
 
       private fun checkAndNotifyPrayer(isAr: Boolean) {
           val prefs = applicationContext.getSharedPreferences("prayer_prefs", Context.MODE_PRIVATE)
-          val lat = prefs.getFloat("network_lat", 33.5138f).toDouble()
-          val lon = prefs.getFloat("network_lon", 36.2765f).toDouble()
-
-          val coords = Coordinates(lat, lon)
-          val date = DateComponents.from(Date())
-          val params = CalculationMethod.UMM_AL_QURA.parameters.also { it.madhab = Madhab.SHAFI }
-          val prayerTimes = PrayerTimes(coords, date, params)
-
-          val now = Calendar.getInstance()
-          val currentMinutes = now.get(Calendar.HOUR_OF_DAY) * 60 + now.get(Calendar.MINUTE)
-
-          val prayers = listOf(
-              Prayer.FAJR to prayerTimes.fajr,
-              Prayer.SUNRISE to prayerTimes.sunrise,
-              Prayer.DHUHR to prayerTimes.dhuhr,
-              Prayer.ASR to prayerTimes.asr,
-              Prayer.MAGHRIB to prayerTimes.maghrib,
-              Prayer.ISHA to prayerTimes.isha
+          val lat = prefs.getFloat("network_lat", 33.5138f).toDouble().takeIf { it in -90.0..90.0 } ?: 33.5138
+          val lon = prefs.getFloat("network_lon", 36.2765f).toDouble().takeIf { it in -180.0..180.0 } ?: 36.2765
+          val coordinates = Coordinates(lat, lon)
+          val now = Date()
+          val today = PrayerTimes(
+              coordinates,
+              DateComponents.from(now),
+              CalculationMethod.UMM_AL_QURA.parameters.also { it.madhab = Madhab.SHAFI }
+          )
+          val tomorrowCalendar = Calendar.getInstance().apply {
+              time = now
+              add(Calendar.DAY_OF_YEAR, 1)
+          }
+          val tomorrow = PrayerTimes(
+              coordinates,
+              DateComponents.from(tomorrowCalendar.time),
+              CalculationMethod.UMM_AL_QURA.parameters.also { it.madhab = Madhab.SHAFI }
           )
 
+          // Sunrise is not one of the five obligatory prayers and is excluded.
+          val scheduledPrayers = listOf(
+              Prayer.FAJR to today.fajr,
+              Prayer.DHUHR to today.dhuhr,
+              Prayer.ASR to today.asr,
+              Prayer.MAGHRIB to today.maghrib,
+              Prayer.ISHA to today.isha,
+              Prayer.FAJR to tomorrow.fajr
+          )
           val arabicNames = mapOf(
               Prayer.FAJR to "الفجر",
-              Prayer.SUNRISE to "الشروق",
               Prayer.DHUHR to "الظهر",
               Prayer.ASR to "العصر",
               Prayer.MAGHRIB to "المغرب",
               Prayer.ISHA to "العشاء"
           )
+          val timeFormat = java.text.SimpleDateFormat("hh:mm a", java.util.Locale.getDefault())
+          val dateFormat = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.ROOT)
 
-          for ((prayer, prayerDate) in prayers) {
-              if (prayerDate == null) continue
-              val prayerCal = Calendar.getInstance().apply { time = prayerDate }
-              val prayerMinutes = prayerCal.get(Calendar.HOUR_OF_DAY) * 60 + prayerCal.get(Calendar.MINUTE)
+          for ((prayer, prayerDate) in scheduledPrayers) {
+              val minutesUntil = kotlin.math.floor((prayerDate.time - now.time) / 60_000.0).toInt()
+              val prayerDateKey = dateFormat.format(prayerDate)
+              val timeText = timeFormat.format(prayerDate)
+              val lastNotifiedSoon = prefs.getString("last_5min_${prayer.name}", "")
+              val lastNotifiedAtTime = prefs.getString("last_exact_${prayer.name}", "")
+              val name = if (isAr) arabicNames[prayer] ?: prayer.name else prayer.name
 
-              val minutesBefore = prayerMinutes - currentMinutes
-              val timeFormat = java.text.SimpleDateFormat("hh:mm a", java.util.Locale.getDefault())
-              val timeStr = timeFormat.format(prayerCal.time)
-
-              val lastNotified5Min = prefs.getString("last_5min_${prayer.name}", "")
-              val lastNotifiedExact = prefs.getString("last_exact_${prayer.name}", "")
-              val todayDate = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault()).format(Date())
-
-              if (minutesBefore in 1..15 && lastNotified5Min != todayDate) {
-                  val name = if (isAr) (arabicNames[prayer] ?: prayer.name) else prayer.name
+              // WorkManager is not an exact alarm; wider windows reduce missed reminders.
+              if (minutesUntil in 1..30 && lastNotifiedSoon != prayerDateKey) {
                   val dua = SHORT_DUAS[prayer] ?: ""
                   showNotification(
-                      title = if (isAr) "🤲 استعد لصلاة $name — $timeStr"
-                              else "🤲 Prepare for ${prayer.name} — $timeStr",
+                      title = if (isAr) "اقترب موعد صلاة $name — $timeText"
+                              else "${prayer.name} is approaching — $timeText",
                       message = if (isAr)
-                          "بقي ١٥ دقيقة أو أقل على أذان $name. توضّأ واستعد للقاء ربّك.\n\n$dua"
+                          "بقي نحو $minutesUntil دقيقة على صلاة $name. توضّأ واستعد.${if (dua.isNotBlank()) "\n\n$dua" else ""}"
                       else
-                          "15 minutes or less until ${prayer.name} at $timeStr. Make wudu and prepare.\n\n$dua",
+                          "About $minutesUntil minutes until ${prayer.name}. Prepare for prayer.${if (dua.isNotBlank()) "\n\n$dua" else ""}",
                       id = 2000 + prayer.ordinal(),
                       channelId = CHANNEL_PRAYER
                   )
-                  prefs.edit().putString("last_5min_${prayer.name}", todayDate).apply()
+                  prefs.edit().putString("last_5min_${prayer.name}", prayerDateKey).apply()
               }
 
-              if (minutesBefore in -15..0 && lastNotifiedExact != todayDate) {
-                  val name = if (isAr) (arabicNames[prayer] ?: prayer.name) else prayer.name
+              if (minutesUntil in -30..0 && lastNotifiedAtTime != prayerDateKey) {
                   val motivation = PRAYER_MOTIVATIONS[prayer] ?: ""
                   showNotification(
-                      title = if (isAr) "🕌 الله أكبر — حان وقت صلاة $name"
-                              else "🕌 Allahu Akbar — Time for ${prayer.name}",
+                      title = if (isAr) "حان وقت صلاة $name"
+                              else "It is time for ${prayer.name}",
                       message = if (isAr)
-                          "حيّ على الصلاة، حيّ على الفلاح.\n\n$motivation"
+                          "حيّ على الصلاة، حيّ على الفلاح.${if (motivation.isNotBlank()) "\n\n$motivation" else ""}"
                       else
-                          "Come to prayer, come to success.\n\n$motivation",
+                          "Come to prayer, come to success.${if (motivation.isNotBlank()) "\n\n$motivation" else ""}",
                       id = 3000 + prayer.ordinal(),
                       channelId = CHANNEL_PRAYER
                   )
-                  prefs.edit().putString("last_exact_${prayer.name}", todayDate).apply()
+                  prefs.edit().putString("last_exact_${prayer.name}", prayerDateKey).apply()
               }
-          }
-      }
-
-      private fun performDeviceSecurityScan(isAr: Boolean) {
-          val pm = applicationContext.packageManager
-          val dangerousPermissions = mapOf(
-              android.Manifest.permission.CAMERA to (if (isAr) "الكاميرا" else "Camera"),
-              android.Manifest.permission.RECORD_AUDIO to (if (isAr) "الميكروفون" else "Microphone"),
-              android.Manifest.permission.READ_CONTACTS to (if (isAr) "جهات الاتصال" else "Contacts"),
-              android.Manifest.permission.READ_SMS to (if (isAr) "الرسائل النصية" else "SMS")
-          )
-
-          var securityNotificationId = 4000
-
-          val installedApps = pm.getInstalledPackages(PackageManager.GET_PERMISSIONS)
-          for (packageInfo in installedApps) {
-              val appInfo = packageInfo.applicationInfo ?: continue
-              if (appInfo.flags and android.content.pm.ApplicationInfo.FLAG_SYSTEM != 0) continue
-              if (packageInfo.packageName == applicationContext.packageName) continue
-
-              val requestedPermissions = packageInfo.requestedPermissions ?: continue
-              val grantedDangerous = mutableListOf<String>()
-
-              for ((permission, label) in dangerousPermissions) {
-                  val permissionGranted =
-                      requestedPermissions.contains(permission) &&
-                          pm.checkPermission(permission, packageInfo.packageName) ==
-                              PackageManager.PERMISSION_GRANTED
-                  if (permissionGranted) {
-                      grantedDangerous.add(label)
-                  }
-              }
-
-              if (grantedDangerous.size >= 2) {
-                  val appName = pm.getApplicationLabel(appInfo).toString()
-                  val permList = grantedDangerous.joinToString(" و")
-                  showNotification(
-                      title = if (isAr) "تحذير أمني: صلاحيات خطيرة" else "Security Warning: Dangerous Permissions",
-                      message = if (isAr)
-                          "تحذير: تطبيق $appName لديه صلاحية الوصول إلى $permList. راجع صلاحيات هذا التطبيق وتأكّد من أنّك تثق به."
-                      else
-                          "Warning: $appName has access to ${grantedDangerous.joinToString(" and ")}. Review this app's permissions.",
-                      id = securityNotificationId++,
-                      channelId = CHANNEL_SECURITY
-                  )
-              }
-          }
-
-          val devOptionsEnabled = try {
-              Settings.Secure.getInt(
-                  applicationContext.contentResolver,
-                  Settings.Global.DEVELOPMENT_SETTINGS_ENABLED, 0
-              ) != 0
-          } catch (_: Exception) { false }
-
-          if (devOptionsEnabled) {
-              showNotification(
-                  title = if (isAr) "تنبيه أمني: خيارات المطوّر مفعّلة" else "Security Alert: Developer Options Enabled",
-                  message = if (isAr)
-                      "خيارات المطوّر مفعّلة على جهازك. هذا قد يُعرّض جهازك لمخاطر أمنية. يُنصح بتعطيلها إن لم تكن بحاجة إليها."
-                  else
-                      "Developer options are enabled on your device. This may expose your device to security risks. Disable if not needed.",
-                  id = securityNotificationId++,
-                  channelId = CHANNEL_SECURITY
-              )
-          }
-
-          val usbDebuggingEnabled = try {
-              Settings.Secure.getInt(
-                  applicationContext.contentResolver,
-                  Settings.Global.ADB_ENABLED, 0
-              ) != 0
-          } catch (_: Exception) { false }
-
-          if (usbDebuggingEnabled) {
-              showNotification(
-                  title = if (isAr) "تحذير: تصحيح USB مفعّل" else "Warning: USB Debugging Enabled",
-                  message = if (isAr)
-                      "تصحيح أخطاء USB مفعّل. هذا يسمح بالوصول إلى بيانات جهازك عبر الحاسوب. قم بتعطيله لحماية خصوصيتك."
-                  else
-                      "USB debugging is enabled. This allows access to your device data via computer. Disable it to protect your privacy.",
-                  id = securityNotificationId++,
-                  channelId = CHANNEL_SECURITY
-              )
-          }
-
-          val unknownSourcesEnabled = try {
-              if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                  applicationContext.packageManager.canRequestPackageInstalls()
-              } else {
-                  @Suppress("DEPRECATION")
-                  Settings.Secure.getInt(
-                      applicationContext.contentResolver,
-                      Settings.Secure.INSTALL_NON_MARKET_APPS, 0
-                  ) != 0
-              }
-          } catch (_: Exception) { false }
-
-          if (unknownSourcesEnabled) {
-              showNotification(
-                  title = if (isAr) "تحذير: مصادر غير معروفة مفعّلة" else "Warning: Unknown Sources Enabled",
-                  message = if (isAr)
-                      "تثبيت التطبيقات من مصادر غير معروفة مُفعّل. هذا يزيد خطر تثبيت تطبيقات ضارة. قم بتعطيله من الإعدادات."
-                  else
-                      "Installing apps from unknown sources is enabled. This increases the risk of malware. Disable it in settings.",
-                  id = securityNotificationId++,
-                  channelId = CHANNEL_SECURITY
-              )
           }
       }
 

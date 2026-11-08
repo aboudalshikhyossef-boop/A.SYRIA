@@ -114,28 +114,35 @@ class PrayerViewModel(application: Application) : AndroidViewModel(application) 
         val coordinates = _coordinates.value ?: DAMASCUS
         val now = Date()
         val prayerTimes = getTodayPrayerTimes(coordinates, now)
-        val nextPrayer = prayerTimes.nextPrayer()
-        val effectiveNextPrayer = if (nextPrayer == Prayer.NONE) Prayer.FAJR else nextPrayer
-        val nextPrayerDate = if (nextPrayer == Prayer.NONE) {
-            getTomorrowFajr(coordinates, now)
-        } else {
-            prayerTimes.timeForPrayer(effectiveNextPrayer)
-        }
 
-        val arabicName = when (effectiveNextPrayer) {
+        // The dashboard countdown follows the five obligatory prayers, not sunrise.
+        val todayPrayers = listOf(
+            Prayer.FAJR to prayerTimes.fajr,
+            Prayer.DHUHR to prayerTimes.dhuhr,
+            Prayer.ASR to prayerTimes.asr,
+            Prayer.MAGHRIB to prayerTimes.maghrib,
+            Prayer.ISHA to prayerTimes.isha
+        )
+        val nextEntry = todayPrayers.firstOrNull { it.second.time > now.time }
+            ?: (Prayer.FAJR to getTomorrowFajr(coordinates, now))
+        val nextPrayer = nextEntry.first
+        val nextPrayerDate = nextEntry.second
+
+        val arabicName = when (nextPrayer) {
             Prayer.FAJR -> "الفجر"
-            Prayer.SUNRISE -> "الشروق"
             Prayer.DHUHR -> "الظهر"
             Prayer.ASR -> "العصر"
             Prayer.MAGHRIB -> "المغرب"
             Prayer.ISHA -> "العشاء"
-            else -> effectiveNextPrayer.name
+            else -> nextPrayer.name
         }
-        _nextPrayerName.value = arabicName
+        if (_nextPrayerName.value != arabicName) _nextPrayerName.value = arabicName
 
         val formatter = SimpleDateFormat("hh:mm a", Locale.getDefault())
-        _nextPrayerTime.value = formatter.format(nextPrayerDate)
-        _allPrayerTimes.value = mapOf(
+        val nextTimeText = formatter.format(nextPrayerDate)
+        if (_nextPrayerTime.value != nextTimeText) _nextPrayerTime.value = nextTimeText
+
+        val formattedPrayerTimes = mapOf(
             "الفجر" to formatter.format(prayerTimes.fajr),
             "الشروق" to formatter.format(prayerTimes.sunrise),
             "الظهر" to formatter.format(prayerTimes.dhuhr),
@@ -143,22 +150,28 @@ class PrayerViewModel(application: Application) : AndroidViewModel(application) 
             "المغرب" to formatter.format(prayerTimes.maghrib),
             "العشاء" to formatter.format(prayerTimes.isha)
         )
+        if (_allPrayerTimes.value != formattedPrayerTimes) {
+            _allPrayerTimes.value = formattedPrayerTimes
+        }
 
         val remainingMillis = (nextPrayerDate.time - now.time).coerceAtLeast(0L)
         val hours = remainingMillis / 3_600_000
         val minutes = (remainingMillis % 3_600_000) / 60_000
         val seconds = (remainingMillis % 60_000) / 1_000
-        _nextPrayerCountdown.value = String.format(
+        val countdown = String.format(
             Locale.getDefault(), "%02d:%02d:%02d", hours, minutes, seconds
         )
+        if (_nextPrayerCountdown.value != countdown) _nextPrayerCountdown.value = countdown
 
-        val currentPrayer = prayerTimes.currentPrayer()
-        val currentPrayerDate = prayerTimes.timeForPrayer(currentPrayer) ?: now
-        val interval = nextPrayerDate.time - currentPrayerDate.time
-        val elapsed = now.time - currentPrayerDate.time
-        _nextPrayerProgress.value = if (interval > 0L) {
+        val previousPrayerDate = todayPrayers.lastOrNull { it.second.time <= now.time }?.second ?: now
+        val interval = nextPrayerDate.time - previousPrayerDate.time
+        val elapsed = now.time - previousPrayerDate.time
+        val progress = if (interval > 0L) {
             (elapsed.toFloat() / interval.toFloat()).coerceIn(0f, 1f)
-        } else 1f
+        } else 0f
+        if (kotlin.math.abs(_nextPrayerProgress.value - progress) >= 0.001f) {
+            _nextPrayerProgress.value = progress
+        }
     }
 
     private fun getTodayPrayerTimes(coordinates: Coordinates, now: Date): PrayerTimes {

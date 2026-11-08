@@ -11,14 +11,15 @@ import com.example.data.chat.ChatMessage
 import com.example.data.chat.ChatMessageDao
 
 @Database(
-    entities = [InventorIdea::class, ChatMessage::class],
-    version = 3,
+    entities = [InventorIdea::class, ChatMessage::class, VaultItem::class],
+    version = 4,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
 
     abstract fun inventorIdeaDao(): InventorIdeaDao
     abstract fun chatMessageDao(): ChatMessageDao
+    abstract fun vaultItemDao(): VaultItemDao
 
     companion object {
         private val MIGRATION_1_2 = object : Migration(1, 2) {
@@ -75,6 +76,20 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        private val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL(
+                    "CREATE TABLE IF NOT EXISTS vault_items (" +
+                        "id TEXT NOT NULL PRIMARY KEY, " +
+                        "encryptedDisplayName TEXT NOT NULL, " +
+                        "encryptedMimeType TEXT NOT NULL, " +
+                        "storedFileName TEXT NOT NULL, " +
+                        "sizeBytes INTEGER NOT NULL, " +
+                        "createdAt INTEGER NOT NULL)"
+                )
+            }
+        }
+
         @Volatile
         private var INSTANCE: AppDatabase? = null
 
@@ -85,7 +100,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "sovereign_archive_db"
                 )
-                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
                     .build()
                     .also { INSTANCE = it }
             }
