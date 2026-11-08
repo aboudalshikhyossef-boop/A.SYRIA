@@ -27,7 +27,6 @@ import com.example.ui.theme.AmberZen
 import com.example.ui.theme.CyberCyan
 import com.example.ui.theme.VoidBlack
 import com.example.ui.viewmodel.DashboardViewModel
-import kotlinx.coroutines.delay
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -36,36 +35,6 @@ fun LinkScannerScreen(viewModel: DashboardViewModel, onBack: () -> Unit) {
     val isAnalyzingLink by viewModel.isAnalyzingLink.collectAsState()
     val linkAnalysisResult by viewModel.linkAnalysisResult.collectAsState()
     val isAr by viewModel.isArabic.collectAsState(initial = false)
-
-    val scanLogs = remember { mutableStateListOf<String>() }
-    val progress = remember { Animatable(0f) }
-
-    LaunchedEffect(isAnalyzingLink) {
-        if (isAnalyzingLink) {
-            scanLogs.clear()
-            progress.snapTo(0f)
-            val logSequence = listOf(
-                "CONNECTING TO NEURAL_CORE...",
-                "INTERCEPTING DATA PACKETS...",
-                "CIPHER: 0x${(1000..9999).random().toString(16).uppercase()}",
-                "ANALYZING SECURITY HEADERS...",
-                "GEMINI_UPLINK ESTABLISHED",
-                "DECODING PAYLOAD...",
-                "RECOGNIZING PATTERNS...",
-                "SCAN_COMPLETE // GENERATING REPORT"
-            )
-            
-            // Progress animation synchronized with logs
-            for (log in logSequence) {
-                scanLogs.add("> $log")
-                progress.animateTo(
-                    targetValue = scanLogs.size.toFloat() / logSequence.size,
-                    animationSpec = tween(400)
-                )
-                delay(300)
-            }
-        }
-    }
 
     Box(
         modifier = Modifier
@@ -84,7 +53,7 @@ fun LinkScannerScreen(viewModel: DashboardViewModel, onBack: () -> Unit) {
             ) {
                 Column {
                     Text(
-                        text = "INTERNAL SCAN",
+                        text = if (isAr) "تحليل الرابط بالذكاء الاصطناعي" else "AI LINK TEXT ANALYSIS",
                         color = CyberCyan,
                         fontSize = 20.sp,
                         fontWeight = FontWeight.Black,
@@ -92,7 +61,7 @@ fun LinkScannerScreen(viewModel: DashboardViewModel, onBack: () -> Unit) {
                         fontFamily = FontFamily.Monospace
                     )
                     Text(
-                        text = "NEURAL LINK DECODER v4.2",
+                        text = if (isAr) "تقييم استدلالي للنص الظاهر فقط" else "HEURISTIC REVIEW OF THE URL STRING ONLY",
                         color = Color.White.copy(alpha = 0.5f),
                         fontSize = 8.sp,
                         fontFamily = FontFamily.Monospace
@@ -152,45 +121,19 @@ fun LinkScannerScreen(viewModel: DashboardViewModel, onBack: () -> Unit) {
                     .padding(16.dp)
             ) {
                 if (isAnalyzingLink) {
-                    Column(modifier = Modifier.fillMaxSize()) {
-                        // Hex Progress Bar
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(
-                                text = "SCANNING [",
-                                color = CyberCyan.copy(alpha = 0.6f),
-                                fontSize = 10.sp,
-                                fontFamily = FontFamily.Monospace
-                            )
-                            LinearProgressIndicator(
-                                progress = progress.value,
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .height(4.dp)
-                                    .padding(horizontal = 4.dp),
-                                color = CyberCyan,
-                                trackColor = CyberCyan.copy(alpha = 0.1f)
-                            )
-                            Text(
-                                text = "] ${(progress.value * 100).toInt()}%",
-                                color = CyberCyan.copy(alpha = 0.6f),
-                                fontSize = 10.sp,
-                                fontFamily = FontFamily.Monospace
-                            )
-                        }
-                        
+                    Column(
+                        modifier = Modifier.fillMaxSize(),
+                        verticalArrangement = Arrangement.Center,
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        CircularProgressIndicator(color = CyberCyan)
                         Spacer(modifier = Modifier.height(16.dp))
-                        
-                        LazyColumn(modifier = Modifier.fillMaxSize()) {
-                            items(scanLogs) { log ->
-                                Text(
-                                    text = log,
-                                    color = if (log.contains("COMPLETE")) AmberZen else Color.White.copy(alpha = 0.5f),
-                                    fontSize = 10.sp,
-                                    fontFamily = FontFamily.Monospace,
-                                    modifier = Modifier.padding(vertical = 2.dp)
-                                )
-                            }
-                        }
+                        Text(
+                            if (isAr) "يجري تحليل صياغة الرابط فقط؛ لن يتم فتحه." else "Reviewing the URL string only; the link is not being opened.",
+                            color = Color.White.copy(alpha = 0.75f),
+                            fontSize = 11.sp,
+                            textAlign = TextAlign.Center
+                        )
                     }
                 } else if (linkAnalysisResult != null) {
                     Column(
@@ -199,11 +142,22 @@ fun LinkScannerScreen(viewModel: DashboardViewModel, onBack: () -> Unit) {
                             .verticalScroll(rememberScrollState())
                     ) {
                         Text(
-                            text = if (isAr) "تقرير التشفير السيادي:" else "SOVEREIGN DECODING REPORT:",
+                            text = if (isAr) "تقييم استدلالي للرابط:" else "URL-STRING HEURISTIC REVIEW:",
                             color = AmberZen,
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Bold,
                             fontFamily = FontFamily.Monospace
+                        )
+                        Text(
+                            text = if (isAr) {
+                                "تنبيه: لم يتم فتح الرابط أو فحص محتوى الصفحة أو DNS أو شهادة TLS أو قواعد السمعة. هذا التقييم ليس دليلاً على أن الرابط آمن."
+                            } else {
+                                "Limit: this did not open the link or inspect page content, DNS, TLS certificates, or reputation feeds. This is not proof that the URL is safe."
+                            },
+                            color = Color(0xFFFFC66D),
+                            fontSize = 10.sp,
+                            lineHeight = 15.sp,
+                            modifier = Modifier.padding(top = 6.dp, bottom = 10.dp)
                         )
                         Spacer(modifier = Modifier.height(12.dp))
                         Text(
