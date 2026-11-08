@@ -36,6 +36,8 @@ package com.example.ui.viewmodel
       private val _geminiKey = MutableStateFlow("")
 
       private var analysisJob: Job? = null
+      private var sendJob: Job? = null
+      private var isClearingHistory = false
 
       init {
           viewModelScope.launch {
@@ -46,13 +48,15 @@ package com.example.ui.viewmodel
 
       fun sendMessage(text: String, uiConfig: UIConfig? = null) {
           val trimmed = text.trim()
-          if (trimmed.isBlank()) return
+          if (trimmed.isBlank() || isClearingHistory || _isTyping.value) return
 
-          viewModelScope.launch(Dispatchers.IO) {
-              dao.insert(ChatMessage(role = "user", content = trimmed))
-              _isTyping.value = true
-
+          // Set this synchronously on the caller thread so two rapid taps cannot start
+          // overlapping conversations whose replies would be inserted out of order.
+          _isTyping.value = true
+          sendJob = viewModelScope.launch(Dispatchers.IO) {
               try {
+                  dao.insert(ChatMessage(role = "user", content = trimmed))
+
                   val key = dataStore.geminiApiKey.first().also { _geminiKey.value = it }
                   if (key.isBlank()) {
                       dao.insert(ChatMessage(
@@ -69,16 +73,16 @@ package com.example.ui.viewmodel
 
                   val reply = gemini.chat(
                       systemPrompt = buildSystemPrompt(uiConfig),
-                      history      = history,
+                      history = history,
                       apiKey = key
                   )
                   dao.insert(ChatMessage(role = "assistant", content = reply))
-
-              } catch (e: Exception) {
-                  if (e is CancellationException) throw e
+              } catch (cancelled: CancellationException) {
+                  throw cancelled
+              } catch (error: Exception) {
                   dao.insert(ChatMessage(
-                      role    = "assistant",
-                      content = "Connection error — ${e.message?.take(90) ?: "unknown"}"
+                      role = "assistant",
+                      content = "Connection error — ${error.message?.take(90) ?: "unknown"}"
                   ))
               } finally {
                   _isTyping.value = false
@@ -87,7 +91,7 @@ package com.example.ui.viewmodel
       }
 
       fun runBackgroundAnalysis(uiConfig: UIConfig) {
-          if (analysisJob?.isActive == true) return
+          if (isClearingHistory || _isTyping.value || analysisJob?.isActive == true) return
           analysisJob = viewModelScope.launch(Dispatchers.IO) {
               try {
                   val key = dataStore.geminiApiKey.first().also { _geminiKey.value = it }
@@ -118,11 +122,22 @@ package com.example.ui.viewmodel
       }
 
       fun clearHistory() {
+          if (isClearingHistory) return
+          isClearingHistory = true
+          val pendingSend = sendJob
           val pendingAnalysis = analysisJob
+          sendJob = null
           analysisJob = null
+
           viewModelScope.launch(Dispatchers.IO) {
-              pendingAnalysis?.cancelAndJoin()
-              dao.clear()
+              try {
+                  pendingSend?.cancelAndJoin()
+                  pendingAnalysis?.cancelAndJoin()
+                  dao.clear()
+              } finally {
+                  _isTyping.value = false
+                  isClearingHistory = false
+              }
           }
       }
 

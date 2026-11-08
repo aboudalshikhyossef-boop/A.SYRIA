@@ -3,7 +3,7 @@ package com.example.adaptive
 import android.content.Context
 
 /**
- * Process-safe local quota reservation.
+ * Thread-safe local quota reservation within the application process.
  * The quota is consumed when a request starts, not after it succeeds, so
  * concurrent requests cannot all pass a separate check before being counted.
  */
@@ -16,7 +16,7 @@ object RateLimiter {
     private const val WINDOW_MS = 30L * 60 * 1000
     private val lock = Any()
 
-    /** Atomically reserves one request in the rolling window. */
+    /** Atomically reserves one request in the fixed window. */
     fun tryAcquire(context: Context): Boolean = synchronized(lock) {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         val now = System.currentTimeMillis()

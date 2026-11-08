@@ -33,6 +33,7 @@ import com.example.data.database.VaultItem
 import com.example.ui.theme.CyberCyan
 import com.example.ui.theme.VoidBlack
 import com.example.ui.viewmodel.DashboardViewModel
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import java.util.Locale
 
@@ -88,6 +89,8 @@ fun SecureVaultScreen(viewModel: DashboardViewModel, isArabic: Boolean, onClose:
                 try {
                     viewModel.exportVaultFile(item.id, uri)
                     message = if (isArabic) "تم تصدير نسخة إلى المكان المحدد." else "A decrypted export copy was saved to the selected location."
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
                 } catch (error: Exception) {
                     message = (if (isArabic) "فشل التصدير: " else "Export failed: ") + (error.message ?: "")
                 } finally {
@@ -145,6 +148,8 @@ fun SecureVaultScreen(viewModel: DashboardViewModel, isArabic: Boolean, onClose:
                 viewModel.importVaultFile(uri)
                 message = if (isArabic) "حُفظ الملف داخل الخزينة بتشفير كامل." else "The file was encrypted and stored in the vault."
                 if (moveOriginal) removeOriginal(uri)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
             } catch (error: Exception) {
                 message = (if (isArabic) "فشل الحفظ: " else "Save failed: ") + (error.message ?: "")
             } finally {
@@ -280,6 +285,8 @@ fun SecureVaultScreen(viewModel: DashboardViewModel, isArabic: Boolean, onClose:
                         noteTitle = ""
                         noteText = ""
                         message = if (isArabic) "حُفظ النص مشفّراً داخل الخزينة." else "The text was encrypted and saved."
+                    } catch (cancelled: CancellationException) {
+                        throw cancelled
                     } catch (error: Exception) {
                         message = (if (isArabic) "فشل حفظ النص: " else "Save failed: ") + (error.message ?: "")
                     } finally { busy = false }
@@ -323,7 +330,8 @@ fun SecureVaultScreen(viewModel: DashboardViewModel, isArabic: Boolean, onClose:
                 try {
                     viewModel.deleteVaultItem(item.id)
                     message = if (isArabic) "حُذف العنصر من الخزينة." else "Item deleted from the vault."
-                } catch (error: Exception) { message = error.message ?: "Delete failed" }
+                } catch (cancelled: CancellationException) { throw cancelled }
+                catch (error: Exception) { message = error.message ?: "Delete failed" }
                 finally { busy = false }
             }
         }) { Text(if (isArabic) "حذف" else "DELETE", color = Color.Red) } },
@@ -356,7 +364,8 @@ fun SecureVaultScreen(viewModel: DashboardViewModel, isArabic: Boolean, onClose:
                 try {
                     viewModel.wipeVault()
                     message = if (isArabic) "تم مسح محتويات الخزينة." else "The vault was cleared."
-                } catch (error: Exception) { message = error.message ?: "Vault wipe failed" }
+                } catch (cancelled: CancellationException) { throw cancelled }
+                catch (error: Exception) { message = error.message ?: "Vault wipe failed" }
                 finally { busy = false }
             }
         }) { Text(if (isArabic) "تأكيد المسح" else "CONFIRM WIPE", color = Color.Red) } },

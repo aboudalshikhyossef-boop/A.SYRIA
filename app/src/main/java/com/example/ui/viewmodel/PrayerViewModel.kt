@@ -31,6 +31,14 @@ class PrayerViewModel(application: Application) : AndroidViewModel(application) 
     private val networkLocationRepository = NetworkLocationRepository()
     private val preferences = application.getSharedPreferences("prayer_prefs", Application.MODE_PRIVATE)
 
+    companion object {
+        private const val KEY_NETWORK_LOCATION_ATTEMPT = "network_location_attempt_ms"
+        private const val KEY_NETWORK_LOCATION_SUCCESS = "network_location_success_ms"
+        private const val LOCATION_SUCCESS_TTL_MS = 24L * 60 * 60 * 1000
+        private const val LOCATION_RETRY_TTL_MS = 6L * 60 * 60 * 1000
+        val DAMASCUS = Coordinates(33.5138, 36.2765)
+    }
+
     // Prayer times are stable for a local date and a coordinate pair.
     private var cachedPrayerTimes: PrayerTimes? = null
     private var cachedPrayerDateKey: String? = null
@@ -67,24 +75,39 @@ class PrayerViewModel(application: Application) : AndroidViewModel(application) 
 
     init {
         publishCoordinates(_coordinates.value ?: DAMASCUS)
-        refreshNetworkCoordinates()
+        if (shouldRefreshNetworkCoordinates()) refreshNetworkCoordinates()
         startTimer()
+    }
+
+    private fun shouldRefreshNetworkCoordinates(now: Long = System.currentTimeMillis()): Boolean {
+        val hasCachedCoordinates = _coordinates.value != null
+        val lastSuccess = preferences.getLong(KEY_NETWORK_LOCATION_SUCCESS, 0L)
+        val lastAttempt = preferences.getLong(KEY_NETWORK_LOCATION_ATTEMPT, 0L)
+        return if (hasCachedCoordinates && lastSuccess > 0L) {
+            now < lastSuccess || now - lastSuccess >= LOCATION_SUCCESS_TTL_MS
+        } else {
+            lastAttempt <= 0L || now < lastAttempt || now - lastAttempt >= LOCATION_RETRY_TTL_MS
+        }
     }
 
     private fun refreshNetworkCoordinates() {
         viewModelScope.launch {
-            val coordinates = try {
-                networkLocationRepository.getCoordinates()
+            val attemptedAt = System.currentTimeMillis()
+            preferences.edit().putLong(KEY_NETWORK_LOCATION_ATTEMPT, attemptedAt).apply()
+            try {
+                val resolved = networkLocationRepository.getCoordinates()
+                preferences.edit()
+                    .putFloat("network_lat", resolved.latitude.toFloat())
+                    .putFloat("network_lon", resolved.longitude.toFloat())
+                    .putLong(KEY_NETWORK_LOCATION_SUCCESS, System.currentTimeMillis())
+                    .apply()
+                publishCoordinates(resolved)
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (_: Exception) {
-                _coordinates.value ?: DAMASCUS
+                // Keep valid cached coordinates; otherwise retain the documented Damascus fallback.
+                if (_coordinates.value == null) publishCoordinates(DAMASCUS)
             }
-            preferences.edit()
-                .putFloat("network_lat", coordinates.latitude.toFloat())
-                .putFloat("network_lon", coordinates.longitude.toFloat())
-                .apply()
-            publishCoordinates(coordinates)
         }
     }
 
@@ -214,8 +237,5 @@ class PrayerViewModel(application: Application) : AndroidViewModel(application) 
             cachedTomorrowFajr = fajr
             cachedTomorrowDateKey = todayKey
         }
-    }
-    private companion object {
-        val DAMASCUS = Coordinates(33.5138, 36.2765)
     }
 }
