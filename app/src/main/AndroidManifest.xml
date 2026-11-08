@@ -12,9 +12,6 @@
     <!-- Haptic feedback -->
     <uses-permission android:name="android.permission.VIBRATE" />
 
-    <!-- Boot receiver — restores periodic notifications after reboot -->
-    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
-
     <application
         android:allowBackup="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
@@ -37,20 +34,6 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
-
-        <!--
-            exported="false": system BOOT_COMPLETED is still delivered to non-exported
-            receivers on Android 8+. This prevents other apps from sending arbitrary
-            intents here, which was flagging Play Protect scans.
-        -->
-        <receiver
-            android:name="com.example.receiver.BootReceiver"
-            android:enabled="true"
-            android:exported="false">
-            <intent-filter>
-                <action android:name="android.intent.action.BOOT_COMPLETED" />
-            </intent-filter>
-        </receiver>
 
     </application>
 

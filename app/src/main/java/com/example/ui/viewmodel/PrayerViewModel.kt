@@ -10,6 +10,7 @@ import com.batoulapps.adhan.Prayer
 import com.batoulapps.adhan.PrayerTimes
 import com.batoulapps.adhan.data.DateComponents
 import com.example.data.location.NetworkLocationRepository
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -72,8 +73,13 @@ class PrayerViewModel(application: Application) : AndroidViewModel(application) 
 
     private fun refreshNetworkCoordinates() {
         viewModelScope.launch {
-            val coordinates = runCatching { networkLocationRepository.getCoordinates() }
-                .getOrElse { _coordinates.value ?: DAMASCUS }
+            val coordinates = try {
+                networkLocationRepository.getCoordinates()
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                _coordinates.value ?: DAMASCUS
+            }
             preferences.edit()
                 .putFloat("network_lat", coordinates.latitude.toFloat())
                 .putFloat("network_lon", coordinates.longitude.toFloat())

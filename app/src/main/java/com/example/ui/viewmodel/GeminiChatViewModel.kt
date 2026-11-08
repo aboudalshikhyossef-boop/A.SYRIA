@@ -9,11 +9,14 @@ package com.example.ui.viewmodel
   import com.example.data.chat.ChatMessage
   import com.example.data.database.AppDatabase
   import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.Dispatchers
+  import kotlinx.coroutines.Dispatchers
+  import kotlinx.coroutines.Job
+  import kotlinx.coroutines.cancelAndJoin
   import kotlinx.coroutines.flow.MutableStateFlow
   import kotlinx.coroutines.flow.SharingStarted
   import kotlinx.coroutines.flow.StateFlow
   import kotlinx.coroutines.flow.asStateFlow
+  import kotlinx.coroutines.flow.first
   import kotlinx.coroutines.flow.stateIn
   import kotlinx.coroutines.launch
 
@@ -32,11 +35,11 @@ import kotlinx.coroutines.Dispatchers
 
       private val _geminiKey = MutableStateFlow("")
 
-      @Volatile
-      private var analysisScheduled = false
+      private var analysisJob: Job? = null
 
       init {
           viewModelScope.launch {
+              dataStore.migrateLegacyGeminiApiKey()
               dataStore.geminiApiKey.collect { _geminiKey.value = it }
           }
       }
@@ -50,7 +53,7 @@ import kotlinx.coroutines.Dispatchers
               _isTyping.value = true
 
               try {
-                  val key = _geminiKey.value
+                  val key = dataStore.geminiApiKey.first().also { _geminiKey.value = it }
                   if (key.isBlank()) {
                       dao.insert(ChatMessage(
                           role = "assistant",
@@ -84,12 +87,10 @@ import kotlinx.coroutines.Dispatchers
       }
 
       fun runBackgroundAnalysis(uiConfig: UIConfig) {
-          if (analysisScheduled) return
-          analysisScheduled = true
-
-          viewModelScope.launch(Dispatchers.IO) {
+          if (analysisJob?.isActive == true) return
+          analysisJob = viewModelScope.launch(Dispatchers.IO) {
               try {
-                  val key = _geminiKey.value
+                  val key = dataStore.geminiApiKey.first().also { _geminiKey.value = it }
                   if (key.isBlank()) return@launch
 
                   val recent = dao.getRecent(6)
@@ -111,16 +112,17 @@ import kotlinx.coroutines.Dispatchers
               } catch (cancelled: CancellationException) {
                   throw cancelled
               } catch (_: Exception) {
-                  // Best-effort analysis; a later request may retry.
-              } finally {
-                  analysisScheduled = false
+                  // Best-effort analysis; a later explicit attempt may retry.
               }
           }
       }
+
       fun clearHistory() {
+          val pendingAnalysis = analysisJob
+          analysisJob = null
           viewModelScope.launch(Dispatchers.IO) {
+              pendingAnalysis?.cancelAndJoin()
               dao.clear()
-              analysisScheduled = false
           }
       }
 

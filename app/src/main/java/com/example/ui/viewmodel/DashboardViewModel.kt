@@ -18,6 +18,7 @@ import com.example.data.database.AppDatabase
 import com.example.data.database.InventorIdea
 import com.example.data.database.InventorIdeaRepository
 import com.example.data.ContextualVerseEngine
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -312,8 +313,9 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
     // --- End User Cognitive Model State ---
 
     private val okHttpClient = OkHttpClient.Builder()
-        .connectTimeout(30, TimeUnit.SECONDS).readTimeout(45, TimeUnit.SECONDS)
-        .writeTimeout(30, TimeUnit.SECONDS).retryOnConnectionFailure(true).build()
+        .connectTimeout(8, TimeUnit.SECONDS).readTimeout(8, TimeUnit.SECONDS)
+        .writeTimeout(8, TimeUnit.SECONDS).callTimeout(12, TimeUnit.SECONDS)
+        .retryOnConnectionFailure(true).build()
 
     private suspend fun generateGeminiText(prompt: String): String {
         val apiKey = _customApiKey.value
@@ -405,6 +407,7 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
                 _isNeuralLinkOffline.value = false
                 _terminalResponse.value = "FULL NEURAL LINK ESTABLISHED ✅"
             } catch (e: Exception) {
+                if (e is CancellationException) throw e
                 _isNeuralLinkOffline.value = true
                 _terminalResponse.value = "[ TERMINAL ALERT ] ${e.message}"
             } finally {
@@ -543,14 +546,34 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
     }
 
     private fun fetchPublicIp(): String {
-        listOf("https://api64.ipify.org", "https://checkip.amazonaws.com", "https://ifconfig.me/ip", "https://icanhazip.com").forEach { endpoint ->
-            try {
-                val req = Request.Builder().url(endpoint).get().build()
-                val resp = okHttpClient.newCall(req).execute()
-                if (resp.isSuccessful) { resp.body?.string()?.trim()?.takeIf { it.isNotBlank() && it.length < 50 && (it.contains(".") || it.contains(":")) }?.let { return it } }
-            } catch (_: Exception) {}
+        val request = Request.Builder()
+            .url("https://api64.ipify.org")
+            .get()
+            .build()
+
+        return try {
+            okHttpClient.newCall(request).execute().use { response ->
+                if (response.isSuccessful) {
+                    response.body?.string()?.trim()?.takeIf(::isValidIpAddress)
+                } else {
+                    null
+                }
+            } ?: extractLocalIp()
+        } catch (_: Exception) {
+            extractLocalIp()
         }
-        return extractLocalIp()
+    }
+
+    private fun isValidIpAddress(value: String): Boolean {
+        if (value.isBlank() || value.length > 45) return false
+        if (':' in value) {
+            return value.count { it == ':' } >= 2 &&
+                value.all { it in "0123456789abcdefABCDEF:" }
+        }
+        val octets = value.split('.')
+        return octets.size == 4 && octets.all { octet ->
+            octet.isNotEmpty() && octet.toIntOrNull()?.let { it in 0..255 } == true
+        }
     }
 
     private fun extractLocalIp(): String {
@@ -612,6 +635,7 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
                 _isNeuralLinkOffline.value = false
                 addCyberScore(5)
             } catch (e: Exception) {
+                if (e is CancellationException) throw e
                 _terminalResponse.value = "[ TERMINAL ALERT ] :Error\n${e.message}"
                 _isNeuralLinkOffline.value = true
             } finally {
@@ -703,6 +727,7 @@ Every scenario you produce MUST be on a COMPLETELY DIFFERENT situation, attack v
                         return@launch
                     }
                 } catch (e: Exception) {
+                    if (e is CancellationException) throw e
                     _isAcademyGenerating.value = false
                     onFailure(e)
                     return@launch
@@ -729,6 +754,7 @@ Every scenario you produce MUST be on a COMPLETELY DIFFERENT situation, attack v
                   val result = generateGeminiText(prompt)
                   onResponse(result)
               } catch (e: Exception) {
+                  if (e is CancellationException) throw e
                   onResponse("")
               }
           }
@@ -748,6 +774,7 @@ Every scenario you produce MUST be on a COMPLETELY DIFFERENT situation, attack v
                 _linkAnalysisResult.value = result
                 addCyberScore(10)
             } catch (e: Exception) {
+                if (e is CancellationException) throw e
                 _linkAnalysisResult.value = "[ SCAN ERROR ]: ${e.message}"
             } finally {
                 _isAnalyzingLink.value = false

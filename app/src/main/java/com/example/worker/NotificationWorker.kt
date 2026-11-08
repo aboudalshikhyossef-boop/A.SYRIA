@@ -8,6 +8,7 @@ import android.content.pm.PackageManager
   import android.os.Build
   import android.provider.Settings
   import androidx.core.app.NotificationCompat
+import androidx.core.app.NotificationManagerCompat
   import androidx.work.CoroutineWorker
   import androidx.work.WorkerParameters
   import com.batoulapps.adhan.CalculationMethod
@@ -18,7 +19,8 @@ import android.content.pm.PackageManager
   import com.batoulapps.adhan.data.DateComponents
   import com.example.data.SovereignDataStore
   import com.example.data.remote.GeminiRepository
-  import kotlinx.coroutines.flow.first
+  import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.flow.first
   import java.util.Calendar
   import java.util.Date
 
@@ -67,6 +69,10 @@ import android.content.pm.PackageManager
       }
 
       override suspend fun doWork(): Result {
+          if (!NotificationManagerCompat.from(applicationContext).areNotificationsEnabled()) {
+              return Result.success()
+          }
+
           val dataStore = SovereignDataStore(applicationContext)
           val isAr = dataStore.isArabic.first()
           val apiKey = dataStore.geminiApiKey.first()
@@ -106,6 +112,7 @@ import android.content.pm.PackageManager
                       throttlePrefs.edit().putLong(KEY_LAST_GEMINI, nowMs).apply()
                   }
               } catch (e: Exception) {
+                  if (e is CancellationException) throw e
                   e.printStackTrace()
               }
           }
