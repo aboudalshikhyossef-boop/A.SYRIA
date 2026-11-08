@@ -17,6 +17,7 @@ import androidx.core.app.NotificationManagerCompat
   import com.batoulapps.adhan.PrayerTimes
   import com.batoulapps.adhan.data.DateComponents
   import com.example.data.SovereignDataStore
+import com.example.adaptive.AdaptiveEngine
   import com.example.data.remote.GeminiRepository
   import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.first
@@ -310,24 +311,33 @@ import kotlinx.coroutines.flow.first
               else -> NotificationCompat.CATEGORY_MESSAGE
           }
 
-          val soundUri = android.media.RingtoneManager.getDefaultUri(android.media.RingtoneManager.TYPE_NOTIFICATION)
-          val notification = NotificationCompat.Builder(applicationContext, channelId)
+          val notificationLevel = runCatching {
+              AdaptiveEngine(applicationContext).uiConfig.value.notificationLevel
+          }.getOrDefault("normal")
+
+          val builder = NotificationCompat.Builder(applicationContext, channelId)
               .setSmallIcon(icon)
               .setContentTitle(title)
               .setContentText(message)
               .setStyle(NotificationCompat.BigTextStyle().bigText(message))
-              .setPriority(
-                  if (channelId == CHANNEL_WISDOM) NotificationCompat.PRIORITY_DEFAULT
-                  else NotificationCompat.PRIORITY_MAX
-              )
               .setCategory(category)
               .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
-              .setSound(soundUri)
-              .setVibrate(longArrayOf(0, 300, 100, 300, 100, 500))
               .setAutoCancel(true)
-              .build()
 
-          runCatching { notificationManager.notify(id, notification) }
+          when (notificationLevel) {
+              "silent" -> builder
+                  .setSilent(true)
+                  .setPriority(NotificationCompat.PRIORITY_MIN)
+              "active" -> builder.setPriority(NotificationCompat.PRIORITY_MAX)
+              else -> builder.setPriority(
+                  if (channelId == CHANNEL_WISDOM) NotificationCompat.PRIORITY_DEFAULT
+                  else NotificationCompat.PRIORITY_HIGH
+              )
+          }
+
+          // On Android 8+, channel settings remain user-controlled. Do not override
+          // channel sound/vibration with per-notification hard-coded values.
+          runCatching { notificationManager.notify(id, builder.build()) }
       }
   }
   
