@@ -18,6 +18,7 @@ import com.example.data.database.AppDatabase
 import android.net.Uri
 import com.example.data.database.VaultFileRepository
 import com.example.data.database.VaultItem
+import com.example.data.database.InventorIdea
 import com.example.data.database.InventorIdeaRepository
 import com.example.data.ContextualVerseEngine
 import kotlinx.coroutines.CancellationException
@@ -43,6 +44,7 @@ import java.net.Inet4Address
 import java.net.NetworkInterface
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlin.random.Random
 
 class DashboardViewModel(application: Application) : AndroidViewModel(application), SensorEventListener {
@@ -138,9 +140,9 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
     suspend fun exportVaultFile(id: String, destination: Uri) =
         vaultFileRepository.exportToUri(id, destination)
 
-    fun deleteVaultItem(id: String) {
-        if (!_isVaultAuthenticated.value) return
-        viewModelScope.launch(Dispatchers.IO) { vaultFileRepository.delete(id) }
+    suspend fun deleteVaultItem(id: String) {
+        check(_isVaultAuthenticated.value) { "Vault authentication is required." }
+        vaultFileRepository.delete(id)
     }
 
     val savedIdeas: StateFlow<List<InventorIdea>> = repository.allIdeas
@@ -470,71 +472,11 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
         viewModelScope.launch(Dispatchers.IO) { repository.deleteIdeaById(ideaId) }
     }
 
-    fun wipeVault() {
-        if (!_isVaultAuthenticated.value) return
-        viewModelScope.launch(Dispatchers.IO) {
+    suspend fun wipeVault() {
+        check(_isVaultAuthenticated.value) { "Vault authentication is required." }
+        withContext(Dispatchers.IO) {
             vaultFileRepository.clearAll()
             repository.clearAll()
-        }
-    }
-
-    fun forgeAndSaveIdea() {
-        val title = _forgeTitle.value.trim()
-        val category = _forgeCategory.value.trim()
-        val ideaRaw = _forgeIdea.value.trim()
-        if (title.isEmpty() || ideaRaw.isEmpty() || _isThinking.value) return
-
-        viewModelScope.launch {
-            _isThinking.value = true
-            _forgeBlueprint.value = ""
-            try {
-                val responseLanguage = if (_isArabic.value) "Arabic" else "English"
-                val prompt = """
-                    You are the product architect for A.SYRIA.
-                    Produce a practical, privacy-first innovation blueprint in $responseLanguage.
-                    Idea title: $title
-                    Category: $category
-                    User's initial idea:
-                    $ideaRaw
-
-                    Return a structured, actionable plan with:
-                    1. Problem and intended users.
-                    2. Proposed solution and core user flow.
-                    3. System components and data flow.
-                    4. Privacy and security controls, including data minimization.
-                    5. A realistic MVP broken into ordered implementation steps.
-                    6. Main technical risks and mitigations.
-                    Be specific, avoid unsupported claims, and do not propose harmful cyber activity.
-                """.trimIndent()
-
-                val generatedBlueprint = generateGeminiText(prompt).trim()
-                check(generatedBlueprint.isNotBlank()) {
-                    "Gemini returned an empty blueprint."
-                }
-
-                val encryptedEntity = InventorIdea.createEncrypted(
-                    title = title,
-                    category = category,
-                    originalIdea = ideaRaw,
-                    geminiBlueprint = generatedBlueprint
-                )
-                repository.insertIdea(encryptedEntity)
-                _forgeBlueprint.value = generatedBlueprint
-                _isNeuralLinkOffline.value = false
-                // Keep the generated blueprint visible in the Forge panel.
-                // The vault itself must only open through its authentication gate.
-            } catch (cancelled: kotlinx.coroutines.CancellationException) {
-                throw cancelled
-            } catch (error: Exception) {
-                _isNeuralLinkOffline.value = true
-                _forgeBlueprint.value = if (_isArabic.value) {
-                    "تعذّر إنشاء المخطط ولم تُحفظ الفكرة. تحقق من اتصال Gemini ومفتاح API ثم أعد المحاولة.\n${error.message?.take(160).orEmpty()}"
-                } else {
-                    "The blueprint could not be generated, so the idea was not saved. Check the Gemini connection and API key, then retry.\n${error.message?.take(160).orEmpty()}"
-                }
-            } finally {
-                _isThinking.value = false
-            }
         }
     }
 

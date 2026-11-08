@@ -158,15 +158,6 @@ fun SettingsScreen(
                         }
                     }
 
-                    // ── DATA MANAGEMENT ───────────────────────────────────────────────
-                    SettingsCard(title = if (isAr) "إدارة البيانات" else "DATA MANAGEMENT", icon = Icons.Default.Storage, color = Color(0xFFFF6B35), glowAlpha = borderGlow) {
-                        Text(if (isAr) "⚠️ يحذف جميع الأفكار المحفوظة نهائياً ولا يمكن التراجع عنه" else "⚠️ Permanently deletes all saved records. Cannot be undone.", color = Color(0xFFFF6B35).copy(alpha = 0.7f), fontSize = 10.sp, lineHeight = 15.sp, modifier = Modifier.padding(bottom = 10.dp))
-                        Row(modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(Color.Red.copy(alpha = 0.08f)).border(1.dp, Color.Red.copy(alpha = 0.3f), RoundedCornerShape(10.dp)).clickable { haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress); viewModel.wipeVault() }.padding(14.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                            Icon(Icons.Default.DeleteForever, null, tint = Color.Red, modifier = Modifier.size(20.dp))
-                            Text(if (isAr) "حذف جميع البيانات المحفوظة" else "DELETE ALL SAVED DATA", color = Color.Red, fontSize = 13.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
-                        }
-                    }
-
                     // Footer
                     Column(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                         Text("A.SYRIA SOVEREIGN OS v5.0.0", color = Color.White.copy(alpha = 0.2f), fontSize = 10.sp, fontFamily = FontFamily.Monospace, letterSpacing = 2.sp, textAlign = TextAlign.Center)
