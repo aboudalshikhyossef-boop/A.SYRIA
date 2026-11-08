@@ -6,6 +6,8 @@ import android.provider.OpenableColumns
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import java.io.BufferedInputStream
 import java.io.DataInputStream
 import java.io.File
@@ -29,54 +31,73 @@ class VaultFileRepository(
     private val appContext = context.applicationContext
     private val resolver = appContext.contentResolver
     private val vaultDirectory = File(appContext.filesDir, "vault_items")
+    private val ioMutex = Mutex()
 
     val items: Flow<List<VaultItem>> = dao.observeAll()
 
     suspend fun importFromUri(uri: Uri): VaultItem = withContext(Dispatchers.IO) {
-        val displayName = queryDisplayName(uri)
-        val mimeType = resolver.getType(uri) ?: "application/octet-stream"
-        val input = resolver.openInputStream(uri)
-            ?: throw IOException("The selected file could not be opened.")
-        input.use { storeEncrypted(it, displayName, mimeType) }
+        ioMutex.withLock {
+            val displayName = queryDisplayName(uri)
+            val mimeType = resolver.getType(uri) ?: "application/octet-stream"
+            val input = resolver.openInputStream(uri)
+                ?: throw IOException("The selected file could not be opened.")
+            input.use { storeEncrypted(it, displayName, mimeType) }
+        }
     }
 
     suspend fun saveText(displayName: String, text: String): VaultItem = withContext(Dispatchers.IO) {
-        require(displayName.isNotBlank()) { "Enter a name for this text." }
-        require(text.isNotBlank()) { "The text is empty." }
-        text.byteInputStream(Charsets.UTF_8).use {
-            storeEncrypted(it, displayName.trim(), "text/plain; charset=utf-8")
+        ioMutex.withLock {
+            require(displayName.isNotBlank()) { "Enter a name for this text." }
+            require(text.isNotBlank()) { "The text is empty." }
+            text.byteInputStream(Charsets.UTF_8).use {
+                storeEncrypted(it, displayName.trim(), "text/plain; charset=utf-8")
+            }
         }
     }
 
     suspend fun exportToUri(id: String, destination: Uri) = withContext(Dispatchers.IO) {
-        val item = dao.getById(id) ?: throw IOException("The vault item no longer exists.")
-        val encryptedFile = resolveVaultFile(item.storedFileName)
-        if (!encryptedFile.isFile) throw IOException("The encrypted vault file is missing.")
-        // Verify the authentication tag before any plaintext is written to an export destination.
-        verifyEncryptedFile(encryptedFile)
-        val output = resolver.openOutputStream(destination, "w")
-            ?: throw IOException("The destination could not be opened.")
-        output.use { decryptInto(encryptedFile, it) }
+        ioMutex.withLock {
+            val item = dao.getById(id) ?: throw IOException("The vault item no longer exists.")
+            val encryptedFile = resolveVaultFile(item.storedFileName)
+            if (!encryptedFile.isFile) throw IOException("The encrypted vault file is missing.")
+            // Verify the authentication tag before any plaintext is written to an export destination.
+            verifyEncryptedFile(encryptedFile)
+            val output = resolver.openOutputStream(destination, "w")
+                ?: throw IOException("The destination could not be opened.")
+            output.use { decryptInto(encryptedFile, it) }
+        }
     }
 
     suspend fun delete(id: String) = withContext(Dispatchers.IO) {
-        val item = dao.getById(id) ?: return@withContext
-        val file = resolveVaultFile(item.storedFileName)
-        if (file.exists() && !file.delete()) {
-            throw IOException("The encrypted file could not be removed.")
+        ioMutex.withLock {
+            val item = dao.getById(id) ?: return@withLock
+            val file = resolveVaultFile(item.storedFileName)
+            if (file.exists() && !file.delete()) {
+                throw IOException("The encrypted file could not be removed.")
+            }
+            dao.deleteById(id)
         }
-        dao.deleteById(id)
     }
 
     suspend fun clearAll() = withContext(Dispatchers.IO) {
-        val all = dao.getAll()
-        all.forEach { item ->
-            val file = resolveVaultFile(item.storedFileName)
-            if (file.exists() && !file.delete()) {
-                throw IOException("Could not securely remove " + item.getDisplayName() + ".")
+        ioMutex.withLock {
+            val all = dao.getAll()
+            all.forEach { item ->
+                val file = resolveVaultFile(item.storedFileName)
+                if (file.exists() && !file.delete()) {
+                    throw IOException("Could not remove " + item.getDisplayName() + ".")
+                }
+                // Remove metadata as each file is deleted, so a partial failure stays consistent.
+                dao.deleteById(item.id)
+            }
+            vaultDirectory.listFiles()?.forEach { file ->
+                if ((file.name.endsWith(".asv") || file.name.endsWith(".tmp")) &&
+                    file.isFile && !file.delete()
+                ) {
+                    throw IOException("A leftover encrypted vault file could not be removed.")
+                }
             }
         }
-        dao.deleteAll()
     }
 
     private fun resolveVaultFile(storedFileName: String): File {
@@ -88,12 +109,14 @@ class VaultFileRepository(
 
     /** Remove abandoned temporary files and encrypted files without a metadata row. */
     suspend fun removeOrphanedFiles() = withContext(Dispatchers.IO) {
-        if (!vaultDirectory.isDirectory) return@withContext
-        val referenced = dao.getAll().map { it.storedFileName }.toSet()
-        vaultDirectory.listFiles()?.forEach { candidate ->
-            val isTemporary = candidate.name.endsWith(".tmp")
-            val isUnreferenced = candidate.name.endsWith(".asv") && candidate.name !in referenced
-            if ((isTemporary || isUnreferenced) && candidate.isFile) candidate.delete()
+        ioMutex.withLock {
+            if (!vaultDirectory.isDirectory) return@withLock
+            val referenced = dao.getAll().map { it.storedFileName }.toSet()
+            vaultDirectory.listFiles()?.forEach { candidate ->
+                val isTemporary = candidate.name.endsWith(".tmp")
+                val isUnreferenced = candidate.name.endsWith(".asv") && candidate.name !in referenced
+                if ((isTemporary || isUnreferenced) && candidate.isFile) candidate.delete()
+            }
         }
     }
 
