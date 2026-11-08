@@ -8,7 +8,8 @@ package com.example.ui.viewmodel
   import com.example.data.SovereignDataStore
   import com.example.data.chat.ChatMessage
   import com.example.data.database.AppDatabase
-  import kotlinx.coroutines.Dispatchers
+  import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
   import kotlinx.coroutines.flow.MutableStateFlow
   import kotlinx.coroutines.flow.SharingStarted
   import kotlinx.coroutines.flow.StateFlow
@@ -31,6 +32,7 @@ package com.example.ui.viewmodel
 
       private val _geminiKey = MutableStateFlow("")
 
+      @Volatile
       private var analysisScheduled = false
 
       init {
@@ -65,11 +67,12 @@ package com.example.ui.viewmodel
                   val reply = gemini.chat(
                       systemPrompt = buildSystemPrompt(uiConfig),
                       history      = history,
-                      geminiApiKey   = key
+                      apiKey = key
                   )
                   dao.insert(ChatMessage(role = "assistant", content = reply))
 
               } catch (e: Exception) {
+                  if (e is CancellationException) throw e
                   dao.insert(ChatMessage(
                       role    = "assistant",
                       content = "Connection error — ${e.message?.take(90) ?: "unknown"}"
@@ -85,13 +88,13 @@ package com.example.ui.viewmodel
           analysisScheduled = true
 
           viewModelScope.launch(Dispatchers.IO) {
-              val key = _geminiKey.value
-              if (key.isBlank()) return@launch
-
-              val recent = dao.getRecent(6)
-              if (recent.any { it.role == "suggestion" }) return@launch
-
               try {
+                  val key = _geminiKey.value
+                  if (key.isBlank()) return@launch
+
+                  val recent = dao.getRecent(6)
+                  if (recent.any { it.role == "suggestion" }) return@launch
+
                   val insight = gemini.generateText(
                       systemInstruction = """You are an intelligent UI advisor embedded in A.SYRIA, a sovereign privacy-first app.
   Analyse the provided configuration and write ONE short, proactive suggestion (2-3 sentences max).
@@ -105,10 +108,15 @@ package com.example.ui.viewmodel
                       apiKey = key
                   )
                   dao.insert(ChatMessage(role = "suggestion", content = insight))
-              } catch (_: Exception) { /* Silent — background analysis is best-effort */ }
+              } catch (cancelled: CancellationException) {
+                  throw cancelled
+              } catch (_: Exception) {
+                  // Best-effort analysis; a later request may retry.
+              } finally {
+                  analysisScheduled = false
+              }
           }
       }
-
       fun clearHistory() {
           viewModelScope.launch(Dispatchers.IO) {
               dao.clear()

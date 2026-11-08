@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.*
 import androidx.datastore.preferences.preferencesDataStore
+import com.example.data.database.SovereigntyCipher
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
@@ -38,7 +39,9 @@ class SovereignDataStore(private val context: Context) {
 
     val operatorName: Flow<String>  = context.dataStore.data.map { it[OPERATOR_NAME]  ?: "Sovereign_Operator" }
     val neuralRole: Flow<String>    = context.dataStore.data.map { it[NEURAL_ROLE]    ?: "Sovereign Node v5" }
-    val geminiApiKey: Flow<String>  = context.dataStore.data.map { it[GEMINI_API_KEY] ?: "" }
+    val geminiApiKey: Flow<String> = context.dataStore.data.map {
+        SovereigntyCipher.decryptSecret(it[GEMINI_API_KEY])
+    }
     val projectName: Flow<String>   = context.dataStore.data.map { it[PROJECT_NAME]   ?: "" }
     val projectId: Flow<String>     = context.dataStore.data.map { it[PROJECT_ID]     ?: "" }
     val projectNumber: Flow<String> = context.dataStore.data.map { it[PROJECT_NUMBER] ?: "" }
@@ -68,13 +71,32 @@ class SovereignDataStore(private val context: Context) {
 
     suspend fun saveOperatorName(name: String) { context.dataStore.edit { it[OPERATOR_NAME] = name } }
     suspend fun saveNeuralRole(role: String)   { context.dataStore.edit { it[NEURAL_ROLE]   = role } }
-    suspend fun saveGeminiApiKey(key: String)  { context.dataStore.edit { it[GEMINI_API_KEY] = key } }
+     suspend fun saveGeminiApiKey(key: String) {
+        context.dataStore.edit { it[GEMINI_API_KEY] = SovereigntyCipher.encryptSecret(key) }
+    }
+
+    /** Encrypts a legacy plaintext API key once, without interrupting existing readers. */
+    suspend fun migrateLegacyGeminiApiKey() {
+        context.dataStore.edit { preferences ->
+            val stored = preferences[GEMINI_API_KEY].orEmpty()
+            if (stored.isNotBlank() && !SovereigntyCipher.isSecretEncrypted(stored)) {
+                preferences[GEMINI_API_KEY] = SovereigntyCipher.encryptSecret(stored)
+            }
+        }
+    }
     suspend fun saveProjectName(name: String)  { context.dataStore.edit { it[PROJECT_NAME]   = name } }
     suspend fun saveProjectId(id: String)      { context.dataStore.edit { it[PROJECT_ID]     = id } }
     suspend fun saveProjectNumber(n: String)   { context.dataStore.edit { it[PROJECT_NUMBER] = n } }
     suspend fun saveIsArabic(v: Boolean)       { context.dataStore.edit { it[IS_ARABIC]      = v } }
     suspend fun saveStealthMode(v: Boolean)    { context.dataStore.edit { it[STEALTH_MODE]   = v } }
     suspend fun saveCyberScore(score: Int)     { context.dataStore.edit { it[CYBER_SCORE]    = score } }
+    
+    /** Atomic score increment; avoids lost updates from concurrent feature actions. */
+    suspend fun addCyberScore(points: Int) {
+        context.dataStore.edit { preferences ->
+            preferences[CYBER_SCORE] = (preferences[CYBER_SCORE] ?: 0) + points
+        }
+    }
     suspend fun saveUserLevel(level: String)   { context.dataStore.edit { it[USER_LEVEL]     = level } }
     suspend fun saveUserInterests(s: Set<String>) { context.dataStore.edit { it[USER_INTERESTS] = s } }
     suspend fun saveCalibrationCompleted(v: Boolean) { context.dataStore.edit { it[CALIBRATION_COMPLETED] = v } }

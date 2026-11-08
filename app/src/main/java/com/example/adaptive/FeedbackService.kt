@@ -2,7 +2,8 @@ package com.example.adaptive
 
   import android.content.Context
   import com.example.data.remote.GeminiRepository
-  import kotlinx.coroutines.Dispatchers
+  import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
   import kotlinx.coroutines.withContext
   import org.json.JSONArray
 
@@ -35,7 +36,7 @@ package com.example.adaptive
           withContext(Dispatchers.IO) {
 
               // Rate-limit guard
-              if (!RateLimiter.isAllowed(context)) {
+              if (!RateLimiter.tryAcquire(context)) {
                   return@withContext FeedbackResult.RateLimited(
                       resetSeconds = RateLimiter.getResetSeconds(context),
                       remaining    = 0
@@ -70,7 +71,6 @@ package com.example.adaptive
                   )
 
                   val changes = parseAndValidateChanges(aiText)
-                  RateLimiter.recordRequest(context)
 
                   if (changes.isEmpty()) {
                       FeedbackResult.Empty(
@@ -84,6 +84,7 @@ package com.example.adaptive
                   }
 
               } catch (e: Exception) {
+                  if (e is CancellationException) throw e
                   FeedbackResult.Error("Connection error: ${e.message?.take(100)}")
               }
           }

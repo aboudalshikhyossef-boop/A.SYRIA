@@ -45,6 +45,8 @@ import kotlin.random.Random
 class DashboardViewModel(application: Application) : AndroidViewModel(application), SensorEventListener {
 
     private val sensorManager = application.getSystemService(Context.SENSOR_SERVICE) as SensorManager
+    private val connectivityManager = application.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+    private var connectivityCallback: ConnectivityManager.NetworkCallback? = null
     private val accelerometer: Sensor? = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
     private val magnetometer: Sensor? = sensorManager.getDefaultSensor(Sensor.TYPE_MAGNETIC_FIELD)
 
@@ -198,7 +200,7 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
     val isResourcesOpen: StateFlow<Boolean> = _isResourcesOpen.asStateFlow()
 
     fun addCyberScore(points: Int) {
-        viewModelScope.launch { dataStore.saveCyberScore(_cyberScore.value + points) }
+        viewModelScope.launch(Dispatchers.IO) { dataStore.addCyberScore(points) }
     }
 
 
@@ -413,6 +415,7 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
 
     init {
         viewModelScope.launch { dataStore.clearLegacyAiSettings() }
+        viewModelScope.launch(Dispatchers.IO) { dataStore.migrateLegacyGeminiApiKey() }
         application.registerReceiver(batteryReceiver, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
         monitorConnectivity()
         viewModelScope.launch { dataStore.isArabic.collect { _isArabic.value = it } }
@@ -517,25 +520,30 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
         return "N/A"
     }
 
-      private fun monitorConnectivity() {
-          val cm = getApplication<Application>().getSystemService(Context.CONNECTIVITY_SERVICE) as android.net.ConnectivityManager
-          val callback = object : android.net.ConnectivityManager.NetworkCallback() {
-              override fun onCapabilitiesChanged(network: android.net.Network, caps: android.net.NetworkCapabilities) {
-                  _connectionType.value = when {
-                      caps.hasTransport(android.net.NetworkCapabilities.TRANSPORT_WIFI) -> "Wi-Fi"
-                      caps.hasTransport(android.net.NetworkCapabilities.TRANSPORT_CELLULAR) -> "Cellular"
-                      caps.hasTransport(android.net.NetworkCapabilities.TRANSPORT_ETHERNET) -> "Ethernet"
-                      else -> "Connected"
-                  }
-              }
-              override fun onLost(network: android.net.Network) { _connectionType.value = "DISCONNECTED" }
-              override fun onUnavailable() { _connectionType.value = "DISCONNECTED" }
-          }
-          try {
-              cm.registerDefaultNetworkCallback(callback)
-          } catch (_: Exception) { _connectionType.value = "Unknown" }
-      }
+    private fun monitorConnectivity() {
+        if (connectivityCallback != null) return
+        val callback = object : ConnectivityManager.NetworkCallback() {
+            override fun onCapabilitiesChanged(network: android.net.Network, caps: NetworkCapabilities) {
+                _connectionType.value = when {
+                    caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) -> "Wi-Fi"
+                    caps.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) -> "Cellular"
+                    caps.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET) -> "Ethernet"
+                    else -> "Connected"
+                }
+            }
 
+            override fun onLost(network: android.net.Network) {
+                _connectionType.value = "DISCONNECTED"
+            }
+        }
+        connectivityCallback = callback
+        try {
+            connectivityManager.registerDefaultNetworkCallback(callback)
+        } catch (_: Exception) {
+            connectivityCallback = null
+            _connectionType.value = "Unknown"
+        }
+    }
   
     fun fetchStrategicIntelligence() {
         // This can now be personalized too in the future!
@@ -736,6 +744,10 @@ Every scenario you produce MUST be on a COMPLETELY DIFFERENT situation, attack v
 
     override fun onCleared() {
         super.onCleared()
+        connectivityCallback?.let { callback ->
+            runCatching { connectivityManager.unregisterNetworkCallback(callback) }
+        }
+        connectivityCallback = null
         sensorManager.unregisterListener(this)
         try { getApplication<Application>().unregisterReceiver(batteryReceiver) } catch (_: Exception) {}
     }

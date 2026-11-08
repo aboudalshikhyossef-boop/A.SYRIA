@@ -76,7 +76,7 @@ package com.example.worker
           createNotificationChannels()
 
           // 1. Prayer alerts — always check every 15 min (has its own per-prayer deduplication)
-          checkAndNotifyPrayerPrecise(isAr)
+          checkAndNotifyPrayer(isAr)
 
           // 2. Device Security Scan — throttled to once every 12 hours
           val lastSecurity = throttlePrefs.getLong(KEY_LAST_SECURITY, 0L)
@@ -187,7 +187,7 @@ package com.example.worker
           }
       }
 
-      private fun checkAndNotifyPrayerPrecise(isAr: Boolean) {
+      private fun checkAndNotifyPrayer(isAr: Boolean) {
           val prefs = applicationContext.getSharedPreferences("prayer_prefs", Context.MODE_PRIVATE)
           val lat = prefs.getFloat("network_lat", 33.5138f).toDouble()
           val lon = prefs.getFloat("network_lon", 36.2765f).toDouble()
@@ -238,16 +238,16 @@ package com.example.worker
                       title = if (isAr) "🤲 استعد لصلاة $name — $timeStr"
                               else "🤲 Prepare for ${prayer.name} — $timeStr",
                       message = if (isAr)
-                          "بقي ٥ دقائق على أذان $name. توضّأ واستعد للقاء ربّك.\n\n$dua"
+                          "بقي ١٥ دقيقة أو أقل على أذان $name. توضّأ واستعد للقاء ربّك.\n\n$dua"
                       else
-                          "5 minutes until ${prayer.name} at $timeStr. Make wudu and prepare.\n\n$dua",
+                          "15 minutes or less until ${prayer.name} at $timeStr. Make wudu and prepare.\n\n$dua",
                       id = 2000 + prayer.ordinal(),
                       channelId = CHANNEL_PRAYER
                   )
                   prefs.edit().putString("last_5min_${prayer.name}", todayDate).apply()
               }
 
-              if (minutesBefore in -10..2 && lastNotifiedExact != todayDate) {
+              if (minutesBefore in -15..0 && lastNotifiedExact != todayDate) {
                   val name = if (isAr) (arabicNames[prayer] ?: prayer.name) else prayer.name
                   val motivation = PRAYER_MOTIVATIONS[prayer] ?: ""
                   showNotification(
@@ -286,7 +286,11 @@ package com.example.worker
               val grantedDangerous = mutableListOf<String>()
 
               for ((permission, label) in dangerousPermissions) {
-                  if (requestedPermissions.contains(permission)) {
+                  val permissionGranted =
+                      requestedPermissions.contains(permission) &&
+                          pm.checkPermission(permission, packageInfo.packageName) ==
+                              PackageManager.PERMISSION_GRANTED
+                  if (permissionGranted) {
                       grantedDangerous.add(label)
                   }
               }
@@ -402,7 +406,7 @@ package com.example.worker
                   else NotificationCompat.PRIORITY_MAX
               )
               .setCategory(category)
-              .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+              .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
               .setSound(soundUri)
               .setVibrate(longArrayOf(0, 300, 100, 300, 100, 500))
               .setAutoCancel(true)
