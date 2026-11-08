@@ -1,6 +1,5 @@
 package com.example
 
-import android.app.Application
 import android.content.Context
 import com.example.adaptive.AdaptiveEngine
 import com.example.data.remote.GeminiRepository
@@ -69,7 +68,7 @@ class ExampleUnitTest {
 
     @Test
     fun libraryLoadsOnlyUniqueDuasAndHadiths() {
-        val context = RuntimeEnvironment.getApplication<Application>()
+        val context = RuntimeEnvironment.getApplication()
         val data = loadLibraryData(context)
 
         assertEquals(setOf("duas", "hadiths"), data.keys)

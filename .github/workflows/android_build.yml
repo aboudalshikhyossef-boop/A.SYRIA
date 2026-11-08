@@ -31,7 +31,7 @@ jobs:
       # Run the installed Gradle distribution directly. This avoids executing
       # the unverified wrapper JAR currently present in the repository.
       - name: Run unit tests and build debug APK
-        run: gradle testDebugUnitTest assembleDebug --no-configuration-cache --stacktrace --build-cache
+        run: gradle testDebugUnitTest compileDebugAndroidTestKotlin assembleDebug --no-configuration-cache --stacktrace --build-cache
 
       - name: Upload debug APK
         uses: actions/upload-artifact@v4
