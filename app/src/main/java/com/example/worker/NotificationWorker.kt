@@ -72,17 +72,31 @@ import kotlinx.coroutines.flow.first
           }
 
           val dataStore = SovereignDataStore(applicationContext)
-          val isAr = dataStore.isArabic.first()
-          val apiKey = dataStore.geminiApiKey.first()
+          val isAr = try {
+              dataStore.isArabic.first()
+          } catch (cancelled: CancellationException) {
+              throw cancelled
+          } catch (_: Exception) {
+              java.util.Locale.getDefault().language == "ar"
+          }
           val throttlePrefs = applicationContext.getSharedPreferences(PREFS_THROTTLE, Context.MODE_PRIVATE)
           val nowMs = System.currentTimeMillis()
 
           createNotificationChannels()
 
-          // 1. Prayer alerts — WorkManager is inexact and may be deferred by the OS.
+          // Prayer and local wisdom must never depend on Gemini credentials or availability.
           checkAndNotifyPrayer(isAr)
 
-          // 2. Optional Gemini tip. Throttle attempts, not only successes, to avoid repeating
+          // Read the encrypted Gemini key only after the independent prayer alerts have run.
+          val apiKey = try {
+              dataStore.geminiApiKey.first()
+          } catch (cancelled: CancellationException) {
+              throw cancelled
+          } catch (_: Exception) {
+              ""
+          }
+
+          // Optional Gemini tip. Throttle attempts, not only successes, to avoid repeating
           // paid requests every 15 minutes while the provider is unavailable.
           val lastGeminiAttempt = throttlePrefs.getLong(KEY_LAST_GEMINI_ATTEMPT, 0L)
           if (apiKey.isNotBlank() && nowMs - lastGeminiAttempt >= TWENTY_FOUR_HOURS_MS) {
@@ -153,10 +167,10 @@ import kotlinx.coroutines.flow.first
 
               val securityChannel = NotificationChannel(
                   CHANNEL_SECURITY,
-                  "تنبيهات الأمان",
+                  "نصائح أمنية",
                   NotificationManager.IMPORTANCE_HIGH
               ).apply {
-                  description = "تنبيهات فحص أمان الجهاز والتطبيقات"
+                  description = "نصائح أمنية عامة مدعومة بالذكاء الاصطناعي"
                   enableVibration(true)
                   vibrationPattern = longArrayOf(0, 300, 100, 300, 100, 500)
                   enableLights(true)
