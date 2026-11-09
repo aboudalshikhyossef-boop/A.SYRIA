@@ -37,6 +37,7 @@ import androidx.work.*
 import com.example.worker.NotificationWorker
 import java.util.concurrent.TimeUnit
 import com.example.adaptive.LocalAdaptiveConfig
+import com.example.adaptive.AdaptiveContentFrame
 import com.example.adaptive.LocalWindowAdaptiveInfo
 import com.example.adaptive.ProvideWindowAdaptiveLayout
 import com.example.ui.screens.*
