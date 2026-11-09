@@ -56,7 +56,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        api-level: ['33', '36', '37.0']
+        include:
+          - api-level: '33'
+          - api-level: '36'
+          - api-level: '37.0'
+            ram-size: '3072M'
     steps:
       - name: Checkout source
         uses: actions/checkout@v7
@@ -84,11 +88,42 @@ jobs:
           target: google_apis
           arch: x86_64
           profile: pixel_2
+          ram-size: ${{ matrix.ram-size }}
           emulator-options: -no-window -no-audio -no-boot-anim -no-snapshot -no-snapshot-save -no-metrics -wipe-data -gpu swiftshader_indirect -camera-back none
           emulator-boot-timeout: 900
           disable-animations: true
           script: |
+            set -euo pipefail
+
+            emulator_serial="${ANDROID_SERIAL:-emulator-5554}"
             adb devices -l
-            adb -s emulator-5554 shell getprop ro.build.version.sdk
-            adb -s emulator-5554 shell getprop ro.product.cpu.abilist
+            adb -s "$emulator_serial" wait-for-device
+
+            # The emulator runner waits for sys.boot_completed, which can become
+            # true slightly before Package Manager is registered on newer images.
+            package_manager_ready=false
+            for attempt in $(seq 1 90); do
+              boot_completed="$(adb -s "$emulator_serial" shell getprop sys.boot_completed 2>/dev/null | tr -d '\\r' || true)"
+              package_probe="$(adb -s "$emulator_serial" shell cmd package list packages 2>&1 || true)"
+
+              if [ "$boot_completed" = "1" ] && printf '%s' "$package_probe" | grep -q '^package:'; then
+                package_manager_ready=true
+                echo "Android boot and Package Manager are ready."
+                break
+              fi
+
+              echo "Waiting for Package Manager (attempt $attempt/90)."
+              sleep 2
+            done
+
+            if [ "$package_manager_ready" != true ]; then
+              echo "::error::Android Package Manager did not become ready after emulator boot."
+              adb -s "$emulator_serial" shell getprop init.svc.system_server || true
+              adb -s "$emulator_serial" shell service check package || true
+              adb -s "$emulator_serial" logcat -d -b all -v time -t 2000 | grep -Ei 'FATAL EXCEPTION|SystemServer|PackageManager|ActivityManager|OutOfMemory|watchdog' | tail -n 200 || true
+              exit 1
+            fi
+
+            adb -s "$emulator_serial" shell getprop ro.build.version.sdk
+            adb -s "$emulator_serial" shell getprop ro.product.cpu.abilist
             ./gradlew connectedDebugAndroidTest --no-configuration-cache --stacktrace --build-cache
