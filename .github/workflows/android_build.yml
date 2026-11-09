@@ -132,6 +132,37 @@ jobs:
           echo "$sdk_root/platform-tools" >> "$GITHUB_PATH"
           echo "Android SDK command-line tools: $("$tools_dir/latest/bin/sdkmanager" --version)"
 
+      # The upstream emulator action also installs the latest emulator package.
+      # Preinstall it with retries so a transient/corrupt SDK archive cannot fail
+      # API 37 before the emulator is even created. The action then reuses this package.
+      - name: Preinstall Android Emulator (API 37) with retry
+        if: matrix.api-level == '37.0'
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          sdkmanager_bin="${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager"
+          test -x "$sdkmanager_bin"
+
+          for attempt in 1 2 3; do
+            echo "Installing stable-channel Android Emulator package (attempt $attempt/3)."
+            if "$sdkmanager_bin" --install emulator --channel=0; then
+              emulator_bin="${ANDROID_HOME}/emulator/emulator"
+              test -x "$emulator_bin"
+              "$emulator_bin" -version
+              echo "Android Emulator package is installed and reusable by android-emulator-runner."
+              exit 0
+            fi
+
+            if (( attempt < 3 )); then
+              echo "::warning::Android Emulator package download failed; retrying after a clean delay."
+              sleep $((attempt * 10))
+            fi
+          done
+
+          echo "::error::Could not install the Android Emulator package after 3 attempts."
+          exit 1
+
       - name: Enable KVM
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
