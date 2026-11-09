@@ -73,3 +73,36 @@ if [ "$api_level" -ge 37 ]; then
       ;;
   esac
 fi
+\n
+# The caller can pass the Gradle instrumentation command. Running it here lets
+# us capture emulator diagnostics before android-emulator-runner shuts the AVD down.
+echo "Android test device diagnostics:"
+adb -s "$emulator_serial" shell getprop ro.build.version.sdk || true
+adb -s "$emulator_serial" shell getprop init.svc.system_server || true
+adb -s "$emulator_serial" shell service check package || true
+adb -s "$emulator_serial" shell df -h /data || true
+
+if [ "$#" -gt 0 ]; then
+  set +e
+  "$@"
+  test_exit_code=$?
+  set -e
+
+  if [ "$test_exit_code" -ne 0 ]; then
+    echo "::error::Android instrumentation command failed with exit code $test_exit_code."
+    echo "Collecting Package Manager, system_server, storage, and low-memory diagnostics."
+    adb -s "$emulator_serial" shell getprop init.svc.system_server || true
+    adb -s "$emulator_serial" shell service check package || true
+    adb -s "$emulator_serial" shell df -h /data || true
+    if [ "$api_level" -ge 37 ]; then
+      adb -s "$emulator_serial" shell cmd appops get android GET_USAGE_STATS || true
+    fi
+
+    diagnostic_log="$(adb -s "$emulator_serial" logcat -d -b all -v threadtime -t 5000 2>&1 || true)"
+    printf '%s\n' "$diagnostic_log" |
+      grep -Ei 'FATAL EXCEPTION|SystemServer|system_server|PackageManager|PackageInstaller|StorageStats|ActivityManager|OutOfMemory|lmkd|watchdog|Fatal signal|installd|low memory|Broken pipe' |
+      tail -n 300 || true
+  fi
+
+  exit "$test_exit_code"
+fi
