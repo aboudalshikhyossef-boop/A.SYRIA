@@ -1,5 +1,6 @@
 package com.example.ui.screens
 
+/** Stateless presentation components shared by the dashboard's status and metrics sections. */
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
