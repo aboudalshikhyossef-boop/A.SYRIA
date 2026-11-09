@@ -101,7 +101,7 @@ if [ "$#" -gt 0 ]; then
     fi
 
     diagnostic_log="$(adb -s "$emulator_serial" logcat -d -b all -v threadtime -t 8000 2>&1 || true)"
-    printf '%s\\n' "$diagnostic_log" |
+    printf '%s\n' "$diagnostic_log" |
       grep -Ei 'FATAL EXCEPTION|Fatal signal|am_crash|am_anr|AndroidRuntime|INSTRUMENTATION_ABORTED|WATCHDOG|Watchdog|WTF|lmkd|lowmemory|OutOfMemory|SIGSEGV|SIGABRT|system_server.*(died|crash|killed)|Process .*died|Process .*has died|Killing .*system_server|PackageManager.*(crash|died|failed)|PackageInstaller.*(crash|died|failed)|StorageStats.*(crash|died|failed)|Broken pipe' |
       tail -n 400 || true
 
