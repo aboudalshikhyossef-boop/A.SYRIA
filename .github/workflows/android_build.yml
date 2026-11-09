@@ -39,7 +39,27 @@ jobs:
 
       # The official wrapper is checksum-validated before any Gradle task runs.
       - name: Run unit tests and build debug APK
-        run: ./gradlew testDebugUnitTest compileDebugAndroidTestKotlin assembleDebug --no-configuration-cache --stacktrace --build-cache
+        run: ./gradlew testDebugUnitTest processDebugAndroidTestManifest compileDebugAndroidTestKotlin assembleDebug --no-configuration-cache --stacktrace --build-cache
+
+      - name: Verify Compose instrumentation host manifest
+        shell: bash
+        run: |
+          mapfile -t manifests < <(find app/build/intermediates -type f -name AndroidManifest.xml -path '*debugAndroidTest*')
+          if (( ${#manifests[@]} == 0 )); then
+            echo "::error::No merged debugAndroidTest manifest was generated."
+            exit 1
+          fi
+
+          for manifest in "${manifests[@]}"; do
+            if grep -q 'androidx.activity.ComponentActivity' "$manifest"; then
+              echo "Compose test host is declared in $manifest"
+              exit 0
+            fi
+          done
+
+          echo "::error::androidx.activity.ComponentActivity is missing from the merged instrumentation manifest."
+          printf '%s\\n' "${manifests[@]}"
+          exit 1
 
       - name: Upload debug APK
         uses: actions/upload-artifact@v7
