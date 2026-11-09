@@ -84,4 +84,8 @@ jobs:
           emulator-options: -no-window -no-audio -no-boot-anim -no-snapshot -no-snapshot-save -wipe-data -gpu swiftshader_indirect -camera-back none
           emulator-boot-timeout: 900
           disable-animations: true
-          script: gradle connectedDebugAndroidTest --no-configuration-cache --stacktrace --build-cache
+          script: |
+            adb devices -l
+            adb -s emulator-5554 shell getprop ro.build.version.sdk
+            adb -s emulator-5554 shell getprop ro.product.cpu.abilist
+            gradle connectedDebugAndroidTest --no-configuration-cache --stacktrace --build-cache
