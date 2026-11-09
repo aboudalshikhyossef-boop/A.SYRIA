@@ -56,6 +56,7 @@ import com.example.ui.theme.CyberCyan
 import com.example.ui.theme.AmberZen
 import com.example.ui.theme.VoidBlack
 import com.example.ui.viewmodel.DashboardViewModel
+import com.example.ui.viewmodel.resolveDashboardStartDestination
 import com.example.ui.viewmodel.GeminiChatViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -169,16 +170,11 @@ class MainActivity : FragmentActivity() {
                         onDispose { lifecycle.removeObserver(observer) }
                     }
 
-                    // Wait for DataStore to load before computing startDestination
-                    // This prevents the onboarding from showing every time
-                    val startDestination = remember(isDataLoaded, onboardingCompleted, calibrationCompleted) {
-                        if (!isDataLoaded) "splash" // Stay on splash while loading
-                        else when {
-                            !onboardingCompleted  -> "onboarding"
-                            !calibrationCompleted -> "calibration"
-                            else                  -> "dashboard"
-                        }
-                    }
+                    val startDestination = resolveDashboardStartDestination(
+                        isDataLoaded = isDataLoaded,
+                        onboardingCompleted = onboardingCompleted,
+                        calibrationCompleted = calibrationCompleted
+                    )
 
                     CompositionLocalProvider(LocalAdaptiveConfig provides uiConfig) {
                         ProvideWindowAdaptiveLayout {
