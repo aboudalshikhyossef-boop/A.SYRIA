@@ -56,11 +56,20 @@ fi
 
 api_level="$(adb -s "$emulator_serial" shell getprop ro.build.version.sdk)"
 if [ "$api_level" -ge 37 ]; then
-  # Android 17's emulator image may leave GET_USAGE_STATS denied for the
-  # shared system UID. Package installation calls StorageStatsService,
-  # which fails before tests start unless this system AppOp is allowed.
-  # This changes only the disposable CI emulator, never the application.
-  echo "Configuring GET_USAGE_STATS for Android system UID on API $api_level."
-  adb -s "$emulator_serial" shell cmd appops set --uid android GET_USAGE_STATS allow
-  adb -s "$emulator_serial" shell cmd appops get --uid android GET_USAGE_STATS
+  # Android 17's emulator image can deny GET_USAGE_STATS to the "android"
+  # package while PackageInstaller queries StorageStatsService. Set the
+  # package-level AppOp because that service checks package "android" (UID 1000).
+  # This affects only the disposable CI emulator, never the application.
+  echo "Allowing GET_USAGE_STATS for the Android system package on API $api_level."
+  adb -s "$emulator_serial" shell cmd appops set android GET_USAGE_STATS allow
+
+  appops_state="$(adb -s "$emulator_serial" shell cmd appops get android GET_USAGE_STATS)"
+  printf '%s\\n' "$appops_state"
+  case "$appops_state" in
+    *"GET_USAGE_STATS: allow"*) ;;
+    *)
+      echo "::error::Android system package GET_USAGE_STATS AppOp is not allowed."
+      exit 1
+      ;;
+  esac
 fi
