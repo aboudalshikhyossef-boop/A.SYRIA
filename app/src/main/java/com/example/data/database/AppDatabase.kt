@@ -1,7 +1,7 @@
-package com.example.data.db
+package com.example.data.database
 
 import android.content.ContentValues
-import android.db.sqlite.SQLiteDatabase
+import android.database.sqlite.SQLiteDatabase
 import android.content.Context
 import androidx.room.Database
 import androidx.room.Room
