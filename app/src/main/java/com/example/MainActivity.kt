@@ -287,11 +287,32 @@ class MainActivity : FragmentActivity() {
                                     }
                                 }
                             }
-                            composable("link_scanner")      { LinkScannerScreen(vm) { navController.popBackStack() } }
-                            composable("about")             { AboutScreen { navController.popBackStack() } }
-                            composable("glossary")          { CyberGlossaryScreen(vm) { navController.popBackStack() } }
-                            composable("checklist")         { SecurityChecklistScreen(vm) { navController.popBackStack() } }
-                            composable("adaptive_feedback") { val isArLocal by vm.isArabic.collectAsState(); FeedbackScreen(vm, isArLocal) { navController.popBackStack() } }
+                            composable("link_scanner") {
+                                AdaptiveContentFrame {
+                                    LinkScannerScreen(vm) { navController.popBackStack() }
+                                }
+                            }
+                            composable("about") {
+                                AdaptiveContentFrame {
+                                    AboutScreen { navController.popBackStack() }
+                                }
+                            }
+                            composable("glossary") {
+                                AdaptiveContentFrame {
+                                    CyberGlossaryScreen(vm) { navController.popBackStack() }
+                                }
+                            }
+                            composable("checklist") {
+                                AdaptiveContentFrame {
+                                    SecurityChecklistScreen(vm) { navController.popBackStack() }
+                                }
+                            }
+                            composable("adaptive_feedback") {
+                                val isArLocal by vm.isArabic.collectAsState()
+                                AdaptiveContentFrame {
+                                    FeedbackScreen(vm, isArLocal) { navController.popBackStack() }
+                                }
+                            }
                         }
                         }
                     }
