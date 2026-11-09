@@ -1,0 +1,55 @@
+#!/bin/sh
+# Wait for Android's Package Manager before installing the app under test.
+# Newer emulator images can report sys.boot_completed before package is registered.
+set -eu
+
+emulator_serial="${ANDROID_SERIAL:-emulator-5554}"
+
+adb devices -l
+adb -s "$emulator_serial" wait-for-device
+
+is_package_manager_ready() {
+  boot_completed="$(adb -s "$emulator_serial" shell getprop sys.boot_completed 2>/dev/null | tr -d '\r' || true)"
+  package_probe="$(adb -s "$emulator_serial" shell cmd package list packages 2>&1 || true)"
+
+  [ "$boot_completed" = "1" ] || return 1
+
+  case "$package_probe" in
+    package:*) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+wait_for_package_manager() {
+  attempt=0
+  while [ "$attempt" -lt 90 ]; do
+    attempt=$((attempt + 1))
+    if is_package_manager_ready; then
+      echo "Android boot and Package Manager are ready."
+      return 0
+    fi
+
+    echo "Waiting for Package Manager (attempt $attempt/90)."
+    sleep 2
+  done
+
+  return 1
+}
+
+if ! wait_for_package_manager; then
+  echo "::warning::Package Manager did not become ready; restarting the emulator once."
+  adb -s "$emulator_serial" reboot
+  adb -s "$emulator_serial" wait-for-device
+
+  if ! wait_for_package_manager; then
+    echo "::error::Android Package Manager remained unavailable after an emulator restart."
+    adb -s "$emulator_serial" shell getprop init.svc.system_server || true
+    adb -s "$emulator_serial" shell service check package || true
+
+    diagnostic_log="$(adb -s "$emulator_serial" logcat -d -b all -v time -t 2000 2>&1 || true)"
+    printf '%s\n' "$diagnostic_log" |
+      grep -Ei 'FATAL EXCEPTION|SystemServer|PackageManager|ActivityManager|OutOfMemory|watchdog|Fatal signal|lmkd' |
+      tail -n 200 || true
+    exit 1
+  fi
+fi
