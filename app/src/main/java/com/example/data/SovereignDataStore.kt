@@ -98,6 +98,50 @@ class SovereignDataStore(private val context: Context) {
             preferences[CYBER_SCORE] = (preferences[CYBER_SCORE] ?: 0) + points
         }
     }
+    /**
+     * Persist the complete calibration result in one DataStore transaction.
+     * An empty goal deliberately clears any previously saved goal.
+     */
+    suspend fun saveCalibrationData(level: String, interests: Set<String>, goal: String) {
+        context.dataStore.edit { preferences ->
+            preferences[USER_LEVEL] = level
+            preferences[USER_INTERESTS] = interests
+            preferences[USER_GOAL] = goal.trim()
+            preferences[CALIBRATION_COMPLETED] = true
+        }
+    }
+
+    /** Persist profile values and their completion marker atomically. */
+    suspend fun saveUserProfile(gender: String, birthYear: Int) {
+        context.dataStore.edit { preferences ->
+            preferences[USER_GENDER] = gender
+            preferences[USER_BIRTH_YEAR] = birthYear
+            preferences[PROFILE_COMPLETED] = true
+        }
+    }
+
+    /**
+     * Record quiz points and the daily streak together, so an interruption
+     * cannot update one value while leaving the other stale.
+     */
+    suspend fun recordAcademyAnswer(points: Int) {
+        val today = LocalDate.now()
+        val todayKey = today.toString()
+        val yesterdayKey = today.minusDays(1).toString()
+        context.dataStore.edit { preferences ->
+            preferences[ACADEMY_POINTS] = (preferences[ACADEMY_POINTS] ?: 0) + points
+
+            val lastDate = preferences[LAST_QUIZ_DATE].orEmpty()
+            val currentStreak = preferences[ACADEMY_STREAK] ?: 0
+            preferences[LAST_QUIZ_DATE] = todayKey
+            preferences[ACADEMY_STREAK] = when (lastDate) {
+                todayKey -> currentStreak
+                yesterdayKey -> currentStreak + 1
+                else -> 1
+            }
+        }
+    }
+
     suspend fun saveUserLevel(level: String)   { context.dataStore.edit { it[USER_LEVEL]     = level } }
     suspend fun saveUserInterests(s: Set<String>) { context.dataStore.edit { it[USER_INTERESTS] = s } }
     suspend fun saveCalibrationCompleted(v: Boolean) { context.dataStore.edit { it[CALIBRATION_COMPLETED] = v } }
