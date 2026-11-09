@@ -158,7 +158,7 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
 
     val cyberRank: StateFlow<String> = combine(_cyberScore, _isArabic) { score, isAr ->
         cyberRankForScore(score, isAr)
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), cyberRankForScore(0, false))
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), cyberRankForScore(0, _isArabic.value))
 
     val cyberProgress: StateFlow<Float> = _cyberScore
         .map(::cyberProgressForScore)
@@ -301,7 +301,7 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
     fun updateCustomApiKey(key: String) {
         val normalizedKey = key.trim()
         _customApiKey.value = normalizedKey
-        viewModelScope.launch(Dispatchers.IO) {
+        viewModelScope.launch {
             dataStore.saveGeminiApiKey(normalizedKey)
         }
     }
