@@ -1,11 +1,14 @@
 package com.example.adaptive
 
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -114,3 +117,25 @@ internal fun classifyWindowHeight(heightDp: Int): WindowHeightClass = when {
 
 internal fun prefersLandscapeWindow(widthDp: Int, heightDp: Int): Boolean =
     widthDp > heightDp
+
+
+/**
+ * Centers secondary destinations and prevents oversized line lengths on tablets.
+ * The child still receives the full available height and scrolls within its own screen.
+ */
+@Composable
+fun AdaptiveContentFrame(content: @Composable () -> Unit) {
+    val layoutInfo = LocalWindowAdaptiveInfo.current
+    Box(
+        modifier = Modifier.fillMaxSize(),
+        contentAlignment = Alignment.TopCenter
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .widthIn(max = layoutInfo.maxContentWidth)
+        ) {
+            content()
+        }
+    }
+}
