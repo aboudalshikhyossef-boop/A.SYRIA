@@ -26,6 +26,7 @@ internal fun isValidIpAddress(value: String): Boolean {
     val octets = value.split('.')
     return octets.size == 4 && octets.all { octet ->
         octet.isNotEmpty() &&
+            (octet == "0" || octet.first() != '0') &&
             octet.all { it in '0'..'9' } &&
             octet.toIntOrNull()?.let { it in 0..255 } == true
     }
