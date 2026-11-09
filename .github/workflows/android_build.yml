@@ -34,8 +34,7 @@ jobs:
       - name: Validate Gradle Wrapper
         uses: gradle/actions/wrapper-validation@v6
 
-      # Run the installed Gradle distribution directly. This avoids executing
-      # the unverified wrapper JAR currently present in the repository.
+      # The official wrapper is checksum-validated before any Gradle task runs.
       - name: Run unit tests and build debug APK
         run: ./gradlew testDebugUnitTest compileDebugAndroidTestKotlin assembleDebug --no-configuration-cache --stacktrace --build-cache
 
