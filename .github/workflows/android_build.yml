@@ -103,7 +103,7 @@ jobs:
             # true slightly before Package Manager is registered on newer images.
             package_manager_ready=false
             for attempt in $(seq 1 90); do
-              boot_completed="$(adb -s "$emulator_serial" shell getprop sys.boot_completed 2>/dev/null | tr -d '\\r' || true)"
+              boot_completed="$(adb -s "$emulator_serial" shell getprop sys.boot_completed 2>/dev/null | tr -d '\r' || true)"
               package_probe="$(adb -s "$emulator_serial" shell cmd package list packages 2>&1 || true)"
 
               if [ "$boot_completed" = "1" ] && printf '%s' "$package_probe" | grep -q '^package:'; then
