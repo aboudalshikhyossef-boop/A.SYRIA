@@ -87,47 +87,4 @@ jobs:
           emulator-options: -no-window -no-audio -no-boot-anim -no-snapshot -no-snapshot-save -no-metrics -wipe-data -gpu swiftshader_indirect -camera-back none
           emulator-boot-timeout: 900
           disable-animations: true
-          script: |
-            set -eu
-
-            emulator_serial="${ANDROID_SERIAL:-emulator-5554}"
-            adb devices -l
-            adb -s "$emulator_serial" wait-for-device
-
-            wait_for_package_manager() {
-              for attempt in $(seq 1 90); do
-                boot_completed="$(adb -s "$emulator_serial" shell getprop sys.boot_completed 2>/dev/null | tr -d '\r' || true)"
-                package_probe="$(adb -s "$emulator_serial" shell cmd package list packages 2>&1 || true)"
-
-                case "$package_probe" in
-                  package:*)
-                    if [ "$boot_completed" = "1" ]; then
-                      echo "Android boot and Package Manager are ready."
-                      return 0
-                    fi
-                    ;;
-                esac
-
-                echo "Waiting for Package Manager (attempt $attempt/90)."
-                sleep 2
-              done
-              return 1
-            }
-
-            if ! wait_for_package_manager; then
-              echo "::warning::Package Manager did not become ready; restarting the emulator once."
-              adb -s "$emulator_serial" reboot
-              adb -s "$emulator_serial" wait-for-device
-
-              if ! wait_for_package_manager; then
-                echo "::error::Android Package Manager remained unavailable after an emulator restart."
-                adb -s "$emulator_serial" shell getprop init.svc.system_server || true
-                adb -s "$emulator_serial" shell service check package || true
-                adb -s "$emulator_serial" logcat -d -b all -v time -t 2000 | grep -Ei 'FATAL EXCEPTION|SystemServer|PackageManager|ActivityManager|OutOfMemory|watchdog' | tail -n 200 || true
-                exit 1
-              fi
-            fi
-
-            adb -s "$emulator_serial" shell getprop ro.build.version.sdk
-            adb -s "$emulator_serial" shell getprop ro.product.cpu.abilist
-            ./gradlew connectedDebugAndroidTest --no-configuration-cache --stacktrace --build-cache
+          script: 'sh scripts/ci/wait-for-android-package-manager.sh && adb -s "${ANDROID_SERIAL:-emulator-5554}" shell getprop ro.build.version.sdk && adb -s "${ANDROID_SERIAL:-emulator-5554}" shell getprop ro.product.cpu.abilist && ./gradlew connectedDebugAndroidTest --no-configuration-cache --stacktrace --build-cache'
