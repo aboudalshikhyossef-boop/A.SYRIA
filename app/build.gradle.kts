@@ -2,22 +2,12 @@ plugins {
   alias(libs.plugins.android.application)
   alias(libs.plugins.kotlin.android)
   alias(libs.plugins.google.devtools.ksp)
+  alias(libs.plugins.compose.compiler)
 }
 
 android {
-  configurations.all {
-    resolutionStrategy {
-      force("org.jetbrains.kotlin:kotlin-stdlib:1.9.24")
-      force("org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.9.24")
-      force("org.jetbrains.kotlin:kotlin-stdlib-jdk7:1.9.24")
-    }
-  }
   namespace = "com.asyria.v4"
-  compileSdk = 34
-  
-  composeOptions {
-    kotlinCompilerExtensionVersion = "1.5.14"
-  }
+  compileSdk = 36
 
   defaultConfig {
     applicationId = "com.asyria.v4"

@@ -22,10 +22,10 @@ jobs:
           java-version: "17"
           distribution: temurin
 
-      - name: Set up Gradle 8.7
+      - name: Set up Gradle 8.13
         uses: gradle/actions/setup-gradle@v6
         with:
-          gradle-version: "8.7"
+          gradle-version: "8.13"
           validate-wrappers: false
 
       # Run the installed Gradle distribution directly. This avoids executing
