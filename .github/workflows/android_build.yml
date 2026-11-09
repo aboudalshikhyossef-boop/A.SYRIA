@@ -150,7 +150,7 @@ jobs:
               emulator_dir="${ANDROID_HOME}/emulator"
               test -x "$emulator_dir/emulator"
               test -x "$emulator_dir/qemu/linux-x86_64/qemu-system-x86_64"
-              "$sdkmanager_bin" --list_installed | grep -E '^[[:space:]]*emulator[[:space:]]*\\|'
+              "$sdkmanager_bin" --list_installed | grep -E '^[[:space:]]*emulator[[:space:]]*\|'
               echo "Android Emulator package files are present and reusable by android-emulator-runner."
               exit 0
             fi
