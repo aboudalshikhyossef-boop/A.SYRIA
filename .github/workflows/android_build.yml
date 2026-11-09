@@ -84,6 +84,7 @@ jobs:
           - api-level: '36'
           - api-level: '37.0'
             disk-size: '8192M'
+            ram-size: '3072M'
     steps:
       - name: Checkout source
         uses: actions/checkout@v7
@@ -112,7 +113,8 @@ jobs:
           arch: x86_64
           profile: pixel_2
           disk-size: ${{ matrix.disk-size }}
+          ram-size: ${{ matrix.ram-size }}
           emulator-options: -no-window -no-audio -no-boot-anim -no-snapshot -no-snapshot-save -no-metrics -wipe-data -gpu swiftshader_indirect -camera-back none
           emulator-boot-timeout: 900
           disable-animations: true
-          script: 'sh scripts/ci/wait-for-android-package-manager.sh && adb -s "${ANDROID_SERIAL:-emulator-5554}" shell df -h /data && adb -s "${ANDROID_SERIAL:-emulator-5554}" shell getprop ro.build.version.sdk && adb -s "${ANDROID_SERIAL:-emulator-5554}" shell getprop ro.product.cpu.abilist && ./gradlew connectedDebugAndroidTest --no-configuration-cache --stacktrace --build-cache'
+          script: 'sh scripts/ci/wait-for-android-package-manager.sh ./gradlew connectedDebugAndroidTest --no-configuration-cache --stacktrace --build-cache'
