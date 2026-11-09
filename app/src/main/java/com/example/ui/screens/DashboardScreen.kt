@@ -65,7 +65,6 @@ import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
@@ -100,6 +99,7 @@ import com.example.ui.theme.GlassWhite
 import com.example.ui.theme.VoidBlack
 import com.example.ui.viewmodel.DashboardViewModel
 import com.example.adaptive.LocalAdaptiveConfig
+import com.example.adaptive.LocalWindowAdaptiveInfo
 import com.example.adaptive.UIConfig
 import kotlin.random.Random
 import java.util.Calendar
@@ -113,11 +113,7 @@ import androidx.compose.animation.core.animateValue
 import androidx.browser.customtabs.CustomTabsIntent
 import android.net.Uri
 import android.content.Intent
-import android.app.Activity
-import android.content.pm.ActivityInfo
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalConfiguration
-import android.content.res.Configuration
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.animateColorAsState
@@ -168,6 +164,7 @@ fun DashboardScreen(
 ) {
     val context = LocalContext.current
     val haptic = androidx.compose.ui.platform.LocalHapticFeedback.current
+    val windowInfo = LocalWindowAdaptiveInfo.current
 
     val roll by viewModel.roll.collectAsState()
     val pitch by viewModel.pitch.collectAsState()
@@ -370,7 +367,7 @@ fun DashboardScreen(
                         .fillMaxSize()
                         .statusBarsPadding()
                         .navigationBarsPadding()
-                        .padding(horizontal = 20.dp, vertical = 12.dp),
+                        .padding(horizontal = windowInfo.horizontalContentPadding, vertical = 12.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
@@ -956,14 +953,6 @@ fun DashboardScreen(
 
         // Desktop Mode Overlay
         if (isDesktopModeOpen) {
-            val activity = LocalContext.current as? Activity
-            DisposableEffect(Unit) {
-                activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR
-                onDispose {
-                    activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
-                }
-            }
-
             DesktopModeScreen(
                 prayerName = nextPrayerName,
                 prayerTime = nextPrayerTime,
@@ -2269,8 +2258,7 @@ fun DesktopModeScreen(
     isOnline: Boolean = true,
     onClose: () -> Unit
 ) {
-    val configuration = LocalConfiguration.current
-    val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+    val isLandscape = LocalWindowAdaptiveInfo.current.prefersLandscapeLayout
 
     val calendar = Calendar.getInstance()
     val dayNames = listOf("الأحد", "الاثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت")

@@ -146,7 +146,13 @@ fun SecurityChecklistScreen(
     )
 
     CompositionLocalProvider(LocalLayoutDirection provides layoutDirection) {
-        Box(modifier = Modifier.fillMaxSize().background(VoidBlack)) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .statusBarsPadding()
+                .navigationBarsPadding()
+                .background(VoidBlack)
+        ) {
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(16.dp)

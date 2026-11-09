@@ -37,6 +37,9 @@ import androidx.work.*
 import com.example.worker.NotificationWorker
 import java.util.concurrent.TimeUnit
 import com.example.adaptive.LocalAdaptiveConfig
+import com.example.adaptive.AdaptiveContentFrame
+import com.example.adaptive.LocalWindowAdaptiveInfo
+import com.example.adaptive.ProvideWindowAdaptiveLayout
 import com.example.ui.screens.*
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -177,6 +180,7 @@ class MainActivity : FragmentActivity() {
                     }
 
                     CompositionLocalProvider(LocalAdaptiveConfig provides uiConfig) {
+                        ProvideWindowAdaptiveLayout {
                         NavHost(navController = navController, startDestination = "splash", enterTransition = { fadeIn(animationSpec = tween(500)) }, exitTransition = { fadeOut(animationSpec = tween(500)) }) {
                             composable("splash") {
                                 SplashScreen {
@@ -231,37 +235,86 @@ class MainActivity : FragmentActivity() {
                                     }
                                 }
 
+                                val windowInfo = LocalWindowAdaptiveInfo.current
                                 CompositionLocalProvider(LocalLayoutDirection provides if (isArLocal) LayoutDirection.Rtl else LayoutDirection.Ltr) {
                                     Scaffold(
                                         modifier = Modifier.fillMaxSize().nestedScroll(nestedScrollConnection),
                                         containerColor = VoidBlack,
                                         contentWindowInsets = WindowInsets(0, 0, 0, 0),
                                         bottomBar = {
-                                            AnimatedVisibility(visible = navBarVisible, enter = slideInVertically { it } + fadeIn(), exit = slideOutVertically { it } + fadeOut()) {
-                                                AppBottomNavBar(isArabic = isArLocal, activeTab = activeTab) { tab ->
-                                                    activeTab = tab; vm.setSettingsOpen(tab == "settings")
+                                            if (!windowInfo.usesNavigationRail) {
+                                                AnimatedVisibility(visible = navBarVisible, enter = slideInVertically { it } + fadeIn(), exit = slideOutVertically { it } + fadeOut()) {
+                                                    AppBottomNavBar(isArabic = isArLocal, activeTab = activeTab) { tab ->
+                                                        activeTab = tab
+                                                        vm.setSettingsOpen(tab == "settings")
+                                                    }
                                                 }
                                             }
                                         }
                                     ) { innerPadding ->
-                                        Box(modifier = Modifier.padding(innerPadding)) {
-                                            when (activeTab) {
-                                                "home"      -> DashboardScreen(vm, prayerVm, { navController.navigate("link_scanner") }, { t, s, ok -> triggerBiometricAuth(t, s, ok) })
-                                                "academy"   -> AcademyScreen(vm, onNavigateToGlossary = { navController.navigate("glossary") }, onNavigateToChecklist = { navController.navigate("checklist") })
-                                                "resources" -> ResourcesScreen(vm) { activeTab = "home" }
-                                                "library"   -> LibraryScreen(vm) { activeTab = "home" }
-                                                "chat"      -> GeminiChatScreen(chatVm, uiConfig, isArLocal)
-                                                "settings"  -> SettingsScreen(vm, { activeTab = "home" }, { navController.navigate("about") }, { navController.navigate("adaptive_feedback") }) { t, s, ok -> triggerBiometricAuth(t, s, ok) }
+                                        Row(
+                                            modifier = Modifier
+                                                .fillMaxSize()
+                                                .padding(innerPadding)
+                                                .consumeWindowInsets(innerPadding)
+                                        ) {
+                                            if (windowInfo.usesNavigationRail) {
+                                                AppNavigationRail(isArabic = isArLocal, activeTab = activeTab) { tab ->
+                                                    activeTab = tab
+                                                    vm.setSettingsOpen(tab == "settings")
+                                                }
+                                            }
+
+                                            Box(
+                                                modifier = Modifier.weight(1f).fillMaxHeight(),
+                                                contentAlignment = Alignment.TopCenter
+                                            ) {
+                                                Box(
+                                                    modifier = Modifier
+                                                        .widthIn(max = windowInfo.maxContentWidth)
+                                                        .fillMaxSize()
+                                                ) {
+                                                    when (activeTab) {
+                                                        "home"      -> DashboardScreen(vm, prayerVm, { navController.navigate("link_scanner") }, { t, s, ok -> triggerBiometricAuth(t, s, ok) })
+                                                        "academy"   -> AcademyScreen(vm, onNavigateToGlossary = { navController.navigate("glossary") }, onNavigateToChecklist = { navController.navigate("checklist") })
+                                                        "resources" -> ResourcesScreen(vm) { activeTab = "home" }
+                                                        "library"   -> LibraryScreen(vm) { activeTab = "home" }
+                                                        "chat"      -> GeminiChatScreen(chatVm, uiConfig, isArLocal)
+                                                        "settings"  -> SettingsScreen(vm, { activeTab = "home" }, { navController.navigate("about") }, { navController.navigate("adaptive_feedback") }) { t, s, ok -> triggerBiometricAuth(t, s, ok) }
+                                                    }
+                                                }
                                             }
                                         }
                                     }
                                 }
                             }
-                            composable("link_scanner")      { LinkScannerScreen(vm) { navController.popBackStack() } }
-                            composable("about")             { AboutScreen { navController.popBackStack() } }
-                            composable("glossary")          { CyberGlossaryScreen(vm) { navController.popBackStack() } }
-                            composable("checklist")         { SecurityChecklistScreen(vm) { navController.popBackStack() } }
-                            composable("adaptive_feedback") { val isArLocal by vm.isArabic.collectAsState(); FeedbackScreen(vm, isArLocal) { navController.popBackStack() } }
+                            composable("link_scanner") {
+                                AdaptiveContentFrame {
+                                    LinkScannerScreen(vm) { navController.popBackStack() }
+                                }
+                            }
+                            composable("about") {
+                                AdaptiveContentFrame {
+                                    AboutScreen { navController.popBackStack() }
+                                }
+                            }
+                            composable("glossary") {
+                                AdaptiveContentFrame {
+                                    CyberGlossaryScreen(vm) { navController.popBackStack() }
+                                }
+                            }
+                            composable("checklist") {
+                                AdaptiveContentFrame {
+                                    SecurityChecklistScreen(vm) { navController.popBackStack() }
+                                }
+                            }
+                            composable("adaptive_feedback") {
+                                val isArLocal by vm.isArabic.collectAsState()
+                                AdaptiveContentFrame {
+                                    FeedbackScreen(vm, isArLocal) { navController.popBackStack() }
+                                }
+                            }
+                        }
                         }
                     }
                 }
@@ -272,60 +325,157 @@ class MainActivity : FragmentActivity() {
 
 private data class NavTab(val key: String, val labelEn: String, val labelAr: String)
 
+private val appNavigationTabs = listOf(
+    NavTab("home", "Home", "الرئيسية"),
+    NavTab("academy", "Academy", "الأكاديمية"),
+    NavTab("chat", "Chat", "الدردشة"),
+    NavTab("library", "Library", "المكتبة"),
+    NavTab("settings", "Settings", "الإعدادات")
+)
+
+private fun NavTab.icon() = when (key) {
+    "home" -> Icons.Rounded.Home
+    "academy" -> Icons.Rounded.School
+    "chat" -> Icons.Rounded.SmartToy
+    "resources" -> Icons.Rounded.MenuBook
+    "library" -> Icons.Rounded.AutoStories
+    else -> Icons.Rounded.Settings
+}
+
+private fun NavTab.accentColor() = when (key) {
+    "home" -> CyberCyan
+    "academy" -> Color(0xFF00FF88)
+    "chat" -> Color(0xFFBB66FF)
+    "resources" -> AmberZen
+    "library" -> Color(0xFFAA77FF)
+    else -> Color(0xFFFF6B35)
+}
+
+private fun NavTab.label(isArabic: Boolean) = if (isArabic) labelAr else labelEn
+
+@Composable
+private fun AppNavigationRail(
+    isArabic: Boolean,
+    activeTab: String,
+    onTabSelected: (String) -> Unit
+) {
+    val haptic = LocalHapticFeedback.current
+
+    NavigationRail(containerColor = Color(0xFF02050D).copy(alpha = 0.98f)) {
+        Spacer(Modifier.height(12.dp))
+        appNavigationTabs.forEach { tab ->
+            val selected = activeTab == tab.key
+            val color = tab.accentColor()
+            NavigationRailItem(
+                selected = selected,
+                onClick = {
+                    haptic.performHapticFeedback(
+                        androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove
+                    )
+                    onTabSelected(tab.key)
+                },
+                icon = {
+                    Icon(
+                        imageVector = tab.icon(),
+                        contentDescription = tab.label(isArabic),
+                        tint = if (selected) color else Color.White.copy(alpha = 0.35f),
+                        modifier = Modifier.size(22.dp)
+                    )
+                },
+                label = {
+                    Text(
+                        text = tab.label(isArabic),
+                        color = if (selected) color else Color.White.copy(alpha = 0.45f),
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = FontFamily.Monospace
+                    )
+                },
+                alwaysShowLabel = true,
+                colors = NavigationRailItemDefaults.colors(
+                    selectedIconColor = color,
+                    selectedTextColor = color,
+                    unselectedIconColor = Color.White.copy(alpha = 0.35f),
+                    unselectedTextColor = Color.White.copy(alpha = 0.45f),
+                    indicatorColor = color.copy(alpha = 0.12f)
+                )
+            )
+        }
+    }
+}
+
 @Composable
 private fun AppBottomNavBar(isArabic: Boolean, activeTab: String, onTabSelected: (String) -> Unit) {
     val haptic = LocalHapticFeedback.current
-    val tabs = listOf(
-        NavTab("home", "Home", "الرئيسية"),
-        NavTab("academy", "Academy", "الأكاديمية"),
-        NavTab("chat", "Chat", "الدردشة"),
-        NavTab("library", "Library", "المكتبة"),
-        NavTab("settings", "Settings", "الإعدادات")
+    val infiniteTransition = rememberInfiniteTransition(label = "nav_glow")
+    val glowAlpha by infiniteTransition.animateFloat(
+        initialValue = 0.3f,
+        targetValue = 0.9f,
+        animationSpec = infiniteRepeatable(tween(1800), RepeatMode.Reverse),
+        label = "glow"
     )
 
-    val infiniteTransition = rememberInfiniteTransition(label = "nav_glow")
-    val glowAlpha by infiniteTransition.animateFloat(initialValue = 0.3f, targetValue = 0.9f, animationSpec = infiniteRepeatable(tween(1800), RepeatMode.Reverse), label = "glow")
-
     Box(modifier = Modifier.fillMaxWidth()) {
-        // Glowing top border line
-        Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(Brush.horizontalGradient(listOf(Color.Transparent, CyberCyan.copy(alpha = glowAlpha * 0.5f), AmberZen.copy(alpha = glowAlpha * 0.3f), CyberCyan.copy(alpha = glowAlpha * 0.5f), Color.Transparent))).align(Alignment.TopCenter))
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(1.dp)
+                .background(
+                    Brush.horizontalGradient(
+                        listOf(
+                            Color.Transparent,
+                            CyberCyan.copy(alpha = glowAlpha * 0.5f),
+                            AmberZen.copy(alpha = glowAlpha * 0.3f),
+                            CyberCyan.copy(alpha = glowAlpha * 0.5f),
+                            Color.Transparent
+                        )
+                    )
+                )
+                .align(Alignment.TopCenter)
+        )
 
-        NavigationBar(containerColor = Color(0xFF02050D).copy(alpha = 0.98f), tonalElevation = 0.dp, windowInsets = WindowInsets.navigationBars) {
-            tabs.forEach { tab ->
+        NavigationBar(
+            containerColor = Color(0xFF02050D).copy(alpha = 0.98f),
+            tonalElevation = 0.dp,
+            windowInsets = WindowInsets.navigationBars
+        ) {
+            appNavigationTabs.forEach { tab ->
                 val selected = activeTab == tab.key
-                val icon = when (tab.key) {
-                    "home"      -> Icons.Rounded.Home
-                    "academy"   -> Icons.Rounded.School
-                    "chat"      -> Icons.Rounded.SmartToy
-                    "resources" -> Icons.Rounded.MenuBook
-                    "library"   -> Icons.Rounded.AutoStories
-                    else        -> Icons.Rounded.Settings
-                }
-                val tabColor = when (tab.key) {
-                    "home"      -> CyberCyan
-                    "academy"   -> Color(0xFF00FF88)
-                    "chat"      -> Color(0xFFBB66FF)
-                    "resources" -> AmberZen
-                    "library"   -> Color(0xFFAA77FF)
-                    else        -> Color(0xFFFF6B35)
-                }
-
+                val color = tab.accentColor()
                 NavigationBarItem(
                     selected = selected,
-                    onClick = { haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove); onTabSelected(tab.key) },
+                    onClick = {
+                        haptic.performHapticFeedback(
+                            androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove
+                        )
+                        onTabSelected(tab.key)
+                    },
                     icon = {
                         Box(contentAlignment = Alignment.Center) {
-                            // Glow halo for active tab
                             if (selected) {
-                                Box(modifier = Modifier.size(46.dp).background(tabColor.copy(alpha = glowAlpha * 0.12f), RoundedCornerShape(14.dp)).border(1.dp, tabColor.copy(alpha = glowAlpha * 0.5f), RoundedCornerShape(14.dp)))
+                                Box(
+                                    modifier = Modifier
+                                        .size(46.dp)
+                                        .background(color.copy(alpha = glowAlpha * 0.12f), RoundedCornerShape(14.dp))
+                                        .border(1.dp, color.copy(alpha = glowAlpha * 0.5f), RoundedCornerShape(14.dp))
+                                )
                             }
-                            Icon(icon, tab.labelEn, tint = if (selected) tabColor else Color.White.copy(alpha = 0.25f), modifier = Modifier.size(22.dp))
+                            Icon(
+                                imageVector = tab.icon(),
+                                contentDescription = tab.label(isArabic),
+                                tint = if (selected) color else Color.White.copy(alpha = 0.25f),
+                                modifier = Modifier.size(22.dp)
+                            )
                         }
                     },
                     label = {
-                        Text(if (isArabic) tab.labelAr else tab.labelEn,
-                            color = if (selected) tabColor else Color.White.copy(alpha = 0.25f),
-                            fontSize = 9.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
+                        Text(
+                            text = tab.label(isArabic),
+                            color = if (selected) color else Color.White.copy(alpha = 0.25f),
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.Bold,
+                            fontFamily = FontFamily.Monospace
+                        )
                     },
                     colors = NavigationBarItemDefaults.colors(indicatorColor = Color.Transparent)
                 )
