@@ -1,6 +1,4 @@
 package com.example.ui.screens
-
-/** Stateless presentation components shared by the dashboard's status and metrics sections. */
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -23,12 +21,15 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.VisibilityOff
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.graphicsLayer
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -40,6 +41,8 @@ import androidx.compose.ui.unit.sp
 import com.example.ui.theme.AmberZen
 import com.example.ui.theme.CyberCyan
 import com.example.ui.theme.VoidBlack
+
+/** Stateless presentation components shared by the dashboard's status and metrics sections. */
 
 @Composable
 fun StatusHeaderCell(
@@ -79,8 +82,8 @@ fun StatusHeaderCell(
             
             if (isStealth) {
                 Spacer(modifier = Modifier.width(8.dp))
-                androidx.compose.material3.Icon(
-                    imageVector = androidx.compose.material.icons.Icons.Default.VisibilityOff,
+                Icon(
+                    imageVector = Icons.Default.VisibilityOff,
                     contentDescription = "Stealth Active",
                     tint = Color.Gray.copy(alpha = 0.6f),
                     modifier = Modifier.size(20.dp)
