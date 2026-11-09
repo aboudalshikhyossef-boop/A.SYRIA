@@ -1,7 +1,7 @@
-package com.example.data.database
+package com.example.data.db
 
 import android.content.ContentValues
-import android.database.sqlite.SQLiteDatabase
+import android.db.sqlite.SQLiteDatabase
 import android.content.Context
 import androidx.room.Database
 import androidx.room.Room
@@ -24,8 +24,8 @@ abstract class AppDatabase : RoomDatabase() {
 
     companion object {
         private val MIGRATION_1_2 = object : Migration(1, 2) {
-            override fun migrate(database: SupportSQLiteDatabase) {
-                database.execSQL(
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
                     "CREATE TABLE IF NOT EXISTS chat_messages (" +
                         "id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
                         "role TEXT NOT NULL, " +
@@ -38,7 +38,7 @@ abstract class AppDatabase : RoomDatabase() {
 
         /** Re-encrypt legacy vault fields. Any failure aborts the DB migration. */
         private val MIGRATION_2_3 = object : Migration(2, 3) {
-            override fun migrate(database: SupportSQLiteDatabase) {
+            override fun migrate(db: SupportSQLiteDatabase) {
                 data class LegacyIdea(
                     val id: Int,
                     val title: String,
@@ -48,7 +48,7 @@ abstract class AppDatabase : RoomDatabase() {
                 )
 
                 val rows = mutableListOf<LegacyIdea>()
-                database.query(
+                db.query(
                     "SELECT id, encryptedTitle, encryptedCategory, " +
                         "encryptedOriginalIdea, encryptedGeminiBlueprint FROM inventor_ideas"
                 ).use { cursor ->
@@ -71,15 +71,15 @@ abstract class AppDatabase : RoomDatabase() {
                         put("encryptedGeminiBlueprint", SovereigntyCipher.reencryptLegacyVaultValue(row.blueprint))
                     }
                     check(
-                        database.update("inventor_ideas", SQLiteDatabase.CONFLICT_ABORT, values, "id = ?", arrayOf(row.id.toString())) == 1
+                        db.update("inventor_ideas", SQLiteDatabase.CONFLICT_ABORT, values, "id = ?", arrayOf(row.id.toString())) == 1
                     ) { "Failed to migrate encrypted vault record ${row.id}." }
                 }
             }
         }
 
         private val MIGRATION_3_4 = object : Migration(3, 4) {
-            override fun migrate(database: SupportSQLiteDatabase) {
-                database.execSQL(
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
                     "CREATE TABLE IF NOT EXISTS vault_items (" +
                         "id TEXT NOT NULL PRIMARY KEY, " +
                         "encryptedDisplayName TEXT NOT NULL, " +
