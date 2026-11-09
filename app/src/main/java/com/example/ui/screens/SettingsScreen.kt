@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -147,7 +148,7 @@ fun SettingsScreen(
                     }
 
                     // ── DOCUMENTATION ─────────────────────────────────────────────────
-                    SettingsCard(title = if (isAr) "التوثيق والمعلومات" else "DOCUMENTATION", icon = Icons.Default.MenuBook, color = Color(0xFF00FF88), glowAlpha = borderGlow) {
+                    SettingsCard(title = if (isAr) "التوثيق والمعلومات" else "DOCUMENTATION", icon = Icons.AutoMirrored.Filled.MenuBook, color = Color(0xFF00FF88), glowAlpha = borderGlow) {
                         Row(modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(Color(0xFF00FF88).copy(alpha = 0.05f)).border(1.dp, Color(0xFF00FF88).copy(alpha = 0.2f), RoundedCornerShape(10.dp)).clickable { haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress); onOpenAbout() }.padding(14.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                             Icon(Icons.Default.Info, null, tint = Color(0xFF00FF88), modifier = Modifier.size(20.dp))
                             Column(modifier = Modifier.weight(1f)) {
