@@ -12,22 +12,21 @@ import com.example.data.database.InventorIdeaRepository
 import com.example.data.device.DeviceTelemetryMonitor
 import com.example.data.ContextualVerseEngine
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import com.example.adaptive.AdaptiveEngine
-  import com.example.adaptive.FeedbackResult
-  import com.example.adaptive.FeedbackService
-  import com.example.adaptive.UIChange
-  import com.example.data.SovereignDataStore
+import com.example.adaptive.FeedbackResult
+import com.example.adaptive.FeedbackService
+import com.example.adaptive.UIChange
+import com.example.data.SovereignDataStore
 import com.example.data.remote.GeminiRepository
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlin.random.Random
 
@@ -45,15 +44,6 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
 
     private val _isAcademyGenerating = MutableStateFlow(false)
     val isAcademyGenerating: StateFlow<Boolean> = _isAcademyGenerating.asStateFlow()
-
-    fun startSensors() {
-        accelerometer?.let { sensorManager.registerListener(this, it, SensorManager.SENSOR_DELAY_UI) }
-        magnetometer?.let { sensorManager.registerListener(this, it, SensorManager.SENSOR_DELAY_UI) }
-    }
-
-    fun stopSensors() {
-        sensorManager.unregisterListener(this)
-    }
 
     val connectionType: StateFlow<String> = deviceTelemetry.connectionType
     val ipAddress: StateFlow<String> = deviceTelemetry.ipAddress
@@ -309,11 +299,6 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
     val userProfileAnalysis: StateFlow<String> = _userProfileAnalysis.asStateFlow()
     // --- End User Cognitive Model State ---
 
-    private val okHttpClient = OkHttpClient.Builder()
-        .connectTimeout(8, TimeUnit.SECONDS).readTimeout(8, TimeUnit.SECONDS)
-        .writeTimeout(8, TimeUnit.SECONDS).callTimeout(12, TimeUnit.SECONDS)
-        .retryOnConnectionFailure(true).build()
-
     private suspend fun generateGeminiText(prompt: String): String {
         val apiKey = _customApiKey.value
         if (apiKey.isBlank()) {
@@ -431,9 +416,6 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
         viewModelScope.launch {
             dataStore.onboardingCompleted.first()
             _isDataLoaded.value = true
-        }
-        viewModelScope.launch(Dispatchers.IO) {
-            try { _ipAddress.value = fetchPublicIp() } catch (_: Exception) { _ipAddress.value = extractLocalIp() }
         }
     }
 
