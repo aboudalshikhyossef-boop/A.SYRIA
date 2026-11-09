@@ -150,4 +150,5 @@ jobs:
           emulator-options: -no-window -no-audio -no-boot-anim -no-snapshot -no-snapshot-save -no-metrics -wipe-data -gpu swiftshader_indirect -camera-back none
           emulator-boot-timeout: 900
           disable-animations: true
+          pre-emulator-launch-script: 'grep -E "^(target|image.sysdir.1|hw.ramSize|disk.dataPartition.size)=" "$ANDROID_AVD_HOME/test.avd/config.ini"'
           script: 'sh scripts/ci/wait-for-android-package-manager.sh ./gradlew connectedDebugAndroidTest --no-configuration-cache --stacktrace --build-cache'
