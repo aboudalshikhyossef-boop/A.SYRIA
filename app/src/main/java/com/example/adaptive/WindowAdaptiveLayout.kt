@@ -1,18 +1,21 @@
 package com.example.adaptive
 
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.compose.material3.adaptive.currentWindowAdaptiveInfoV2
+import kotlin.math.roundToInt
 
 /**
- * App-level width breakpoints based on the available app window, not the device model.
+ * App-level layout classes derived from the available Compose window constraints.
  *
- * Values follow Android's recommended window size classes and are deliberately
- * kept independent from UIConfig, which stores user-selected visual preferences.
+ * Measuring the app window in dp (rather than physical pixels or device names)
+ * keeps layouts correct across densities, split-screen, rotation, and foldables.
  */
 enum class WindowWidthClass {
     COMPACT,
@@ -37,11 +40,11 @@ data class WindowAdaptiveLayoutInfo(
     val usesNavigationRail: Boolean
         get() = widthClass != WindowWidthClass.COMPACT
 
-    /** Wide layouts can use horizontal arrangements; short windows should avoid tall stacks. */
+    /** Reflects the actual window aspect ratio, not the device orientation setting. */
     val prefersLandscapeLayout: Boolean
         get() = isLandscapeWindow
 
-    /** Prevents phone and tablet content from stretching to unreadable line lengths. */
+    /** Prevents content from stretching to unreadable line lengths on wide displays. */
     val maxContentWidth: Dp
         get() = when (widthClass) {
             WindowWidthClass.COMPACT -> 600.dp
@@ -69,29 +72,30 @@ val LocalWindowAdaptiveInfo = staticCompositionLocalOf {
 }
 
 /**
- * Provides adaptive information for the current app window.
+ * Provides responsive information from the current app window constraints.
  *
- * Recalculates automatically when the app window changes due to rotation,
- * resizing, multi-window mode, or folding/unfolding a device.
+ * BoxWithConstraints is remeasured when the app window changes, including rotation,
+ * resizing in multi-window mode, and folding/unfolding. It also works on older
+ * Android versions without relying on API-level-specific display metrics.
  */
 @Composable
 fun ProvideWindowAdaptiveLayout(content: @Composable () -> Unit) {
-    val windowSizeClass = currentWindowAdaptiveInfoV2().windowSizeClass
-    val layoutInfo = remember(windowSizeClass) {
-        WindowAdaptiveLayoutInfo(
-            widthClass = classifyWindowWidth(windowSizeClass.minWidthDp),
-            heightClass = classifyWindowHeight(windowSizeClass.minHeightDp),
-            isLandscapeWindow = prefersLandscapeWindow(
-                windowSizeClass.minWidthDp,
-                windowSizeClass.minHeightDp
+    BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+        val widthDp = maxWidth.value.roundToInt()
+        val heightDp = maxHeight.value.roundToInt()
+        val layoutInfo = remember(widthDp, heightDp) {
+            WindowAdaptiveLayoutInfo(
+                widthClass = classifyWindowWidth(widthDp),
+                heightClass = classifyWindowHeight(heightDp),
+                isLandscapeWindow = prefersLandscapeWindow(widthDp, heightDp)
             )
+        }
+
+        CompositionLocalProvider(
+            LocalWindowAdaptiveInfo provides layoutInfo,
+            content = content
         )
     }
-
-    CompositionLocalProvider(
-        LocalWindowAdaptiveInfo provides layoutInfo,
-        content = content
-    )
 }
 
 internal fun classifyWindowWidth(widthDp: Int): WindowWidthClass = when {
@@ -107,7 +111,6 @@ internal fun classifyWindowHeight(heightDp: Int): WindowHeightClass = when {
     heightDp >= 480 -> WindowHeightClass.MEDIUM
     else -> WindowHeightClass.COMPACT
 }
-
 
 internal fun prefersLandscapeWindow(widthDp: Int, heightDp: Int): Boolean =
     widthDp > heightDp
