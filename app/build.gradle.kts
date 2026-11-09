@@ -44,6 +44,10 @@ android {
     debug {
       isMinifyEnabled = false
       isShrinkResources = false
+      ndk {
+        // Include emulator ABI for Android instrumentation tests; release stays ARM64-only.
+        abiFilters += setOf("arm64-v8a", "x86_64")
+      }
     }
   }
   compileOptions {
