@@ -91,17 +91,21 @@ if [ "$#" -gt 0 ]; then
   if [ "$test_exit_code" -ne 0 ]; then
     echo "::error::Android instrumentation command failed with exit code $test_exit_code."
     echo "Collecting Package Manager, system_server, storage, and low-memory diagnostics."
-    adb -s "$emulator_serial" shell getprop init.svc.system_server || true
+    adb -s "$emulator_serial" shell getprop sys.boot_completed || true
+    adb -s "$emulator_serial" shell pidof system_server || true
+    adb -s "$emulator_serial" shell ps -A | grep -E 'system_server|com.android.packageinstaller|android.process' || true
     adb -s "$emulator_serial" shell service check package || true
     adb -s "$emulator_serial" shell df -h /data || true
     if [ "$api_level" -ge 37 ]; then
       adb -s "$emulator_serial" shell cmd appops get android GET_USAGE_STATS || true
     fi
 
-    diagnostic_log="$(adb -s "$emulator_serial" logcat -d -b all -v threadtime -t 5000 2>&1 || true)"
-    printf '%s\n' "$diagnostic_log" |
-      grep -Ei 'FATAL EXCEPTION|SystemServer|system_server|PackageManager|PackageInstaller|StorageStats|ActivityManager|OutOfMemory|lmkd|watchdog|Fatal signal|installd|low memory|Broken pipe' |
-      tail -n 300 || true
+    diagnostic_log="$(adb -s "$emulator_serial" logcat -d -b all -v threadtime -t 8000 2>&1 || true)"
+    printf '%s\\n' "$diagnostic_log" |
+      grep -Ei 'FATAL EXCEPTION|Fatal signal|am_crash|am_anr|AndroidRuntime|INSTRUMENTATION_ABORTED|WATCHDOG|Watchdog|WTF|lmkd|lowmemory|OutOfMemory|SIGSEGV|SIGABRT|system_server.*(died|crash|killed)|Process .*died|Process .*has died|Killing .*system_server|PackageManager.*(crash|died|failed)|PackageInstaller.*(crash|died|failed)|StorageStats.*(crash|died|failed)|Broken pipe' |
+      tail -n 400 || true
+
+    adb -s "$emulator_serial" logcat -b crash -d -v threadtime -t 1000 2>&1 || true
   fi
 
   exit "$test_exit_code"
