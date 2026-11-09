@@ -9,6 +9,7 @@ class IpAddressValidatorTest {
     @Test
     fun acceptsValidIpv4Literals() {
         assertTrue(isValidIpAddress("127.0.0.1"))
+        assertTrue(isValidIpAddress("0.0.0.0"))
         assertTrue(isValidIpAddress("192.0.2.25"))
         assertTrue(isValidIpAddress("255.255.255.255"))
     }
@@ -26,6 +27,7 @@ class IpAddressValidatorTest {
         assertFalse(isValidIpAddress("127.0.0"))
         assertFalse(isValidIpAddress("256.0.0.1"))
         assertFalse(isValidIpAddress("192.0.2.999"))
+        assertFalse(isValidIpAddress("010.0.0.1"))
         assertFalse(isValidIpAddress("::::"))
         assertFalse(isValidIpAddress("1:2:3:4:5:6:7:8:9"))
         assertFalse(isValidIpAddress("example.com"))
