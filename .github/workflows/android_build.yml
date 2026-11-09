@@ -34,6 +34,9 @@ jobs:
       - name: Validate Gradle Wrapper
         uses: gradle/actions/wrapper-validation@v6
 
+      - name: Validate CI shell helpers
+        run: sh -n scripts/ci/wait-for-android-package-manager.sh
+
       # The official wrapper is checksum-validated before any Gradle task runs.
       - name: Run unit tests and build debug APK
         run: ./gradlew testDebugUnitTest compileDebugAndroidTestKotlin assembleDebug --no-configuration-cache --stacktrace --build-cache
