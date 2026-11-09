@@ -15,30 +15,32 @@ permissions:
 
 jobs:
   build-and-test:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    env:
+      GIT_CONFIG_COUNT: 1
+      GIT_CONFIG_KEY_0: init.defaultBranch
+      GIT_CONFIG_VALUE_0: main
     steps:
       - name: Checkout source
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set up JDK 17
-        uses: actions/setup-java@v5
+        uses: actions/setup-java@v6
         with:
           java-version: "17"
           distribution: temurin
+          cache: gradle
 
-      - name: Set up Gradle 8.13
-        uses: gradle/actions/setup-gradle@v6
-        with:
-          gradle-version: "8.13"
-          validate-wrappers: false
+      - name: Validate Gradle Wrapper
+        uses: gradle/actions/wrapper-validation@v6
 
       # Run the installed Gradle distribution directly. This avoids executing
       # the unverified wrapper JAR currently present in the repository.
       - name: Run unit tests and build debug APK
-        run: gradle testDebugUnitTest compileDebugAndroidTestKotlin assembleDebug --no-configuration-cache --stacktrace --build-cache
+        run: ./gradlew testDebugUnitTest compileDebugAndroidTestKotlin assembleDebug --no-configuration-cache --stacktrace --build-cache
 
       - name: Upload debug APK
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: a-syria-debug
           path: app/build/outputs/apk/debug/app-debug.apk
@@ -47,26 +49,28 @@ jobs:
 
   instrumentation-tests:
     name: Instrumentation tests (Android ${{ matrix.api-level }})
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    env:
+      GIT_CONFIG_COUNT: 1
+      GIT_CONFIG_KEY_0: init.defaultBranch
+      GIT_CONFIG_VALUE_0: main
     strategy:
       fail-fast: false
       matrix:
         api-level: ['33', '36', '37.0']
     steps:
       - name: Checkout source
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set up JDK 17
-        uses: actions/setup-java@v5
+        uses: actions/setup-java@v6
         with:
           java-version: "17"
           distribution: temurin
+          cache: gradle
 
-      - name: Set up Gradle 8.13
-        uses: gradle/actions/setup-gradle@v6
-        with:
-          gradle-version: "8.13"
-          validate-wrappers: false
+      - name: Validate Gradle Wrapper
+        uses: gradle/actions/wrapper-validation@v6
 
       - name: Enable KVM
         run: |
@@ -81,11 +85,11 @@ jobs:
           target: google_apis
           arch: x86_64
           profile: pixel_2
-          emulator-options: -no-window -no-audio -no-boot-anim -no-snapshot -no-snapshot-save -wipe-data -gpu swiftshader_indirect -camera-back none
+          emulator-options: -no-window -no-audio -no-boot-anim -no-snapshot -no-snapshot-save -no-metrics -wipe-data -gpu swiftshader_indirect -camera-back none
           emulator-boot-timeout: 900
           disable-animations: true
           script: |
             adb devices -l
             adb -s emulator-5554 shell getprop ro.build.version.sdk
             adb -s emulator-5554 shell getprop ro.product.cpu.abilist
-            gradle connectedDebugAndroidTest --no-configuration-cache --stacktrace --build-cache
+            ./gradlew connectedDebugAndroidTest --no-configuration-cache --stacktrace --build-cache
