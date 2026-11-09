@@ -30,7 +30,8 @@ enum class WindowHeightClass {
 
 data class WindowAdaptiveLayoutInfo(
     val widthClass: WindowWidthClass,
-    val heightClass: WindowHeightClass
+    val heightClass: WindowHeightClass,
+    val isLandscapeWindow: Boolean = false
 ) {
     /** Use a side rail when there is enough horizontal space for persistent navigation. */
     val usesNavigationRail: Boolean
@@ -38,8 +39,7 @@ data class WindowAdaptiveLayoutInfo(
 
     /** Wide layouts can use horizontal arrangements; short windows should avoid tall stacks. */
     val prefersLandscapeLayout: Boolean
-        get() = widthClass >= WindowWidthClass.EXPANDED ||
-            heightClass == WindowHeightClass.COMPACT
+        get() = isLandscapeWindow
 
     /** Prevents phone and tablet content from stretching to unreadable line lengths. */
     val maxContentWidth: Dp
@@ -80,7 +80,11 @@ fun ProvideWindowAdaptiveLayout(content: @Composable () -> Unit) {
     val layoutInfo = remember(windowSizeClass) {
         WindowAdaptiveLayoutInfo(
             widthClass = classifyWindowWidth(windowSizeClass.minWidthDp),
-            heightClass = classifyWindowHeight(windowSizeClass.minHeightDp)
+            heightClass = classifyWindowHeight(windowSizeClass.minHeightDp),
+            isLandscapeWindow = prefersLandscapeWindow(
+                windowSizeClass.minWidthDp,
+                windowSizeClass.minHeightDp
+            )
         )
     }
 
@@ -103,3 +107,7 @@ internal fun classifyWindowHeight(heightDp: Int): WindowHeightClass = when {
     heightDp >= 480 -> WindowHeightClass.MEDIUM
     else -> WindowHeightClass.COMPACT
 }
+
+
+internal fun prefersLandscapeWindow(widthDp: Int, heightDp: Int): Boolean =
+    widthDp > heightDp
