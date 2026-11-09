@@ -59,14 +59,19 @@ class WindowAdaptiveLayoutInstrumentedTest {
     }
 
     @Test
-    fun expandedAndLargeWindowsKeepReadableContentBounds() {
-        val tablet = renderWindow(width = 960, height = 700)
-        val desktop = renderWindow(width = 1_300, height = 900)
+    fun expandedTabletWindowKeepsReadableContentBounds() {
+        val info = renderWindow(width = 960, height = 700)
 
-        assertEquals(WindowWidthClass.EXPANDED, tablet.widthClass)
-        assertEquals(960.dp, tablet.maxContentWidth)
-        assertEquals(WindowWidthClass.LARGE, desktop.widthClass)
-        assertEquals(1_120.dp, desktop.maxContentWidth)
+        assertEquals(WindowWidthClass.EXPANDED, info.widthClass)
+        assertEquals(960.dp, info.maxContentWidth)
+    }
+
+    @Test
+    fun largeDesktopWindowKeepsReadableContentBounds() {
+        val info = renderWindow(width = 1_300, height = 900)
+
+        assertEquals(WindowWidthClass.LARGE, info.widthClass)
+        assertEquals(1_120.dp, info.maxContentWidth)
     }
 
     private fun renderWindow(width: Int, height: Int): WindowAdaptiveLayoutInfo {
