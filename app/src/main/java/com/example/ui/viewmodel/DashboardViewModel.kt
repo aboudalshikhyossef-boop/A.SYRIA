@@ -23,12 +23,11 @@ import com.example.adaptive.FeedbackService
 import com.example.adaptive.UIChange
 import com.example.data.SovereignDataStore
 import com.example.data.remote.GeminiRepository
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import kotlin.random.Random
 
 class DashboardViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -158,28 +157,12 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
     val neuralRole: StateFlow<String> = _neuralRole.asStateFlow()
 
     val cyberRank: StateFlow<String> = combine(_cyberScore, _isArabic) { score, isAr ->
-        if (isAr) {
-            when {
-                score <= 50 -> "شيفرة مبتدئة"
-                score <= 150 -> "حارس السينتينل"
-                else -> "شبح سيادي"
-            }
-        } else {
-            when {
-                score <= 50 -> "Novice Cipher"
-                score <= 150 -> "Sentinel Guard"
-                else -> "Sovereign Ghost"
-            }
-        }
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "Novice Cipher")
+        cyberRankForScore(score, isAr)
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), cyberRankForScore(0, false))
 
-    val cyberProgress: StateFlow<Float> = combine(_cyberScore, MutableStateFlow(Unit)) { score, _ ->
-        when {
-            score <= 50 -> (score.toFloat() / 50f).coerceIn(0f, 1f)
-            score <= 150 -> ((score - 50).toFloat() / 100f).coerceIn(0f, 1f)
-            else -> 1.0f
-        }
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0f)
+    val cyberProgress: StateFlow<Float> = _cyberScore
+        .map(::cyberProgressForScore)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), cyberProgressForScore(0))
 
     private val _isAcademyOpen = MutableStateFlow(false)
     val isAcademyOpen: StateFlow<Boolean> = _isAcademyOpen.asStateFlow()
@@ -194,9 +177,7 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
 
     fun saveUserProfile(gender: String, birthYear: Int) {
         viewModelScope.launch {
-            dataStore.saveUserGender(gender)
-            dataStore.saveUserBirthYear(birthYear)
-            dataStore.setProfileCompleted()
+            dataStore.saveUserProfile(gender, birthYear)
         }
     }
 
@@ -204,12 +185,11 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
           viewModelScope.launch { dataStore.setOnboardingCompleted() }
       }
 
-      fun recordCorrectAnswer() {
-          viewModelScope.launch {
-              dataStore.addAcademyPoints(10)
-              dataStore.updateAcademyStreak()
-          }
-      }
+    fun recordCorrectAnswer() {
+        viewModelScope.launch(Dispatchers.IO) {
+            dataStore.recordAcademyAnswer(points = 10)
+        }
+    }
 
           /** Submit UI-customization feedback using the app's single Gemini API key. */
       suspend fun submitFeedback(text: String): FeedbackResult {
@@ -344,10 +324,7 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
     // --- Function to save calibration data ---
     fun saveCalibrationData(level: String, interests: Set<String>, goal: String = "") {
         viewModelScope.launch {
-            dataStore.saveUserLevel(level)
-            dataStore.saveUserInterests(interests)
-            if (goal.isNotBlank()) dataStore.saveUserGoal(goal)
-            dataStore.saveCalibrationCompleted(true)
+            dataStore.saveCalibrationData(level, interests, goal)
         }
     }
 
