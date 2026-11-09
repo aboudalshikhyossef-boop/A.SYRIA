@@ -73,7 +73,7 @@ if [ "$api_level" -ge 37 ]; then
       ;;
   esac
 fi
-\n
+
 # The caller can pass the Gradle instrumentation command. Running it here lets
 # us capture emulator diagnostics before android-emulator-runner shuts the AVD down.
 echo "Android test device diagnostics:"
