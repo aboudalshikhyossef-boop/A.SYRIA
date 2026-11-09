@@ -88,7 +88,7 @@ jobs:
           emulator-boot-timeout: 900
           disable-animations: true
           script: |
-            set -euo pipefail
+            set -eu
 
             emulator_serial="${ANDROID_SERIAL:-emulator-5554}"
             adb devices -l
