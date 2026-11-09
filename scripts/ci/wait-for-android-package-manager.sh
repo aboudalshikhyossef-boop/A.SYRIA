@@ -64,7 +64,7 @@ if [ "$api_level" -ge 37 ]; then
   adb -s "$emulator_serial" shell cmd appops set android GET_USAGE_STATS allow
 
   appops_state="$(adb -s "$emulator_serial" shell cmd appops get android GET_USAGE_STATS)"
-  printf '%s\\n' "$appops_state"
+  printf '%s\n' "$appops_state"
   case "$appops_state" in
     *"GET_USAGE_STATS: allow"*) ;;
     *)
