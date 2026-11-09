@@ -147,10 +147,11 @@ jobs:
           for attempt in 1 2 3; do
             echo "Installing stable-channel Android Emulator package (attempt $attempt/3)."
             if "$sdkmanager_bin" --install emulator --channel=0; then
-              emulator_bin="${ANDROID_HOME}/emulator/emulator"
-              test -x "$emulator_bin"
-              "$emulator_bin" -version
-              echo "Android Emulator package is installed and reusable by android-emulator-runner."
+              emulator_dir="${ANDROID_HOME}/emulator"
+              test -x "$emulator_dir/emulator"
+              test -x "$emulator_dir/qemu/linux-x86_64/qemu-system-x86_64"
+              "$sdkmanager_bin" --list_installed | grep -E '^[[:space:]]*emulator[[:space:]]*\\|'
+              echo "Android Emulator package files are present and reusable by android-emulator-runner."
               exit 0
             fi
 
