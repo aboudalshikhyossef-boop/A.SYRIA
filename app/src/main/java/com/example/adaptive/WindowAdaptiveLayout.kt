@@ -132,8 +132,8 @@ fun AdaptiveContentFrame(content: @Composable () -> Unit) {
     ) {
         Box(
             modifier = Modifier
-                .fillMaxSize()
                 .widthIn(max = layoutInfo.maxContentWidth)
+                .fillMaxSize()
         ) {
             content()
         }
