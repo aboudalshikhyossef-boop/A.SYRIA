@@ -279,15 +279,18 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
     val userProfileAnalysis: StateFlow<String> = _userProfileAnalysis.asStateFlow()
     // --- End User Cognitive Model State ---
 
-    private suspend fun generateGeminiText(prompt: String): String {
-        val apiKey = _customApiKey.value
-        if (apiKey.isBlank()) {
+    private suspend fun generateGeminiText(
+        prompt: String,
+        apiKey: String = _customApiKey.value
+    ): String {
+        val normalizedKey = apiKey.trim()
+        if (normalizedKey.isBlank() || normalizedKey.contains("MY_GEMINI_API_KEY")) {
             throw IllegalStateException("Gemini API key is missing. Add it in Settings.")
         }
         return geminiRepository.generateText(
             systemInstruction = "You are the AI assistant inside A.SYRIA. Follow the task in the user input and respond in the requested language.",
             input = prompt,
-            apiKey = apiKey
+            apiKey = normalizedKey
         )
     }
 
@@ -296,7 +299,11 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
     }
 
     fun updateCustomApiKey(key: String) {
-        viewModelScope.launch { dataStore.saveGeminiApiKey(key) }
+        val normalizedKey = key.trim()
+        _customApiKey.value = normalizedKey
+        viewModelScope.launch(Dispatchers.IO) {
+            dataStore.saveGeminiApiKey(normalizedKey)
+        }
     }
 
     fun updateProjectName(name: String) {
@@ -329,25 +336,28 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
     }
 
     fun testNeuralLink() {
+        if (_isTestingKey.value) return
+        _isTestingKey.value = true
+
         viewModelScope.launch {
-            _isTestingKey.value = true
-            val apiKey = _customApiKey.value
-            if (apiKey.isEmpty() || apiKey.contains("MY_GEMINI_API_KEY")) {
-                _isNeuralLinkOffline.value = true
-                _terminalResponse.value = "[ TERMINAL ALERT ] Gemini API Key is required. Add your Gemini API key in Settings."
-                _isTestingKey.value = false
-                return@launch
-            }
             try {
+                val apiKey = _customApiKey.value.trim()
+                if (apiKey.isBlank() || apiKey.contains("MY_GEMINI_API_KEY")) {
+                    _isNeuralLinkOffline.value = true
+                    _terminalResponse.value = "[ TERMINAL ALERT ] Gemini API Key is required. Add your Gemini API key in Settings."
+                    return@launch
+                }
+
                 kotlinx.coroutines.withTimeout(15000L) {
-                    generateGeminiText("ping")
+                    generateGeminiText("ping", apiKey)
                 }
                 _isNeuralLinkOffline.value = false
                 _terminalResponse.value = "FULL NEURAL LINK ESTABLISHED ✅"
-            } catch (e: Exception) {
-                if (e is CancellationException) throw e
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
                 _isNeuralLinkOffline.value = true
-                _terminalResponse.value = "[ TERMINAL ALERT ] ${e.message}"
+                _terminalResponse.value = "[ TERMINAL ALERT ] ${error.message}"
             } finally {
                 _isTestingKey.value = false
             }
@@ -367,10 +377,22 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
         viewModelScope.launch { dataStore.clearLegacyAiSettings() }
         viewModelScope.launch(Dispatchers.IO) { dataStore.migrateLegacyGeminiApiKey() }
         deviceTelemetry.start()
-        viewModelScope.launch { dataStore.isArabic.collect { _isArabic.value = it } }
+        viewModelScope.launch {
+            combine(
+                dataStore.isArabic,
+                dataStore.onboardingCompleted,
+                dataStore.calibrationCompleted,
+                dataStore.geminiApiKey
+            ) { isArabic, onboardingCompleted, calibrationCompleted, apiKey ->
+                _isArabic.value = isArabic
+                _onboardingCompleted.value = onboardingCompleted
+                _calibrationCompleted.value = calibrationCompleted
+                _customApiKey.value = apiKey
+                _isDataLoaded.value = true
+            }.collect { }
+        }
         viewModelScope.launch { dataStore.stealthMode.collect { _isStealthMode.value = it } }
         viewModelScope.launch { dataStore.cyberScore.collect { _cyberScore.value = it } }
-        viewModelScope.launch { dataStore.geminiApiKey.collect { _customApiKey.value = it } }
         viewModelScope.launch { dataStore.projectName.collect { _projectName.value = it } }
         viewModelScope.launch { dataStore.projectId.collect { _projectId.value = it } }
         viewModelScope.launch { dataStore.projectNumber.collect { _projectNumber.value = it } }
@@ -379,9 +401,7 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
         // Collect user profile data
         viewModelScope.launch { dataStore.userLevel.collect { _userLevel.value = it } }
         viewModelScope.launch { dataStore.userInterests.collect { _userInterests.value = it } }
-        viewModelScope.launch { dataStore.calibrationCompleted.collect { _calibrationCompleted.value = it } }
         viewModelScope.launch { dataStore.userGoal.collect { _userGoal.value = it } }
-          viewModelScope.launch { dataStore.onboardingCompleted.collect { _onboardingCompleted.value = it } }
           viewModelScope.launch { dataStore.academyPoints.collect { _academyPoints.value = it } }
           viewModelScope.launch { dataStore.academyStreak.collect { _academyStreak.value = it } }
 
@@ -389,11 +409,6 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
         viewModelScope.launch { dataStore.userGender.collect { _userGender.value = it } }
         viewModelScope.launch { dataStore.userBirthYear.collect { _userBirthYear.value = it } }
         viewModelScope.launch { dataStore.userProfileAnalysis.collect { _userProfileAnalysis.value = it } }
-        // Mark data as loaded after critical fields are available
-        viewModelScope.launch {
-            dataStore.onboardingCompleted.first()
-            _isDataLoaded.value = true
-        }
     }
 
     fun setTerminalExpanded(expanded: Boolean) {
@@ -425,15 +440,17 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
     }
 
     fun sendTerminalQuery(query: String) {
-        if (query.isBlank()) return
+        val normalizedQuery = query.trim()
+        if (normalizedQuery.isBlank() || _isThinking.value) return
+        _isThinking.value = true
+
         viewModelScope.launch {
-            _isThinking.value = true
             _terminalResponse.value = if (_isArabic.value) "[ جارٍ الاتصال بالنواة العصبية... ]" else "[ CONNECTING TO NEURAL CORE... ]"
             try {
                 val sysContext = if (_isArabic.value)
-                    "أنت نظام ذكاء اصطناعي للأمن السيبراني باسم A.SYRIA SOVEREIGN OS v4. أجب بأسلوب تقني احترافي وموجز. الاستعلام: $query"
+                    "أنت نظام ذكاء اصطناعي للأمن السيبراني باسم A.SYRIA SOVEREIGN OS v4. أجب بأسلوب تقني احترافي وموجز. الاستعلام: $normalizedQuery"
                 else
-                    "You are A.SYRIA SOVEREIGN OS v4 cybersecurity AI assistant. Respond concisely in professional technical style. Query: $query"
+                    "You are A.SYRIA SOVEREIGN OS v4 cybersecurity AI assistant. Respond concisely in professional technical style. Query: $normalizedQuery"
                 val result = generateGeminiText(sysContext)
                 _terminalResponse.value = result
                 _isNeuralLinkOffline.value = false
@@ -456,89 +473,94 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
         onSuccess: (String) -> Unit,
         onFailure: (Throwable) -> Unit
     ) {
-        viewModelScope.launch {
-            _isAcademyGenerating.value = true
-            val apiKey = _customApiKey.value.ifBlank { _customApiKey.value }
-            if (apiKey.isNotBlank()) {
-                try {
-                    val promptLocale = if (useArabic) "Arabic (العربية)" else "English"
-                    val seed = System.currentTimeMillis()
+        if (_isAcademyGenerating.value) return
+        _isAcademyGenerating.value = true
 
-                    // --- NEW ADAPTIVE INTELLIGENCE --- 
-                    val level = _userLevel.value
-                    val interests = _userInterests.value
-                    val goal = _userGoal.value
-                    val goalLabel = when (goal) {
-                        "self_protect" -> "Protect himself/herself and family from digital threats"
-                        "career" -> "Enter the cybersecurity field professionally"
-                        "certification" -> "Pass a cybersecurity certification exam"
-                        "threat_hunting" -> "Professional threat hunting and red team operations"
-                        else -> "General cybersecurity awareness"
-                    }
-                    val userProfilePrompt = """
+        viewModelScope.launch {
+            try {
+                val apiKey = _customApiKey.value.trim()
+                check(apiKey.isNotBlank() && !apiKey.contains("MY_GEMINI_API_KEY")) {
+                    "Gemini API key is missing. Add it in Settings."
+                }
+
+                val promptLocale = if (useArabic) "Arabic (العربية)" else "English"
+                val seed = System.currentTimeMillis()
+                val level = _userLevel.value
+                val interests = _userInterests.value
+                val goal = _userGoal.value
+                val goalLabel = when (goal) {
+                    "self_protect" -> "Protect himself/herself and family from digital threats"
+                    "career" -> "Enter the cybersecurity field professionally"
+                    "certification" -> "Pass a cybersecurity certification exam"
+                    "threat_hunting" -> "Professional threat hunting and red team operations"
+                    else -> "General cybersecurity awareness"
+                }
+                val userProfilePrompt = """
                     USER PROFILE:
                     - Skill Level: $level
                     - Core Interests: ${if (interests.isNotEmpty()) interests.joinToString(", ") else "General Cybersecurity"}
                     - Primary Goal: $goalLabel
-                    """.trimIndent()
+                """.trimIndent()
 
-                    val topicFocus = if (interests.isNotEmpty()) interests.random() else "General Cybersecurity"
-
-                    val avoidClause = if (usedTopics.isNotEmpty()) {
-                        val topicList = usedTopics.take(30).joinToString("\n- ", prefix = "\n- ")
-                        """⛔ STRICTLY FORBIDDEN — Do NOT create any scenario similar to or repeating these already-asked topics:
+                val topicFocus = interests.randomOrNull() ?: "General Cybersecurity"
+                val avoidClause = if (usedTopics.isNotEmpty()) {
+                    val topicList = usedTopics.take(30).joinToString("\n- ", prefix = "\n- ")
+                    """⛔ STRICTLY FORBIDDEN — Do NOT create any scenario similar to or repeating these already-asked topics:
 $topicList
 
 Every scenario you produce MUST be on a COMPLETELY DIFFERENT situation, attack vector, and context from the above list."""
-                    } else ""
-
-                    val prompt = """
-                        You are a Senior Cybersecurity Trainer AI generating FRESH, UNIQUE quiz scenarios.
-                        Entropy seed (guarantees uniqueness): [$seed]
-                        Language: $promptLocale
-                        Module: '$moduleNameEn' / '$moduleNameAr'
-
-                        $userProfilePrompt
-
-                        Your scenarios MUST be tailored to this user's profile.
-                        The difficulty and topic MUST align with their specified level and interests.
-                        Topic focus for this round: [$topicFocus]
-
-                        $avoidClause
-
-                        Rules:
-                        - Scenarios must match the user's skill level. For "Beginner", use clear, simple language and common threats. For "Advanced", use complex, technical, multi-step attack scenarios.
-                        - Scenarios must relate to the topic focus.
-                        - Each scenario MUST describe a DIFFERENT real-world attack, threat, or security decision.
-                        - Options must be plausible, educational, and distinct from each other.
-                        - Explanation must teach a concrete security lesson.
-                        - NEVER reuse the same story, platform, or attack method across scenarios.
-
-                        Generate exactly 3 unique challenging scenarios in this STRICT JSON format:
-                        {
-                          "scenarios": [
-                            { "id": "s...", "scenario": "...", "options": [...], "correctIndex": ..., "explanation": "..." }
-                          ]
-                        }
-
-                        Output ONLY valid JSON. No markdown. No extra text outside JSON.
-                    """.trimIndent()
-                    
-                    val cleanRes = generateGeminiText(prompt).replace("```json", "").replace("```", "").trim()
-                    if (cleanRes.isNotBlank()) {
-                        onSuccess(cleanRes)
-                        _isAcademyGenerating.value = false
-                        return@launch
-                    }
-                } catch (e: Exception) {
-                    if (e is CancellationException) throw e
-                    _isAcademyGenerating.value = false
-                    onFailure(e)
-                    return@launch
+                } else {
+                    ""
                 }
+
+                val prompt = """
+                    You are a Senior Cybersecurity Trainer AI generating FRESH, UNIQUE quiz scenarios.
+                    Entropy seed: [$seed]
+                    Language: $promptLocale
+                    Module: '$moduleNameEn' / '$moduleNameAr'
+
+                    $userProfilePrompt
+
+                    Your scenarios MUST be tailored to this user's profile.
+                    The difficulty and topic MUST align with their specified level and interests.
+                    Topic focus for this round: [$topicFocus]
+
+                    $avoidClause
+
+                    Rules:
+                    - Scenarios must match the user's skill level. For "Beginner", use clear, simple language and common threats. For "Advanced", use complex, technical, multi-step attack scenarios.
+                    - Scenarios must relate to the topic focus.
+                    - Each scenario MUST describe a DIFFERENT real-world attack, threat, or security decision.
+                    - Options must be plausible, educational, and distinct from each other.
+                    - Explanation must teach a concrete security lesson.
+                    - NEVER reuse the same story, platform, or attack method across scenarios.
+
+                    Generate exactly 3 unique challenging scenarios in this STRICT JSON format:
+                    {
+                      "scenarios": [
+                        { "id": "s...", "scenario": "...", "options": [...], "correctIndex": ..., "explanation": "..." }
+                      ]
+                    }
+
+                    Output ONLY valid JSON. No markdown. No extra text outside JSON.
+                """.trimIndent()
+
+                val cleanResponse = generateGeminiText(prompt, apiKey)
+                    .removePrefix("```json")
+                    .removeSuffix("```")
+                    .trim()
+                check(cleanResponse.isNotBlank()) {
+                    "Gemini returned an empty Academy response."
+                }
+
+                onSuccess(cleanResponse)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                onFailure(error)
+            } finally {
+                _isAcademyGenerating.value = false
             }
-            _isAcademyGenerating.value = false
-            onFailure(Exception("Neural Link offline or unavailable"))
         }
     }
 
