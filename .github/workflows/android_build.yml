@@ -84,7 +84,7 @@ jobs:
           - api-level: '36'
           - api-level: '37.0'
             disk-size: '8192M'
-            ram-size: '3072M'
+            ram-size: '4096M' # Android 17 API 37 requires at least 4 GB RAM
     steps:
       - name: Checkout source
         uses: actions/checkout@v7
