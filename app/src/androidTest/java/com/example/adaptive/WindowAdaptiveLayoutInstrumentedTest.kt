@@ -1,7 +1,7 @@
 package com.example.adaptive
 
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.material3.Text
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -78,7 +78,7 @@ class WindowAdaptiveLayoutInstrumentedTest {
         var observedInfo: WindowAdaptiveLayoutInfo? = null
 
         composeRule.setContent {
-            Box(modifier = Modifier.size(width.dp, height.dp)) {
+            Box(modifier = Modifier.requiredSize(width.dp, height.dp)) {
                 ProvideWindowAdaptiveLayout {
                     observedInfo = LocalWindowAdaptiveInfo.current
                     Text("Adaptive layout ready")
