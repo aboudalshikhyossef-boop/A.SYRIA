@@ -15,6 +15,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.Send
 import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -302,7 +303,7 @@ private fun ChatInputBar(value: String, onChange: (String) -> Unit, onSend: () -
             val active = value.isNotBlank() && isEnabled
             Box(modifier = Modifier.size(46.dp).background(if (active) accentColor else Color.White.copy(alpha = 0.04f), CircleShape).border(1.dp, if (active) accentColor else Color.White.copy(alpha = 0.06f), CircleShape), contentAlignment = Alignment.Center) {
                 IconButton(onClick = { onSend(); focusManager.clearFocus() }, enabled = active, modifier = Modifier.size(46.dp)) {
-                    Icon(Icons.Rounded.Send, "Send", tint = if (active) Color(0xFF040810) else Color.White.copy(alpha = 0.18f), modifier = Modifier.size(18.dp))
+                    Icon(Icons.AutoMirrored.Rounded.Send, "Send", tint = if (active) Color(0xFF040810) else Color.White.copy(alpha = 0.18f), modifier = Modifier.size(18.dp))
                 }
             }
         }

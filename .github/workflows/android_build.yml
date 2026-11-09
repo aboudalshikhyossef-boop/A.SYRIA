@@ -15,30 +15,54 @@ permissions:
 
 jobs:
   build-and-test:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    env:
+      GIT_CONFIG_COUNT: 1
+      GIT_CONFIG_KEY_0: init.defaultBranch
+      GIT_CONFIG_VALUE_0: main
     steps:
       - name: Checkout source
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set up JDK 17
-        uses: actions/setup-java@v5
+        uses: actions/setup-java@v6
         with:
           java-version: "17"
           distribution: temurin
+          cache: gradle
 
-      - name: Set up Gradle 8.13
-        uses: gradle/actions/setup-gradle@v6
-        with:
-          gradle-version: "8.13"
-          validate-wrappers: false
+      - name: Validate Gradle Wrapper
+        uses: gradle/actions/wrapper-validation@v6
 
-      # Run the installed Gradle distribution directly. This avoids executing
-      # the unverified wrapper JAR currently present in the repository.
+      - name: Validate CI shell helpers
+        run: sh -n scripts/ci/wait-for-android-package-manager.sh
+
+      # The official wrapper is checksum-validated before any Gradle task runs.
       - name: Run unit tests and build debug APK
-        run: gradle testDebugUnitTest compileDebugAndroidTestKotlin assembleDebug --no-configuration-cache --stacktrace --build-cache
+        run: ./gradlew testDebugUnitTest processDebugAndroidTestManifest compileDebugAndroidTestKotlin assembleDebug --no-configuration-cache --stacktrace --build-cache
+
+      - name: Verify Compose instrumentation host manifest
+        shell: bash
+        run: |
+          mapfile -t manifests < <(find app/build/intermediates -type f -name AndroidManifest.xml -path '*debugAndroidTest*')
+          if (( ${#manifests[@]} == 0 )); then
+            echo "::error::No merged debugAndroidTest manifest was generated."
+            exit 1
+          fi
+
+          for manifest in "${manifests[@]}"; do
+            if grep -q 'androidx.activity.ComponentActivity' "$manifest"; then
+              echo "Compose test host is declared in $manifest"
+              exit 0
+            fi
+          done
+
+          echo "::error::androidx.activity.ComponentActivity is missing from the merged instrumentation manifest."
+          printf '%s\\n' "${manifests[@]}"
+          exit 1
 
       - name: Upload debug APK
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: a-syria-debug
           path: app/build/outputs/apk/debug/app-debug.apk
@@ -47,26 +71,66 @@ jobs:
 
   instrumentation-tests:
     name: Instrumentation tests (Android ${{ matrix.api-level }})
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    env:
+      GIT_CONFIG_COUNT: 1
+      GIT_CONFIG_KEY_0: init.defaultBranch
+      GIT_CONFIG_VALUE_0: main
     strategy:
       fail-fast: false
       matrix:
-        api-level: ['33', '36', '37.0']
+        include:
+          - api-level: '33'
+            target: google_apis
+          - api-level: '36'
+            target: google_apis
+          - api-level: '37.0'
+            target: google_apis
+            disk-size: '8192M'
+            ram-size: '4096M' # Android 17 API 37 requires at least 4 GB RAM
     steps:
       - name: Checkout source
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set up JDK 17
-        uses: actions/setup-java@v5
+        uses: actions/setup-java@v6
         with:
           java-version: "17"
           distribution: temurin
+          cache: gradle
 
-      - name: Set up Gradle 8.13
-        uses: gradle/actions/setup-gradle@v6
-        with:
-          gradle-version: "8.13"
-          validate-wrappers: false
+      - name: Validate Gradle Wrapper
+        uses: gradle/actions/wrapper-validation@v6
+
+      - name: Install pinned Android SDK command-line tools
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          sdk_root="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-}}"
+          if [[ -z "$sdk_root" ]]; then
+            echo "::error::ANDROID_HOME and ANDROID_SDK_ROOT are both unset."
+            exit 1
+          fi
+
+          tools_dir="$sdk_root/cmdline-tools"
+          temp_dir="$(mktemp -d)"
+          trap 'rm -rf "$temp_dir"' EXIT
+
+          curl --fail --location --retry 3 --silent --show-error \
+            --output "$temp_dir/commandline-tools.zip" \
+            "https://dl.google.com/android/repository/commandlinetools-linux-14742923_latest.zip"
+
+          unzip -q "$temp_dir/commandline-tools.zip" -d "$temp_dir"
+          test -x "$temp_dir/cmdline-tools/bin/sdkmanager"
+
+          mkdir -p "$tools_dir"
+          rm -rf "$tools_dir/latest"
+          mv "$temp_dir/cmdline-tools" "$tools_dir/latest"
+
+          echo "$tools_dir/latest/bin" >> "$GITHUB_PATH"
+          echo "$sdk_root/platform-tools" >> "$GITHUB_PATH"
+          echo "Android SDK command-line tools: $("$tools_dir/latest/bin/sdkmanager" --version)"
 
       - name: Enable KVM
         run: |
@@ -78,14 +142,13 @@ jobs:
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: ${{ matrix.api-level }}
-          target: google_apis
+          target: ${{ matrix.target }}
           arch: x86_64
           profile: pixel_2
-          emulator-options: -no-window -no-audio -no-boot-anim -no-snapshot -no-snapshot-save -wipe-data -gpu swiftshader_indirect -camera-back none
+          disk-size: ${{ matrix.disk-size }}
+          ram-size: ${{ matrix.ram-size }}
+          emulator-options: -no-window -no-audio -no-boot-anim -no-snapshot -no-snapshot-save -no-metrics -wipe-data -gpu swiftshader_indirect -camera-back none
           emulator-boot-timeout: 900
           disable-animations: true
-          script: |
-            adb devices -l
-            adb -s emulator-5554 shell getprop ro.build.version.sdk
-            adb -s emulator-5554 shell getprop ro.product.cpu.abilist
-            gradle connectedDebugAndroidTest --no-configuration-cache --stacktrace --build-cache
+          pre-emulator-launch-script: 'grep -E "^(target|image.sysdir.1|hw.ramSize|disk.dataPartition.size)=" "$ANDROID_AVD_HOME/test.avd/config.ini"'
+          script: 'sh scripts/ci/wait-for-android-package-manager.sh ./gradlew connectedDebugAndroidTest --no-configuration-cache --stacktrace --build-cache'
