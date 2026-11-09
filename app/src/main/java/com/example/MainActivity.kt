@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.MenuBook
 import androidx.compose.material.icons.rounded.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.CompositionLocalProvider
@@ -337,7 +338,7 @@ private fun NavTab.icon() = when (key) {
     "home" -> Icons.Rounded.Home
     "academy" -> Icons.Rounded.School
     "chat" -> Icons.Rounded.SmartToy
-    "resources" -> Icons.Rounded.MenuBook
+    "resources" -> Icons.AutoMirrored.Rounded.MenuBook
     "library" -> Icons.Rounded.AutoStories
     else -> Icons.Rounded.Settings
 }
