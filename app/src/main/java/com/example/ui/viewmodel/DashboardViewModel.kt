@@ -1,17 +1,6 @@
 package com.example.ui.viewmodel
 
 import android.app.Application
-import android.content.BroadcastReceiver
-import android.content.Context
-import android.content.Intent
-import android.content.IntentFilter
-import android.hardware.Sensor
-import android.hardware.SensorEvent
-import android.hardware.SensorEventListener
-import android.hardware.SensorManager
-import android.net.ConnectivityManager
-import android.net.NetworkCapabilities
-import android.os.BatteryManager
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.data.database.AppDatabase
@@ -20,80 +9,46 @@ import com.example.data.database.VaultFileRepository
 import com.example.data.database.VaultItem
 import com.example.data.database.InventorIdea
 import com.example.data.database.InventorIdeaRepository
+import com.example.data.device.DeviceTelemetryMonitor
 import com.example.data.ContextualVerseEngine
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import com.example.adaptive.AdaptiveEngine
-  import com.example.adaptive.FeedbackResult
-  import com.example.adaptive.FeedbackService
-  import com.example.adaptive.UIChange
-  import com.example.data.SovereignDataStore
+import com.example.adaptive.FeedbackResult
+import com.example.adaptive.FeedbackService
+import com.example.adaptive.UIChange
+import com.example.data.SovereignDataStore
 import com.example.data.remote.GeminiRepository
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
-import kotlinx.coroutines.launch
-import okhttp3.OkHttpClient
-import okhttp3.Request
-import java.net.Inet4Address
-import java.net.NetworkInterface
-import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlin.random.Random
 
-class DashboardViewModel(application: Application) : AndroidViewModel(application), SensorEventListener {
+class DashboardViewModel(application: Application) : AndroidViewModel(application) {
 
-    private val sensorManager = application.getSystemService(Context.SENSOR_SERVICE) as SensorManager
-    private val connectivityManager = application.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
-    private var connectivityCallback: ConnectivityManager.NetworkCallback? = null
-    private val accelerometer: Sensor? = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
-    private val magnetometer: Sensor? = sensorManager.getDefaultSensor(Sensor.TYPE_MAGNETIC_FIELD)
+    private val deviceTelemetry = DeviceTelemetryMonitor(application, viewModelScope)
 
-    private val _roll = MutableStateFlow(0f)
-    val roll: StateFlow<Float> = _roll.asStateFlow()
+    val roll: StateFlow<Float> = deviceTelemetry.roll
+    val pitch: StateFlow<Float> = deviceTelemetry.pitch
+    val azimuth: StateFlow<Float> = deviceTelemetry.azimuth
 
-    private val _pitch = MutableStateFlow(0f)
-    val pitch: StateFlow<Float> = _pitch.asStateFlow()
+    fun startSensors() = deviceTelemetry.startSensors()
 
-    private val _azimuth = MutableStateFlow(0f)
-    val azimuth: StateFlow<Float> = _azimuth.asStateFlow()
-
-    private val alpha = 0.12f
-    private var currentRoll = 0f
-    private var currentPitch = 0f
-    
-    private var gravity: FloatArray? = null
-    private var geomagnetic: FloatArray? = null
+    fun stopSensors() = deviceTelemetry.stopSensors()
 
     private val _isAcademyGenerating = MutableStateFlow(false)
     val isAcademyGenerating: StateFlow<Boolean> = _isAcademyGenerating.asStateFlow()
 
-    fun startSensors() {
-        accelerometer?.let { sensorManager.registerListener(this, it, SensorManager.SENSOR_DELAY_UI) }
-        magnetometer?.let { sensorManager.registerListener(this, it, SensorManager.SENSOR_DELAY_UI) }
-    }
-
-    fun stopSensors() {
-        sensorManager.unregisterListener(this)
-    }
-
-    private val _connectionType = MutableStateFlow("Determining...")
-    val connectionType: StateFlow<String> = _connectionType.asStateFlow()
-
-    private val _ipAddress = MutableStateFlow("127.0.0.1")
-    val ipAddress: StateFlow<String> = _ipAddress.asStateFlow()
-
-    private val _batteryPercentage = MutableStateFlow(100)
-    val batteryPercentage: StateFlow<Int> = _batteryPercentage.asStateFlow()
-
-    private val _chargingStatus = MutableStateFlow("UNKNOWN")
-    val chargingStatus: StateFlow<String> = _chargingStatus.asStateFlow()
+    val connectionType: StateFlow<String> = deviceTelemetry.connectionType
+    val ipAddress: StateFlow<String> = deviceTelemetry.ipAddress
+    val batteryPercentage: StateFlow<Int> = deviceTelemetry.batteryPercentage
+    val chargingStatus: StateFlow<String> = deviceTelemetry.chargingStatus
 
     private val _isThinking = MutableStateFlow(false)
     val isThinking: StateFlow<Boolean> = _isThinking.asStateFlow()
@@ -113,8 +68,7 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
     private val _isNeuralLinkOffline = MutableStateFlow(false)
     val isNeuralLinkOffline: StateFlow<Boolean> = _isNeuralLinkOffline.asStateFlow()
 
-    private val _hasInternetConnection = MutableStateFlow(true)
-    val hasInternetConnection: StateFlow<Boolean> = _hasInternetConnection.asStateFlow()
+    val hasInternetConnection: StateFlow<Boolean> = deviceTelemetry.hasInternetConnection
 
     private val _isTestingKey = MutableStateFlow(false)
     val isTestingKey: StateFlow<Boolean> = _isTestingKey.asStateFlow()
@@ -156,7 +110,9 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
         .stateIn(scope = viewModelScope, started = SharingStarted.WhileSubscribed(5000), initialValue = emptyList())
 
     val ambientInsight: StateFlow<ContextualVerseEngine.SpiritualInsight> = combine(
-        _batteryPercentage, _chargingStatus, _connectionType
+        deviceTelemetry.batteryPercentage,
+        deviceTelemetry.chargingStatus,
+        deviceTelemetry.connectionType
     ) { battery, charging, connection ->
         ContextualVerseEngine.getInsight(battery, charging == "CHARGING", connection)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), ContextualVerseEngine.getInsight(100, false, "Determining..."))
@@ -343,11 +299,6 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
     val userProfileAnalysis: StateFlow<String> = _userProfileAnalysis.asStateFlow()
     // --- End User Cognitive Model State ---
 
-    private val okHttpClient = OkHttpClient.Builder()
-        .connectTimeout(8, TimeUnit.SECONDS).readTimeout(8, TimeUnit.SECONDS)
-        .writeTimeout(8, TimeUnit.SECONDS).callTimeout(12, TimeUnit.SECONDS)
-        .retryOnConnectionFailure(true).build()
-
     private suspend fun generateGeminiText(prompt: String): String {
         val apiKey = _customApiKey.value
         if (apiKey.isBlank()) {
@@ -400,18 +351,6 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
         }
     }
 
-    private val batteryReceiver = object : BroadcastReceiver() {
-        override fun onReceive(context: Context?, intent: Intent?) {
-            intent?.let {
-                val level = it.getIntExtra(BatteryManager.EXTRA_LEVEL, -1)
-                val scale = it.getIntExtra(BatteryManager.EXTRA_SCALE, -1)
-                if (level != -1 && scale != -1) { _batteryPercentage.value = ((level.toFloat() / scale.toFloat()) * 100).toInt() }
-                val status = it.getIntExtra(BatteryManager.EXTRA_STATUS, -1)
-                _chargingStatus.value = if (status == BatteryManager.BATTERY_STATUS_CHARGING || status == BatteryManager.BATTERY_STATUS_FULL) "CHARGING" else "DISCHARGING"
-            }
-        }
-    }
-
     fun testNeuralLink() {
         viewModelScope.launch {
             _isTestingKey.value = true
@@ -450,8 +389,7 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
         }
         viewModelScope.launch { dataStore.clearLegacyAiSettings() }
         viewModelScope.launch(Dispatchers.IO) { dataStore.migrateLegacyGeminiApiKey() }
-        application.registerReceiver(batteryReceiver, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
-        monitorConnectivity()
+        deviceTelemetry.start()
         viewModelScope.launch { dataStore.isArabic.collect { _isArabic.value = it } }
         viewModelScope.launch { dataStore.stealthMode.collect { _isStealthMode.value = it } }
         viewModelScope.launch { dataStore.cyberScore.collect { _cyberScore.value = it } }
@@ -479,9 +417,6 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
             dataStore.onboardingCompleted.first()
             _isDataLoaded.value = true
         }
-        viewModelScope.launch(Dispatchers.IO) {
-            try { _ipAddress.value = fetchPublicIp() } catch (_: Exception) { _ipAddress.value = extractLocalIp() }
-        }
     }
 
     fun setTerminalExpanded(expanded: Boolean) {
@@ -502,71 +437,6 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
         }
     }
 
-    private fun fetchPublicIp(): String {
-        val request = Request.Builder()
-            .url("https://api64.ipify.org")
-            .get()
-            .build()
-
-        return try {
-            okHttpClient.newCall(request).execute().use { response ->
-                if (response.isSuccessful) {
-                    response.body?.string()?.trim()?.takeIf(::isValidIpAddress)
-                } else {
-                    null
-                }
-            } ?: extractLocalIp()
-        } catch (_: Exception) {
-            extractLocalIp()
-        }
-    }
-
-    private fun isValidIpAddress(value: String): Boolean {
-        if (value.isBlank() || value.length > 45) return false
-        if (':' in value) {
-            return value.count { it == ':' } >= 2 &&
-                value.all { it in "0123456789abcdefABCDEF:" }
-        }
-        val octets = value.split('.')
-        return octets.size == 4 && octets.all { octet ->
-            octet.isNotEmpty() && octet.toIntOrNull()?.let { it in 0..255 } == true
-        }
-    }
-
-    private fun extractLocalIp(): String {
-        try {
-            NetworkInterface.getNetworkInterfaces().toList().mapNotNull { intf ->
-                intf.inetAddresses.toList().find { !it.isLoopbackAddress && it is Inet4Address }?.hostAddress
-            }.firstOrNull()?.let { return it }
-        } catch (_: Exception) {}
-        return "N/A"
-    }
-
-    private fun monitorConnectivity() {
-        if (connectivityCallback != null) return
-        val callback = object : ConnectivityManager.NetworkCallback() {
-            override fun onCapabilitiesChanged(network: android.net.Network, caps: NetworkCapabilities) {
-                _connectionType.value = when {
-                    caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) -> "Wi-Fi"
-                    caps.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) -> "Cellular"
-                    caps.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET) -> "Ethernet"
-                    else -> "Connected"
-                }
-            }
-
-            override fun onLost(network: android.net.Network) {
-                _connectionType.value = "DISCONNECTED"
-            }
-        }
-        connectivityCallback = callback
-        try {
-            connectivityManager.registerDefaultNetworkCallback(callback)
-        } catch (_: Exception) {
-            connectivityCallback = null
-            _connectionType.value = "Unknown"
-        }
-    }
-  
     fun fetchStrategicIntelligence() {
         // This can now be personalized too in the future!
         val list = if (_isArabic.value) {
@@ -776,38 +646,8 @@ Every scenario you produce MUST be on a COMPLETELY DIFFERENT situation, attack v
         _linkAnalysisResult.value = null
     }
 
-    override fun onSensorChanged(event: SensorEvent?) {
-        if (event == null) return
-        when (event.sensor.type) {
-            Sensor.TYPE_ACCELEROMETER -> {
-                gravity = event.values
-                val (ax, ay) = event.values
-                currentRoll += alpha * ((-ax * 4f) - currentRoll)
-                currentPitch += alpha * ((ay * 4f) - currentPitch)
-                _roll.value = currentRoll
-                _pitch.value = currentPitch
-            }
-            Sensor.TYPE_MAGNETIC_FIELD -> geomagnetic = event.values
-        }
-        if (gravity != null && geomagnetic != null) {
-            val rMatrix = FloatArray(9)
-            if (SensorManager.getRotationMatrix(rMatrix, null, gravity, geomagnetic)) {
-                val orientation = FloatArray(3)
-                SensorManager.getOrientation(rMatrix, orientation)
-                _azimuth.value = (Math.toDegrees(orientation[0].toDouble()).toFloat() + 360) % 360
-            }
-        }
-    }
-
-    override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
-
     override fun onCleared() {
+        deviceTelemetry.close()
         super.onCleared()
-        connectivityCallback?.let { callback ->
-            runCatching { connectivityManager.unregisterNetworkCallback(callback) }
-        }
-        connectivityCallback = null
-        sensorManager.unregisterListener(this)
-        try { getApplication<Application>().unregisterReceiver(batteryReceiver) } catch (_: Exception) {}
     }
 }
