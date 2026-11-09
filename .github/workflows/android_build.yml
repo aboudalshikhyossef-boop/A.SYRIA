@@ -85,7 +85,7 @@ jobs:
           - api-level: '36'
             target: google_apis
           - api-level: '37.0'
-            target: google_atd
+            target: google_apis
             disk-size: '8192M'
             ram-size: '4096M' # Android 17 API 37 requires at least 4 GB RAM
     steps:
@@ -101,6 +101,36 @@ jobs:
 
       - name: Validate Gradle Wrapper
         uses: gradle/actions/wrapper-validation@v6
+
+      - name: Install pinned Android SDK command-line tools
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          sdk_root="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-}}"
+          if [[ -z "$sdk_root" ]]; then
+            echo "::error::ANDROID_HOME and ANDROID_SDK_ROOT are both unset."
+            exit 1
+          fi
+
+          tools_dir="$sdk_root/cmdline-tools"
+          temp_dir="$(mktemp -d)"
+          trap 'rm -rf "$temp_dir"' EXIT
+
+          curl --fail --location --retry 3 --silent --show-error \
+            --output "$temp_dir/commandline-tools.zip" \
+            "https://dl.google.com/android/repository/commandlinetools-linux-14742923_latest.zip"
+
+          unzip -q "$temp_dir/commandline-tools.zip" -d "$temp_dir"
+          test -x "$temp_dir/cmdline-tools/bin/sdkmanager"
+
+          mkdir -p "$tools_dir"
+          rm -rf "$tools_dir/latest"
+          mv "$temp_dir/cmdline-tools" "$tools_dir/latest"
+
+          echo "$tools_dir/latest/bin" >> "$GITHUB_PATH"
+          echo "$sdk_root/platform-tools" >> "$GITHUB_PATH"
+          echo "Android SDK command-line tools: $("$tools_dir/latest/bin/sdkmanager" --version)"
 
       - name: Enable KVM
         run: |
