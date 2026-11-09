@@ -18,6 +18,13 @@ class WindowAdaptiveLayoutTest {
     }
 
     @Test
+    fun landscapePreferenceUsesTheAvailableWindowAspectRatio() {
+        assertEquals(true, prefersLandscapeWindow(780, 420))
+        assertEquals(false, prefersLandscapeWindow(840, 900))
+        assertEquals(true, prefersLandscapeWindow(1_200, 480))
+    }
+
+    @Test
     fun heightBreakpointsCoverShortAndTallWindows() {
         assertEquals(WindowHeightClass.COMPACT, classifyWindowHeight(479))
         assertEquals(WindowHeightClass.MEDIUM, classifyWindowHeight(480))
