@@ -517,7 +517,9 @@ class MainActivity : FragmentActivity() {
                                 Lifecycle.Event.ON_PAUSE -> vm.stopSensors()
                                 Lifecycle.Event.ON_STOP -> {
                                     vm.stopSensors()
-                                    vm.lockAppSession()
+                                    // Do not re-lock while Android's credential UI is active;
+                                    // it may temporarily move this activity to STOPPED.
+                                    if (!isAuthInProgress) vm.lockAppSession()
                                 }
                                 else -> Unit
                             }
