@@ -80,6 +80,8 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          - api-level: '29'
+            target: google_apis
           - api-level: '33'
             target: google_apis
           - api-level: '36'
