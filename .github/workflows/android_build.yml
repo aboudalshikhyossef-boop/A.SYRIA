@@ -166,6 +166,37 @@ jobs:
           echo "::error::Could not install the Android Emulator package after 3 attempts."
           exit 1
 
+      # A transient/corrupt Google system-image ZIP previously caused API 33
+      # to fail before the emulator was booted and before any app test ran.
+      - name: Preinstall Android 33 system image with retry
+        if: matrix.api-level == '33'
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          sdkmanager_bin="${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager"
+          package="system-images;android-33;google_apis;x86_64"
+          test -x "$sdkmanager_bin"
+
+          for attempt in 1 2 3; do
+            echo "Installing Android 33 Google APIs image (attempt $attempt/3)."
+            if "$sdkmanager_bin" --install "$package" --channel=0; then
+              "$sdkmanager_bin" --list_installed | grep -F "$package"
+              echo "Android 33 system image is installed."
+              exit 0
+            fi
+
+            if (( attempt < 3 )); then
+              echo "::warning::Android 33 system-image download failed; removing partial files and retrying."
+              rm -rf "${ANDROID_HOME}/system-images/android-33/google_apis/x86_64"
+              rm -rf "$HOME/.android/cache"
+              sleep $((attempt * 10))
+            fi
+          done
+
+          echo "::error::Android 33 system image could not be installed after 3 attempts."
+          exit 1
+
       - name: Enable KVM
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
