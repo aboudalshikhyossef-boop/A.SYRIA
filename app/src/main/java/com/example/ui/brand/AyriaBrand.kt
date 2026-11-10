@@ -51,9 +51,18 @@ internal object AyriaColors {
     val glass = Color(0x1A65CFFF)
 }
 
+// These bundled files are verified TrueType fonts. The old Cairo resources
+// in this repository were HTML error pages masquerading as .ttf files and
+// caused ResourcesCompat/Compose to crash while measuring the first Arabic text.
 internal val AyriaArabicFont = FontFamily(
-    Font(R.font.cairo_regular, FontWeight.Normal),
-    Font(R.font.cairo_bold, FontWeight.Bold)
+    Font(R.font.tajawal_regular, FontWeight.Normal),
+    Font(R.font.tajawal_bold, FontWeight.Bold)
+)
+
+// Amiri is reserved for Quranic text so Arabic letterforms remain traditional and legible.
+internal val AyriaQuranFont = FontFamily(
+    Font(R.font.amiri_regular, FontWeight.Normal),
+    Font(R.font.amiri_bold, FontWeight.Bold)
 )
 
 @Composable
@@ -276,9 +285,9 @@ internal fun AyriaVerseCard(
                 text = "وَقُل رَّبِّ زِدْنِي عِلْمًا",
                 modifier = Modifier.padding(top = 5.dp),
                 color = AyriaColors.pearl,
-                fontFamily = AyriaArabicFont,
+                fontFamily = AyriaQuranFont,
                 fontWeight = FontWeight.Bold,
-                fontSize = 19.sp,
+                fontSize = 21.sp,
                 textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                 lineHeight = 31.sp
             )
