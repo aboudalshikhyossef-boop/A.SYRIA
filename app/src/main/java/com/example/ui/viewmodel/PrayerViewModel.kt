@@ -12,6 +12,7 @@ import com.batoulapps.adhan.data.DateComponents
 import com.example.data.location.NetworkLocationRepository
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -126,8 +127,15 @@ class PrayerViewModel(application: Application) : AndroidViewModel(application) 
 
     private fun startTimer() {
         viewModelScope.launch {
-            while (true) {
-                calculatePrayerTimes()
+            while (isActive) {
+                try {
+                    calculatePrayerTimes()
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (error: Exception) {
+                    // A local date/coordinate calculation failure must not crash the host Activity.
+                    android.util.Log.e("A.SYRIA.Prayer", "Prayer-time refresh failed; keeping the last valid values", error)
+                }
                 delay(1_000)
             }
         }
