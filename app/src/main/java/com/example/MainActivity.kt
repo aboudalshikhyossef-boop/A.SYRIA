@@ -301,6 +301,7 @@ class MainActivity : FragmentActivity() {
             val appPinLockoutUntil   by vm.appPinLockoutUntilMillis.collectAsState()
             var appPinRecoveryMode by remember { mutableStateOf(false) }
             val customApiKey         by vm.customApiKey.collectAsState()
+            var startupGateUnlocked by remember { mutableStateOf(false) }
             var startupGateMessage by remember { mutableStateOf<String?>(null) }
 
             MyApplicationTheme(darkTheme = true, dynamicColor = false, uiConfig = uiConfig) {
