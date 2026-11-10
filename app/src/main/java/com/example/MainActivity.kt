@@ -278,8 +278,8 @@ class MainActivity : FragmentActivity() {
 
                                     override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
                                         isAuthInProgress = false
-                                        hasCompletedStartupGate = true
                                         if (closeOnCancel) {
+                                            hasCompletedStartupGate = true
                                             startupGateUnlocked = true
                                             startupGateMessage = null
                                             requestEssentialPermissionsOnce()
@@ -375,6 +375,49 @@ class MainActivity : FragmentActivity() {
                     }
 
                     DisposableEffect(isDataLoaded, lockAppOnLaunch, isAr) {
+                        val observer = LifecycleEventObserver { _, event ->
+                            when (event) {
+                                Lifecycle.Event.ON_RESUME -> {
+                                    vm.startSensors()
+
+                                    if (isDataLoaded && !lockAppOnLaunch && !hasCompletedStartupGate) {
+                                        hasCompletedStartupGate = true
+                                        startupGateUnlocked = true
+                                    }
+
+                                    if (
+                                        isDataLoaded &&
+                                        lockAppOnLaunch &&
+                                        !hasCompletedStartupGate &&
+                                        !hasRequestedStartupAuthentication &&
+                                        !isAuthInProgress
+                                    ) {
+                                        window.decorView.post {
+                                            val activityReady =
+                                                !isFinishing &&
+                                                !isDestroyed &&
+                                                lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)
+
+                                            if (
+                                                activityReady &&
+                                                lockAppOnLaunch &&
+                                                !hasCompletedStartupGate &&
+                                                !isAuthInProgress
+                                            ) {
+                                                requestStartupAuthentication()
+                                            }
+                                        }
+                                    }
+                                }
+
+                                Lifecycle.Event.ON_PAUSE -> vm.stopSensors()
+                                else -> Unit
+                            }
+                        }
+                        lifecycle.addObserver(observer)
+                        onDispose { lifecycle.removeObserver(observer) }
+                    }
+
                     // Wait for DataStore to load before computing startDestination
                     // This prevents the onboarding from showing every time
                     val startDestination = remember(isDataLoaded, onboardingCompleted, calibrationCompleted) {
