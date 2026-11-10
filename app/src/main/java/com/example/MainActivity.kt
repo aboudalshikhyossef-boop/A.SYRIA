@@ -383,6 +383,7 @@ class MainActivity : FragmentActivity() {
                                     if (isDataLoaded && !lockAppOnLaunch && !hasCompletedStartupGate) {
                                         hasCompletedStartupGate = true
                                         startupGateUnlocked = true
+                                        requestEssentialPermissionsOnce()
                                     }
 
                                     if (
@@ -602,6 +603,7 @@ class MainActivity : FragmentActivity() {
                                             vm.setLockAppOnLaunch(false)
                                             hasCompletedStartupGate = true
                                             startupGateUnlocked = true
+                                            requestEssentialPermissionsOnce()
                                             Toast.makeText(
                                                 this@MainActivity,
                                                 if (isAr) "تم إيقاف قفل التطبيق عند الفتح." else "App launch lock disabled.",
