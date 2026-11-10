@@ -190,17 +190,26 @@ class MainActivity : FragmentActivity() {
                         }
 
                         if (!supportsDeviceCredentialInPrompt && !hasStrongBiometric && hasSecureDeviceCredential) {
-                            if (
-                                launchLegacyDeviceCredential(
-                                    title,
-                                    subtitle,
-                                    onSuccess,
-                                    closeOnCancel,
-                                    onCancel = if (closeOnCancel) {
-                                        { startupGateMessage = if (isAr) "تم إلغاء إدخال رمز قفل الجهاز. أعد المحاولة أو اختر المتابعة دون قفل." else "Device credential entry was cancelled. Retry or continue without the app lock." }
-                                    } else null
-                                )
-                            ) return
+                            val legacyCredentialLaunched = launchLegacyDeviceCredential(
+                                title,
+                                subtitle,
+                                onSuccess,
+                                closeOnCancel,
+                                onCancel = if (closeOnCancel) {
+                                    { startupGateMessage = if (isAr) "تم إلغاء إدخال رمز قفل الجهاز. أعد المحاولة أو اختر المتابعة دون قفل." else "Device credential entry was cancelled. Retry or continue without the app lock." }
+                                } else null
+                            )
+                            if (legacyCredentialLaunched) return
+
+                            // A configured PIN/pattern exists. If Android cannot open its credential
+                            // screen, keep the app locked instead of silently disabling the gate.
+                            startupGateMessage = if (isAr) {
+                                "تعذّر فتح شاشة PIN أو النمط في هذا الجهاز. أعد المحاولة أو اختر المتابعة دون قفل."
+                            } else {
+                                "Android could not open the device PIN/pattern screen. Retry or explicitly continue without the app lock."
+                            }
+                            Toast.makeText(this@MainActivity, startupGateMessage, Toast.LENGTH_LONG).show()
+                            return
                         }
 
                         val allowedAuthenticators = when {
