@@ -61,6 +61,9 @@ import com.example.ui.viewmodel.DashboardViewModel
 import com.example.ui.viewmodel.GeminiChatViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 
 class MainActivity : FragmentActivity() {
 
@@ -68,6 +71,7 @@ class MainActivity : FragmentActivity() {
     private var isAuthInProgress       = false
     private var hasRequestedStartupAuthentication = false
     private var hasRequestedPermissions = false
+    private var hasScheduledBackgroundWork = false
     private var pendingCredentialSuccess: (() -> Unit)? = null
     private var pendingCredentialOnCancel: (() -> Unit)? = null
     private var pendingCredentialIsStartupGate = false
@@ -125,6 +129,31 @@ class MainActivity : FragmentActivity() {
             pendingCredentialIsStartupGate = false
             isAuthInProgress = false
             false
+        }
+    }
+
+    private fun scheduleBackgroundWorkSafely() {
+        if (hasScheduledBackgroundWork) return
+        hasScheduledBackgroundWork = true
+
+        lifecycleScope.launch(Dispatchers.IO) {
+            try {
+                val workRequest =
+                    PeriodicWorkRequestBuilder<NotificationWorker>(15, TimeUnit.MINUTES).build()
+                WorkManager.getInstance(applicationContext).enqueueUniquePeriodicWork(
+                    "sovereign_pulse",
+                    ExistingPeriodicWorkPolicy.UPDATE,
+                    workRequest
+                )
+                android.util.Log.i("A.SYRIA.Startup", "Optional notification work scheduled")
+            } catch (error: Exception) {
+                // Notifications are optional; WorkManager initialization must not close the app.
+                android.util.Log.e(
+                    "A.SYRIA.Startup",
+                    "Optional WorkManager scheduling failed; continuing without background notifications",
+                    error
+                )
+            }
         }
     }
 
@@ -279,15 +308,13 @@ class MainActivity : FragmentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
-        val workRequest = PeriodicWorkRequestBuilder<NotificationWorker>(15, TimeUnit.MINUTES).build()
-        WorkManager.getInstance(applicationContext).enqueueUniquePeriodicWork(
-            "sovereign_pulse", ExistingPeriodicWorkPolicy.UPDATE, workRequest
-        )
+        android.util.Log.i("A.SYRIA.Startup", "MainActivity.onCreate started on API ${Build.VERSION.SDK_INT}")
 
         setContent {
-            val vm: DashboardViewModel    = viewModel()
-            val chatVm: GeminiChatViewModel = viewModel()
-            val prayerVm: com.example.ui.viewmodel.PrayerViewModel = viewModel()
+            val vm: DashboardViewModel = viewModel()
+            LaunchedEffect(Unit) {
+                android.util.Log.i("A.SYRIA.Startup", "Compose root attached; waiting for initial preferences")
+            }
 
             val uiConfig             by vm.uiConfig.collectAsState()
             val isAr                 by vm.isArabic.collectAsState()
@@ -512,26 +539,12 @@ class MainActivity : FragmentActivity() {
 
                     DisposableEffect(appPinEnabled) {
                         val observer = LifecycleEventObserver { _, event ->
-                            when (event) {
-                                Lifecycle.Event.ON_RESUME -> vm.startSensors()
-                                Lifecycle.Event.ON_PAUSE -> vm.stopSensors()
-                                Lifecycle.Event.ON_STOP -> {
-                                    vm.stopSensors()
-                                    // Do not re-lock while Android's credential UI is active;
-                                    // it may temporarily move this activity to STOPPED.
-                                    if (!isAuthInProgress) vm.lockAppSession()
-                                }
-                                else -> Unit
+                            if (event == Lifecycle.Event.ON_STOP && !isAuthInProgress) {
+                                vm.lockAppSession()
                             }
                         }
                         lifecycle.addObserver(observer)
                         onDispose { lifecycle.removeObserver(observer) }
-                    }
-
-                    LaunchedEffect(isDataLoaded, appPinSettingsLoaded, appPinEnabled, appPinUnlocked) {
-                        if (isDataLoaded && appPinSettingsLoaded && (!appPinEnabled || appPinUnlocked)) {
-                            requestEssentialPermissionsOnce()
-                        }
                     }
 
                     // Wait for DataStore to load before computing startDestination
@@ -554,6 +567,7 @@ class MainActivity : FragmentActivity() {
 
                                 LaunchedEffect(splashFinished, startDestination) {
                                     if (splashFinished && startDestination != "splash") {
+                                        android.util.Log.i("A.SYRIA.Startup", "Splash completed; navigating to $startDestination")
                                         navController.navigate(startDestination) {
                                             popUpTo("splash") { inclusive = true }
                                         }
@@ -579,6 +593,40 @@ class MainActivity : FragmentActivity() {
                             composable("dashboard") {
                                 val isArLocal by vm.isArabic.collectAsState()
                                 var activeTab by remember { mutableStateOf("home") }
+
+                                DisposableEffect(vm) {
+                                    val observer = LifecycleEventObserver { _, event ->
+                                        when (event) {
+                                            Lifecycle.Event.ON_RESUME -> {
+                                                runCatching {
+                                                    vm.startTelemetry()
+                                                    vm.startSensors()
+                                                }.onFailure { error ->
+                                                    android.util.Log.e("A.SYRIA.Startup", "Dashboard telemetry could not start", error)
+                                                }
+                                            }
+                                            Lifecycle.Event.ON_PAUSE -> vm.stopSensors()
+                                            Lifecycle.Event.ON_STOP -> {
+                                                vm.stopSensors()
+                                                vm.stopTelemetry()
+                                            }
+                                            else -> Unit
+                                        }
+                                    }
+                                    lifecycle.addObserver(observer)
+                                    onDispose {
+                                        lifecycle.removeObserver(observer)
+                                        vm.stopSensors()
+                                        vm.stopTelemetry()
+                                    }
+                                }
+
+                                LaunchedEffect(Unit) {
+                                    if (!appPinEnabled || appPinUnlocked) {
+                                        requestEssentialPermissionsOnce()
+                                    }
+                                    scheduleBackgroundWorkSafely()
+                                }
                                 val isAcademyOpen   by vm.isAcademyOpen.collectAsState()
                                 val isResourcesOpen by vm.isResourcesOpen.collectAsState()
 
@@ -648,11 +696,17 @@ class MainActivity : FragmentActivity() {
                                                         .fillMaxSize()
                                                 ) {
                                                     when (activeTab) {
-                                                        "home"      -> DashboardScreen(vm, prayerVm, { navController.navigate("link_scanner") }, { t, s, ok -> triggerBiometricAuth(t, s, ok) })
+                                                        "home"      -> {
+                                                            val prayerVm: com.example.ui.viewmodel.PrayerViewModel = viewModel()
+                                                            DashboardScreen(vm, prayerVm, { navController.navigate("link_scanner") }, { t, s, ok -> triggerBiometricAuth(t, s, ok) })
+                                                        }
                                                         "academy"   -> AcademyScreen(vm, onNavigateToGlossary = { navController.navigate("glossary") }, onNavigateToChecklist = { navController.navigate("checklist") })
                                                         "resources" -> ResourcesScreen(vm) { activeTab = "home" }
                                                         "library"   -> LibraryScreen(vm) { activeTab = "home" }
-                                                        "chat"      -> GeminiChatScreen(chatVm, uiConfig, isArLocal)
+                                                        "chat"      -> {
+                                                            val chatVm: GeminiChatViewModel = viewModel()
+                                                            GeminiChatScreen(chatVm, uiConfig, isArLocal)
+                                                        }
                                                         "settings"  -> SettingsScreen(
                                                             viewModel = vm,
                                                             onClose = { activeTab = "home" },
