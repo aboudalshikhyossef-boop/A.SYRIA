@@ -72,6 +72,11 @@ class MainActivity : FragmentActivity() {
     private var hasRequestedStartupAuthentication = false
     private var hasRequestedPermissions = false
     private var hasScheduledBackgroundWork = false
+
+    companion object {
+        @Volatile
+        private var workManagerInitialized = false
+    }
     private var pendingCredentialSuccess: (() -> Unit)? = null
     private var pendingCredentialOnCancel: (() -> Unit)? = null
     private var pendingCredentialIsStartupGate = false
@@ -138,6 +143,18 @@ class MainActivity : FragmentActivity() {
 
         lifecycleScope.launch(Dispatchers.IO) {
             try {
+                // WorkManager auto-initialization is disabled in the manifest.
+                // Initialize it here, only after the user reaches the dashboard.
+                synchronized(MainActivity::class.java) {
+                    if (!workManagerInitialized) {
+                        WorkManager.initialize(
+                            applicationContext,
+                            androidx.work.Configuration.Builder().build()
+                        )
+                        workManagerInitialized = true
+                    }
+                }
+
                 val workRequest =
                     PeriodicWorkRequestBuilder<NotificationWorker>(15, TimeUnit.MINUTES).build()
                 WorkManager.getInstance(applicationContext).enqueueUniquePeriodicWork(
