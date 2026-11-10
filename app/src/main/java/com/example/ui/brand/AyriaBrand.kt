@@ -1,5 +1,7 @@
 package com.example.ui.brand
 
+import kotlin.math.roundToInt
+import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.draw.clipToBounds
@@ -428,37 +430,34 @@ internal fun AyriaActionButton(
     val horizontalParallax = roll.coerceIn(-20f, 20f) * 0.0035f
     val verticalParallax = pitch.coerceIn(-20f, 20f) * 0.0025f
 
-    BoxWithConstraints(
+    Canvas(
         modifier = modifier
             .fillMaxSize()
             .clipToBounds()
-            .background(AyriaColors.abyss),
-        contentAlignment = Alignment.TopLeft
+            .background(AyriaColors.abyss)
     ) {
-        Image(
-            bitmap = panoramaBitmap,
-            contentDescription = null,
-            contentScale = ContentScale.FillBounds,
-            modifier = Modifier
-                .width(maxWidth * 5f)
-                .height(maxHeight)
-                .absoluteOffset(
-                    x = -(maxWidth * pageProgress) + (maxWidth * horizontalParallax),
-                    y = maxHeight * verticalParallax
-                )
+        val cameraX = size.width * pageProgress - size.width * horizontalParallax
+        val cameraY = size.height * verticalParallax
+        drawImage(
+            image = panoramaBitmap,
+            dstOffset = androidx.compose.ui.unit.IntOffset(
+                x = -cameraX.roundToInt(),
+                y = cameraY.roundToInt()
+            ),
+            dstSize = androidx.compose.ui.unit.IntSize(
+                width = (size.width * 5f).roundToInt(),
+                height = size.height.roundToInt()
+            ),
+            filterQuality = androidx.compose.ui.graphics.FilterQuality.High
         )
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(
-                    Brush.verticalGradient(
-                        colors = listOf(
-                            Color(0x1A020918),
-                            Color.Transparent,
-                            Color(0x44020818)
-                        )
-                    )
+        drawRect(
+            brush = Brush.verticalGradient(
+                colors = listOf(
+                    Color(0x1A020918),
+                    Color.Transparent,
+                    Color(0x44020818)
                 )
+            )
         )
     }
 }
