@@ -69,24 +69,25 @@ class MainActivity : FragmentActivity() {
     private var hasRequestedStartupAuthentication = false
     private var hasRequestedPermissions = false
     private var pendingCredentialSuccess: (() -> Unit)? = null
-    private var pendingCredentialCloseOnCancel = false
+    private var pendingCredentialOnCancel: (() -> Unit)? = null
 
     private val permissionLauncher = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { }
 
     private val deviceCredentialLauncher =
         registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
             val onSuccess = pendingCredentialSuccess
-            val closeOnCancel = pendingCredentialCloseOnCancel
+            val onCancel = pendingCredentialOnCancel
             pendingCredentialSuccess = null
-            pendingCredentialCloseOnCancel = false
+            pendingCredentialOnCancel = null
             isAuthInProgress = false
 
             if (result.resultCode == Activity.RESULT_OK) {
                 hasCompletedStartupGate = true
-                if (closeOnCancel) requestEssentialPermissionsOnce()
+                requestEssentialPermissionsOnce()
                 onSuccess?.invoke()
-            } else if (closeOnCancel && !isFinishing) {
-                finish()
+            } else {
+                android.util.Log.i("A.SYRIA.Auth", "Device credential flow cancelled by the user")
+                onCancel?.invoke()
             }
         }
 
@@ -95,7 +96,8 @@ class MainActivity : FragmentActivity() {
         title: String,
         subtitle: String,
         onSuccess: () -> Unit,
-        closeOnCancel: Boolean
+        closeOnCancel: Boolean,
+        onCancel: (() -> Unit)? = null
     ): Boolean {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) return false
 
@@ -107,13 +109,13 @@ class MainActivity : FragmentActivity() {
 
         return runCatching {
             pendingCredentialSuccess = onSuccess
-            pendingCredentialCloseOnCancel = closeOnCancel
+            pendingCredentialOnCancel = onCancel
             isAuthInProgress = true
             deviceCredentialLauncher.launch(credentialIntent)
             true
         }.getOrElse {
             pendingCredentialSuccess = null
-            pendingCredentialCloseOnCancel = false
+            pendingCredentialOnCancel = null
             isAuthInProgress = false
             false
         }
@@ -153,7 +155,10 @@ class MainActivity : FragmentActivity() {
             val calibrationCompleted by vm.calibrationCompleted.collectAsState()
             val onboardingCompleted  by vm.onboardingCompleted.collectAsState()
             val isDataLoaded         by vm.isDataLoaded.collectAsState()
+            val lockAppOnLaunch      by vm.lockAppOnLaunch.collectAsState()
             val customApiKey         by vm.customApiKey.collectAsState()
+            var startupGateUnlocked by remember { mutableStateOf(false) }
+            var startupGateMessage by remember { mutableStateOf<String?>(null) }
 
             MyApplicationTheme(darkTheme = true, dynamicColor = false, uiConfig = uiConfig) {
                 Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
@@ -164,85 +169,99 @@ class MainActivity : FragmentActivity() {
 
                         val apiLevel = Build.VERSION.SDK_INT
                         val supportsDeviceCredentialInPrompt = apiLevel >= Build.VERSION_CODES.R
-                        val biometricAuthenticators = BiometricCompatibility.allowedAuthenticators(apiLevel)
+                        val biometricAuthenticator = BiometricManager.Authenticators.BIOMETRIC_STRONG
                         val deviceCredentialAuthenticator = BiometricManager.Authenticators.DEVICE_CREDENTIAL
-                        val manager = BiometricManager.from(this@MainActivity)
+                        val biometricManager = BiometricManager.from(this@MainActivity)
+                        val keyguardManager = getSystemService(KEYGUARD_SERVICE) as KeyguardManager
+                        val hasSecureDeviceCredential = runCatching { keyguardManager.isDeviceSecure }.getOrDefault(false)
 
-                        fun isAuthenticatorAvailable(authenticators: Int, label: String): Boolean {
-                            return try {
-                                manager.canAuthenticate(authenticators) == BiometricManager.BIOMETRIC_SUCCESS
-                            } catch (error: RuntimeException) {
-                                android.util.Log.e(
-                                    "A.SYRIA.Auth",
-                                    "canAuthenticate($label) failed on API $apiLevel",
-                                    error
+                        val hasStrongBiometric = try {
+                            biometricManager.canAuthenticate(biometricAuthenticator) == BiometricManager.BIOMETRIC_SUCCESS
+                        } catch (error: RuntimeException) {
+                            android.util.Log.e("A.SYRIA.Auth", "Biometric availability check failed on API $apiLevel", error)
+                            false
+                        }
+
+                        if (!supportsDeviceCredentialInPrompt && !hasStrongBiometric && hasSecureDeviceCredential) {
+                            if (
+                                launchLegacyDeviceCredential(
+                                    title,
+                                    subtitle,
+                                    onSuccess,
+                                    closeOnCancel,
+                                    onCancel = if (closeOnCancel) {
+                                        { startupGateMessage = if (isAr) "تم إلغاء إدخال رمز قفل الجهاز. أعد المحاولة أو اختر المتابعة دون قفل." else "Device credential entry was cancelled. Retry or continue without the app lock." }
+                                    } else null
                                 )
-                                false
-                            }
+                            ) return
                         }
 
-                        var promptAuthenticators = biometricAuthenticators
-                        if (!isAuthenticatorAvailable(biometricAuthenticators, "biometric+credential")) {
-                            when {
-                                supportsDeviceCredentialInPrompt &&
-                                    isAuthenticatorAvailable(deviceCredentialAuthenticator, "device-credential-only") -> {
-                                    // Some device implementations reject the combined authenticator mask.
-                                    // Fall back to the Android system credential UI without weakening the gate.
-                                    promptAuthenticators = deviceCredentialAuthenticator
-                                }
-
-                                !supportsDeviceCredentialInPrompt &&
-                                    launchLegacyDeviceCredential(title, subtitle, onSuccess, closeOnCancel) -> {
-                                    return
-                                }
-
-                                else -> {
-                                    Toast.makeText(
-                                        this@MainActivity,
-                                        if (isAr) {
-                                            "للوصول إلى هذه المنطقة، فعّل قفل شاشة آمن (PIN أو نمط أو كلمة مرور) أو بصمة قوية."
-                                        } else {
-                                            "Set up a secure screen lock (PIN, pattern, or password) or strong biometrics to unlock this area."
-                                        },
-                                        Toast.LENGTH_LONG
-                                    ).show()
-                                    if (closeOnCancel) {
-                                        hasCompletedStartupGate = true
-                                        requestEssentialPermissionsOnce()
-                                    }
-                                    return
-                                }
-                            }
+                        val allowedAuthenticators = when {
+                            supportsDeviceCredentialInPrompt && hasSecureDeviceCredential && hasStrongBiometric ->
+                                biometricAuthenticator or deviceCredentialAuthenticator
+                            supportsDeviceCredentialInPrompt && hasSecureDeviceCredential ->
+                                deviceCredentialAuthenticator
+                            hasStrongBiometric ->
+                                biometricAuthenticator
+                            else -> 0
                         }
 
-                        fun launchPrompt(allowedAuthenticators: Int) {
-                            val executor = ContextCompat.getMainExecutor(this@MainActivity)
+                        if (allowedAuthenticators == 0) {
+                            val message = if (isAr) {
+                                "هذا الجهاز لا يحتوي على بصمة مسجلة أو قفل شاشة آمن. تم إيقاف قفل التطبيق عند الفتح حتى تتمكن من استخدام A.SYRIA."
+                            } else {
+                                "This device has no enrolled biometric or secure screen lock. App launch lock has been disabled so you can use A.SYRIA."
+                            }
+                            Toast.makeText(this@MainActivity, message, Toast.LENGTH_LONG).show()
+
+                            if (closeOnCancel) {
+                                hasCompletedStartupGate = true
+                                startupGateUnlocked = true
+                                vm.setLockAppOnLaunch(false)
+                                requestEssentialPermissionsOnce()
+                            }
+                            return
+                        }
+
+                        fun launchPrompt(authenticators: Int) {
                             val prompt = BiometricPrompt(
                                 this@MainActivity,
-                                executor,
+                                ContextCompat.getMainExecutor(this@MainActivity),
                                 object : BiometricPrompt.AuthenticationCallback() {
                                     override fun onAuthenticationError(code: Int, msg: CharSequence) {
                                         isAuthInProgress = false
-                                        android.util.Log.e(
+                                        android.util.Log.w(
                                             "A.SYRIA.Auth",
-                                            "Biometric prompt ended with code=$code on API $apiLevel: $msg"
+                                            "Authentication ended with code=$code on API $apiLevel: $msg"
                                         )
 
                                         if (
                                             code == BiometricPrompt.ERROR_NEGATIVE_BUTTON &&
-                                            !supportsDeviceCredentialInPrompt
+                                            !supportsDeviceCredentialInPrompt &&
+                                            hasSecureDeviceCredential
                                         ) {
-                                            if (!launchLegacyDeviceCredential(title, subtitle, onSuccess, closeOnCancel) && closeOnCancel) {
-                                                finish()
+                                            if (
+                                                !launchLegacyDeviceCredential(
+                                                    title,
+                                                    subtitle,
+                                                    onSuccess,
+                                                    closeOnCancel,
+                                                    onCancel = if (closeOnCancel) {
+                                                        { startupGateMessage = if (isAr) "تم إلغاء المصادقة برمز الجهاز. أعد المحاولة أو اختر المتابعة دون قفل." else "Device credential authentication was cancelled. Retry or continue without the app lock." }
+                                                    } else null
+                                                ) && closeOnCancel
+                                            ) {
+                                                startupGateMessage = if (isAr) "تعذّر فتح قفل الجهاز. أعد المحاولة." else "The device credential screen could not be opened. Please retry."
                                             }
-                                        } else if (code == BiometricPrompt.ERROR_USER_CANCELED && closeOnCancel) {
-                                            finish()
                                         } else if (closeOnCancel) {
-                                            Toast.makeText(
-                                                this@MainActivity,
-                                                if (isAr) "لم تكتمل المصادقة. أغلق التطبيق وافتحه مجددًا للمحاولة." else "Authentication did not complete. Reopen the app to try again.",
-                                                Toast.LENGTH_LONG
-                                            ).show()
+                                            startupGateMessage = if (code == BiometricPrompt.ERROR_USER_CANCELED) {
+                                                if (isAr) "ألغيت المصادقة. التطبيق ما زال مقفلًا؛ أعد المحاولة أو اختر المتابعة دون قفل."
+                                                else "Authentication was cancelled. The app remains locked; retry or continue without the app lock."
+                                            } else {
+                                                msg.toString().ifBlank {
+                                                    if (isAr) "لم تكتمل المصادقة. أعد المحاولة." else "Authentication did not complete. Please retry."
+                                                }
+                                            }
                                         }
                                     }
 
@@ -253,7 +272,11 @@ class MainActivity : FragmentActivity() {
                                     override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
                                         isAuthInProgress = false
                                         hasCompletedStartupGate = true
-                                        if (closeOnCancel) requestEssentialPermissionsOnce()
+                                        if (closeOnCancel) {
+                                            startupGateUnlocked = true
+                                            startupGateMessage = null
+                                            requestEssentialPermissionsOnce()
+                                        }
                                         onSuccess()
                                     }
                                 }
@@ -262,14 +285,18 @@ class MainActivity : FragmentActivity() {
                             val promptInfoBuilder = BiometricPrompt.PromptInfo.Builder()
                                 .setTitle(title)
                                 .setSubtitle(subtitle)
-                                .setAllowedAuthenticators(allowedAuthenticators)
+                                .setAllowedAuthenticators(authenticators)
 
                             if (
                                 !supportsDeviceCredentialInPrompt &&
-                                allowedAuthenticators == BiometricManager.Authenticators.BIOMETRIC_STRONG
+                                authenticators == biometricAuthenticator
                             ) {
                                 promptInfoBuilder.setNegativeButtonText(
-                                    if (isAr) "استخدام رمز قفل الجهاز" else "Use device PIN"
+                                    if (hasSecureDeviceCredential) {
+                                        if (isAr) "استخدام رمز قفل الجهاز" else "Use device PIN"
+                                    } else {
+                                        if (isAr) "إلغاء" else "Cancel"
+                                    }
                                 )
                             }
 
@@ -278,21 +305,19 @@ class MainActivity : FragmentActivity() {
 
                         isAuthInProgress = true
                         try {
-                            launchPrompt(promptAuthenticators)
+                            launchPrompt(allowedAuthenticators)
                         } catch (error: Exception) {
                             isAuthInProgress = false
                             android.util.Log.e(
                                 "A.SYRIA.Auth",
-                                "Failed to create or launch biometric prompt on API $apiLevel",
+                                "Failed to build or launch authentication prompt on API $apiLevel",
                                 error
                             )
 
-                            // Retry once with the system credential authenticator if the combined
-                            // biometric/credential prompt is what this device rejected.
                             if (
                                 supportsDeviceCredentialInPrompt &&
-                                promptAuthenticators != deviceCredentialAuthenticator &&
-                                isAuthenticatorAvailable(deviceCredentialAuthenticator, "device-credential-retry")
+                                hasSecureDeviceCredential &&
+                                allowedAuthenticators != deviceCredentialAuthenticator
                             ) {
                                 isAuthInProgress = true
                                 try {
@@ -300,31 +325,89 @@ class MainActivity : FragmentActivity() {
                                     return
                                 } catch (fallbackError: Exception) {
                                     isAuthInProgress = false
-                                    android.util.Log.e(
-                                        "A.SYRIA.Auth",
-                                        "Device-credential fallback could not be launched",
-                                        fallbackError
-                                    )
+                                    android.util.Log.e("A.SYRIA.Auth", "Device credential fallback failed", fallbackError)
                                 }
                             }
 
                             if (
                                 !supportsDeviceCredentialInPrompt &&
-                                launchLegacyDeviceCredential(title, subtitle, onSuccess, closeOnCancel)
-                            ) {
-                                return
-                            }
+                                hasSecureDeviceCredential &&
+                                launchLegacyDeviceCredential(
+                                    title,
+                                    subtitle,
+                                    onSuccess,
+                                    closeOnCancel,
+                                    onCancel = if (closeOnCancel) {
+                                        { startupGateMessage = if (isAr) "تم إلغاء المصادقة. التطبيق ما زال مقفلًا." else "Authentication was cancelled. The app remains locked." }
+                                    } else null
+                                )
+                            ) return
 
-                            Toast.makeText(
-                                this@MainActivity,
-                                if (isAr) "تعذّر فتح نافذة المصادقة. تحقق من قفل الشاشة ثم أعد فتح التطبيق." else "The authentication prompt could not be opened. Check your screen lock and reopen the app.",
-                                Toast.LENGTH_LONG
-                            ).show()
-                            if (closeOnCancel) finish()
+                            startupGateMessage = if (isAr) {
+                                "تعذّر فتح نافذة المصادقة. أعد المحاولة أو اختر المتابعة دون قفل."
+                            } else {
+                                "The authentication prompt could not be opened. Retry or continue without the app lock."
+                            }
+                            Toast.makeText(this@MainActivity, startupGateMessage, Toast.LENGTH_LONG).show()
                         }
                     }
 
-                    DisposableEffect(Unit) {
+                    fun requestStartupAuthentication() {
+                        if (!lockAppOnLaunch || hasCompletedStartupGate || isAuthInProgress || isFinishing || isDestroyed) return
+                        hasRequestedStartupAuthentication = true
+                        triggerBiometricAuth(
+                            if (isAr) "تأكيد الهوية" else "Verify your identity",
+                            if (isAr) "استخدم البصمة أو رمز قفل الجهاز للمتابعة" else "Use biometrics or your device screen lock to continue",
+                            onSuccess = { startupGateUnlocked = true },
+                            closeOnCancel = true
+                        )
+                    }
+
+                    DisposableEffect(isDataLoaded, lockAppOnLaunch, isAr) {
+                        val observer = LifecycleEventObserver { _, event ->
+                            when (event) {
+                                Lifecycle.Event.ON_RESUME -> {
+                                    vm.startSensors()
+
+                                    if (isDataLoaded && !lockAppOnLaunch && !hasCompletedStartupGate) {
+                                        hasCompletedStartupGate = true
+                                        startupGateUnlocked = true
+                                    }
+
+                                    if (
+                                        isDataLoaded &&
+                                        lockAppOnLaunch &&
+                                        !hasCompletedStartupGate &&
+                                        !hasRequestedStartupAuthentication &&
+                                        !isAuthInProgress
+                                    ) {
+                                        window.decorView.post {
+                                            val activityReady =
+                                                !isFinishing &&
+                                                !isDestroyed &&
+                                                lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)
+
+                                            if (
+                                                activityReady &&
+                                                lockAppOnLaunch &&
+                                                !hasCompletedStartupGate &&
+                                                !isAuthInProgress
+                                            ) {
+                                                requestStartupAuthentication()
+                                            }
+                                        }
+                                    }
+                                }
+
+                                Lifecycle.Event.ON_PAUSE -> vm.stopSensors()
+                                else -> Unit
+                            }
+                        }
+                        lifecycle.addObserver(observer)
+                        onDispose { lifecycle.removeObserver(observer) }
+                    }
+
+
                         val observer = LifecycleEventObserver { _, event ->
                             when (event) {
                                 Lifecycle.Event.ON_RESUME -> {
@@ -520,6 +603,49 @@ class MainActivity : FragmentActivity() {
                                     FeedbackScreen(vm, isArLocal) { navController.popBackStack() }
                                 }
                             }
+                        }
+
+                        if (isDataLoaded && lockAppOnLaunch && !startupGateUnlocked) {
+                            AlertDialog(
+                                onDismissRequest = {},
+                                title = { Text(if (isAr) "A.SYRIA مقفل" else "A.SYRIA is locked") },
+                                text = {
+                                    Text(
+                                        startupGateMessage ?: if (isAr) {
+                                            "أكد هويتك بالبصمة أو PIN أو النمط أو كلمة المرور. يمكنك إعادة المحاولة أو اختيار المتابعة دون قفل."
+                                        } else {
+                                            "Verify with biometrics, PIN, pattern, or password. You can retry or explicitly continue without the app lock."
+                                        }
+                                    )
+                                },
+                                confirmButton = {
+                                    TextButton(
+                                        onClick = {
+                                            startupGateMessage = null
+                                            hasRequestedStartupAuthentication = false
+                                            requestStartupAuthentication()
+                                        }
+                                    ) {
+                                        Text(if (isAr) "إعادة المحاولة" else "Retry")
+                                    }
+                                },
+                                dismissButton = {
+                                    TextButton(
+                                        onClick = {
+                                            vm.setLockAppOnLaunch(false)
+                                            hasCompletedStartupGate = true
+                                            startupGateUnlocked = true
+                                            Toast.makeText(
+                                                this@MainActivity,
+                                                if (isAr) "تم إيقاف قفل التطبيق عند الفتح." else "App launch lock disabled.",
+                                                Toast.LENGTH_SHORT
+                                            ).show()
+                                        }
+                                    ) {
+                                        Text(if (isAr) "المتابعة دون قفل" else "Continue without lock")
+                                    }
+                                }
+                            )
                         }
                         }
                     }
