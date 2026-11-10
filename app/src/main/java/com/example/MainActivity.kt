@@ -1,6 +1,8 @@
 package com.example
 
 import android.Manifest
+import android.app.Activity
+import android.app.KeyguardManager
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
@@ -65,8 +67,56 @@ class MainActivity : FragmentActivity() {
     private var hasCompletedStartupGate = false
     private var isAuthInProgress       = false
     private var hasRequestedPermissions = false
+    private var pendingCredentialSuccess: (() -> Unit)? = null
+    private var pendingCredentialCloseOnCancel = false
 
     private val permissionLauncher = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { }
+
+    private val deviceCredentialLauncher =
+        registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+            val onSuccess = pendingCredentialSuccess
+            val closeOnCancel = pendingCredentialCloseOnCancel
+            pendingCredentialSuccess = null
+            pendingCredentialCloseOnCancel = false
+            isAuthInProgress = false
+
+            if (result.resultCode == Activity.RESULT_OK) {
+                hasCompletedStartupGate = true
+                if (closeOnCancel) requestEssentialPermissionsOnce()
+                onSuccess?.invoke()
+            } else if (closeOnCancel && !isFinishing) {
+                finish()
+            }
+        }
+
+    @Suppress("DEPRECATION")
+    private fun launchLegacyDeviceCredential(
+        title: String,
+        subtitle: String,
+        onSuccess: () -> Unit,
+        closeOnCancel: Boolean
+    ): Boolean {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) return false
+
+        val keyguardManager = getSystemService(KEYGUARD_SERVICE) as KeyguardManager
+        if (!keyguardManager.isDeviceSecure) return false
+
+        val credentialIntent = keyguardManager.createConfirmDeviceCredentialIntent(title, subtitle)
+            ?: return false
+
+        return runCatching {
+            pendingCredentialSuccess = onSuccess
+            pendingCredentialCloseOnCancel = closeOnCancel
+            isAuthInProgress = true
+            deviceCredentialLauncher.launch(credentialIntent)
+            true
+        }.getOrElse {
+            pendingCredentialSuccess = null
+            pendingCredentialCloseOnCancel = false
+            isAuthInProgress = false
+            false
+        }
+    }
 
     private fun requestEssentialPermissionsOnce() {
         if (hasRequestedPermissions) return
@@ -110,13 +160,18 @@ class MainActivity : FragmentActivity() {
 
                     fun triggerBiometricAuth(title: String, subtitle: String, onSuccess: () -> Unit, closeOnCancel: Boolean = false) {
                         if (isAuthInProgress) return
+
+                        val supportsCombinedAuthenticators = Build.VERSION.SDK_INT >= Build.VERSION_CODES.R
+                        val authenticators = BiometricCompatibility.allowedAuthenticators(Build.VERSION.SDK_INT)
                         val manager = BiometricManager.from(this@MainActivity)
-                        val authenticators =
-                            BiometricManager.Authenticators.BIOMETRIC_STRONG or
-                                BiometricManager.Authenticators.DEVICE_CREDENTIAL
                         val availability = manager.canAuthenticate(authenticators)
+
                         if (availability != BiometricManager.BIOMETRIC_SUCCESS) {
-                            // An unavailable authenticator must never be treated as a successful unlock.
+                            // Android 10 and older use a separate system credential screen.
+                            if (launchLegacyDeviceCredential(title, subtitle, onSuccess, closeOnCancel)) {
+                                return
+                            }
+
                             Toast.makeText(
                                 this@MainActivity,
                                 if (isAr) {
@@ -132,12 +187,23 @@ class MainActivity : FragmentActivity() {
                             }
                             return
                         }
+
                         isAuthInProgress = true
                         val executor = ContextCompat.getMainExecutor(this@MainActivity)
                         val prompt = BiometricPrompt(this@MainActivity, executor, object : BiometricPrompt.AuthenticationCallback() {
                             override fun onAuthenticationError(code: Int, msg: CharSequence) {
                                 isAuthInProgress = false
-                                if ((code == BiometricPrompt.ERROR_USER_CANCELED || code == BiometricPrompt.ERROR_NEGATIVE_BUTTON) && closeOnCancel) finish()
+
+                                if (
+                                    code == BiometricPrompt.ERROR_NEGATIVE_BUTTON &&
+                                    !supportsCombinedAuthenticators
+                                ) {
+                                    if (!launchLegacyDeviceCredential(title, subtitle, onSuccess, closeOnCancel) && closeOnCancel) {
+                                        finish()
+                                    }
+                                } else if (code == BiometricPrompt.ERROR_USER_CANCELED && closeOnCancel) {
+                                    finish()
+                                }
                             }
 
                             override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
@@ -147,13 +213,37 @@ class MainActivity : FragmentActivity() {
                                 onSuccess()
                             }
                         })
-                        prompt.authenticate(
-                            BiometricPrompt.PromptInfo.Builder()
-                                .setTitle(title)
-                                .setSubtitle(subtitle)
-                                .setAllowedAuthenticators(authenticators)
-                                .build()
-                        )
+
+                        val promptInfoBuilder = BiometricPrompt.PromptInfo.Builder()
+                            .setTitle(title)
+                            .setSubtitle(subtitle)
+                            .setAllowedAuthenticators(authenticators)
+
+                        if (!supportsCombinedAuthenticators) {
+                            promptInfoBuilder.setNegativeButtonText(
+                                if (isAr) "استخدام رمز قفل الجهاز" else "Use device PIN"
+                            )
+                        }
+
+                        try {
+                            prompt.authenticate(promptInfoBuilder.build())
+                        } catch (error: IllegalArgumentException) {
+                            isAuthInProgress = false
+                            android.util.Log.e(
+                                "A.SYRIA.Auth",
+                                "Unsupported biometric prompt configuration for API ${Build.VERSION.SDK_INT}",
+                                error
+                            )
+
+                            if (!launchLegacyDeviceCredential(title, subtitle, onSuccess, closeOnCancel)) {
+                                Toast.makeText(
+                                    this@MainActivity,
+                                    if (isAr) "تعذرت المصادقة على هذا الجهاز. تحقق من إعدادات قفل الشاشة." else "Authentication is unavailable on this device. Check your screen-lock settings.",
+                                    Toast.LENGTH_LONG
+                                ).show()
+                                if (closeOnCancel) finish()
+                            }
+                        }
                     }
 
                     DisposableEffect(Unit) {
@@ -184,16 +274,22 @@ class MainActivity : FragmentActivity() {
                         ProvideWindowAdaptiveLayout {
                         NavHost(navController = navController, startDestination = "splash", enterTransition = { fadeIn(animationSpec = tween(500)) }, exitTransition = { fadeOut(animationSpec = tween(500)) }) {
                             composable("splash") {
-                                SplashScreen {
-                                    // SplashScreen uses rememberUpdatedState so this always gets latest startDestination
-                                    if (startDestination != "splash") {
-                                        navController.navigate(startDestination) { popUpTo("splash") { inclusive = true } }
+                                var splashFinished by remember { mutableStateOf(false) }
+
+                                LaunchedEffect(splashFinished, startDestination) {
+                                    if (splashFinished && startDestination != "splash") {
+                                        navController.navigate(startDestination) {
+                                            popUpTo("splash") { inclusive = true }
+                                        }
                                     }
-                                    // If still loading, splash will keep running until DataStore loads and callback is refreshed
+                                }
+
+                                SplashScreen(isArabic = isAr) {
+                                    splashFinished = true
                                 }
                             }
                             composable("onboarding") {
-                                OnboardingScreen { profile ->
+                                OnboardingScreen(isArabic = isAr) { profile ->
                                     vm.completeOnboarding()
                                     if (profile != null) vm.saveUserProfile(profile.gender, profile.birthYear)
                                     navController.navigate("calibration") { popUpTo("onboarding") { inclusive = true } }

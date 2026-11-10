@@ -44,6 +44,11 @@ android {
       signingConfig = signingConfigs.getByName("release")
     }
     debug {
+      // Keep preview builds separate from the installed production app so testers
+      // can verify a new build without uninstalling or losing local app data.
+      applicationIdSuffix = ".preview"
+      versionNameSuffix = "-preview"
+      resValue("string", "app_name", "A.SYRIA Preview")
       isMinifyEnabled = false
       isShrinkResources = false
       ndk {
