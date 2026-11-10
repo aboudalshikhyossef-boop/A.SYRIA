@@ -37,18 +37,18 @@ import androidx.compose.ui.unit.sp
 import com.asyria.v4.R
 
 internal object AyriaColors {
-    val abyss = Color(0xFF06141C)
-    val deep = Color(0xFF091D28)
-    val ocean = Color(0xFF102B38)
-    val panel = Color(0xFF122D39)
-    val teal = Color(0xFF72D5D0)
-    val glacier = Color(0xFFA9ECE5)
-    val ion = Color(0xFF7FA9F0)
-    val pearl = Color(0xFFEAF3F1)
-    val muted = Color(0xFF9AB1B7)
-    val dim = Color(0xFF6F8992)
-    val line = Color(0x33D9F5F2)
-    val glass = Color(0x12D8F7F4)
+    val abyss = Color(0xFF050A18)
+    val deep = Color(0xFF07152B)
+    val ocean = Color(0xFF0B2142)
+    val panel = Color(0xFF102A50)
+    val teal = Color(0xFF16C8F5)
+    val glacier = Color(0xFFB9E8FF)
+    val ion = Color(0xFF477DFF)
+    val pearl = Color(0xFFF1F7FF)
+    val muted = Color(0xFF9DB5D4)
+    val dim = Color(0xFF637D9F)
+    val line = Color(0x3D8EDFFF)
+    val glass = Color(0x1A65CFFF)
 }
 
 internal val AyriaArabicFont = FontFamily(
@@ -79,9 +79,9 @@ internal fun AyriaAtmosphere(
             drawRect(
                 brush = Brush.linearGradient(
                     colors = listOf(
-                        Color(0xFF081923),
+                        Color(0xFF081B38),
                         AyriaColors.abyss,
-                        Color(0xFF071A26)
+                        Color(0xFF071229)
                     ),
                     start = Offset(0f, 0f),
                     end = Offset(size.width, size.height)
@@ -95,8 +95,8 @@ internal fun AyriaAtmosphere(
             drawCircle(
                 brush = Brush.radialGradient(
                     colors = listOf(
-                        AyriaColors.teal.copy(alpha = 0.20f),
-                        Color(0xFF1A7180).copy(alpha = 0.075f),
+                        AyriaColors.teal.copy(alpha = 0.24f),
+                        Color(0xFF1C64C7).copy(alpha = 0.10f),
                         Color.Transparent
                     ),
                     center = glowCenter,
@@ -106,11 +106,11 @@ internal fun AyriaAtmosphere(
                 center = glowCenter
             )
 
-            val lowerGlow = Offset(size.width * 0.92f, size.height * 0.78f)
+            val lowerGlow = Offset(size.width * (0.88f - 0.08f * drift), size.height * 0.80f)
             drawCircle(
                 brush = Brush.radialGradient(
                     colors = listOf(
-                        AyriaColors.ion.copy(alpha = 0.10f),
+                        AyriaColors.ion.copy(alpha = 0.16f),
                         Color.Transparent
                     ),
                     center = lowerGlow,
@@ -140,6 +140,36 @@ internal fun AyriaAtmosphere(
                 end = Offset(size.width * 0.95f, size.height * 0.42f),
                 strokeWidth = 1.dp.toPx()
             )
+
+            // Fine liquid-glass light trails and restrained floating particles.
+            drawArc(
+                color = AyriaColors.ion.copy(alpha = 0.075f + 0.025f * drift),
+                startAngle = 202f - drift * 12f,
+                sweepAngle = 112f,
+                useCenter = false,
+                topLeft = Offset(size.width * 0.58f, size.height * 0.54f),
+                size = androidx.compose.ui.geometry.Size(size.minDimension * 0.74f, size.minDimension * 0.74f),
+                style = Stroke(width = 1.1.dp.toPx(), cap = StrokeCap.Round)
+            )
+            val particles = listOf(
+                Offset(0.12f, 0.26f), Offset(0.82f, 0.18f),
+                Offset(0.73f, 0.62f), Offset(0.20f, 0.78f),
+                Offset(0.91f, 0.88f), Offset(0.43f, 0.12f)
+            )
+            particles.forEachIndexed { index, point ->
+                val pulse = 0.42f + 0.28f * kotlin.math.sin((drift * 6.283f) + index * 1.17f)
+                val center = Offset(size.width * point.x, size.height * point.y)
+                drawCircle(
+                    color = AyriaColors.glacier.copy(alpha = pulse.coerceIn(0.08f, 0.78f)),
+                    radius = if (index % 2 == 0) 1.35.dp.toPx() else 0.85.dp.toPx(),
+                    center = center
+                )
+                drawCircle(
+                    color = AyriaColors.teal.copy(alpha = pulse.coerceIn(0.08f, 0.6f) * 0.24f),
+                    radius = 5.dp.toPx(),
+                    center = center
+                )
+            }
         }
         content()
     }
@@ -216,6 +246,60 @@ internal fun AyriaGlassPanel(
             .border(width = 1.dp, brush = edge, shape = shape),
         content = content
     )
+}
+
+@Composable
+internal fun AyriaVerseCard(
+    isArabic: Boolean,
+    modifier: Modifier = Modifier
+) {
+    AyriaGlassPanel(
+        modifier = modifier,
+        highlighted = true,
+        shape = RoundedCornerShape(22.dp)
+    ) {
+        androidx.compose.foundation.layout.Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 18.dp, vertical = 15.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(
+                text = if (isArabic) "آيَةٌ وَتَدَبُّر" else "A VERSE TO REFLECT ON",
+                color = AyriaColors.teal.copy(alpha = 0.92f),
+                fontFamily = AyriaArabicFont,
+                fontWeight = FontWeight.Bold,
+                fontSize = 9.sp,
+                letterSpacing = if (isArabic) 0.sp else 1.6.sp
+            )
+            androidx.compose.foundation.layout.Spacer(Modifier.padding(top = 5.dp))
+            Text(
+                text = "وَقُل رَّبِّ زِدْنِي عِلْمًا",
+                color = AyriaColors.pearl,
+                fontFamily = AyriaArabicFont,
+                fontWeight = FontWeight.Bold,
+                fontSize = 19.sp,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                lineHeight = 31.sp
+            )
+            Text(
+                text = if (isArabic) "سورة طه • الآية ١١٤" else "Taha • 20:114",
+                color = AyriaColors.muted,
+                fontFamily = AyriaArabicFont,
+                fontSize = 10.sp,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center
+            )
+            if (!isArabic) {
+                Text(
+                    text = "My Lord, increase me in knowledge.",
+                    color = AyriaColors.glacier.copy(alpha = 0.86f),
+                    fontSize = 10.sp,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                    modifier = Modifier.padding(top = 3.dp)
+                )
+            }
+        }
+    }
 }
 
 @Composable
