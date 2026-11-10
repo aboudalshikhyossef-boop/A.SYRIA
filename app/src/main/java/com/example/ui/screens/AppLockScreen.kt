@@ -4,6 +4,9 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
@@ -313,6 +316,13 @@ fun AppPinLockScreen(
     var error by remember(recoveryMode) { mutableStateOf<String?>(null) }
     var busy by remember { mutableStateOf(false) }
     var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
+    val backdropTransition = rememberInfiniteTransition(label = "app_pin_backdrop")
+    val backdropPulse by backdropTransition.animateFloat(
+        initialValue = 0.12f,
+        targetValue = 0.24f,
+        animationSpec = infiniteRepeatable(tween(3200), RepeatMode.Reverse),
+        label = "app_pin_backdrop_pulse"
+    )
 
     LaunchedEffect(lockoutUntilMillis) {
         while (lockoutUntilMillis > System.currentTimeMillis()) {
@@ -348,7 +358,18 @@ fun AppPinLockScreen(
                 Modifier
                     .fillMaxWidth()
                     .height(320.dp)
-                    .background(Brush.verticalGradient(listOf(PinAccent.copy(alpha = 0.22f), Color.Transparent)))
+                    .background(Brush.verticalGradient(listOf(PinAccent.copy(alpha = backdropPulse), Color.Transparent)))
+            )
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .height(260.dp)
+                    .align(Alignment.BottomCenter)
+                    .background(
+                        Brush.verticalGradient(
+                            listOf(Color.Transparent, PinAccentSecondary.copy(alpha = backdropPulse * 0.34f))
+                        )
+                    )
             )
 
             Column(
@@ -378,7 +399,7 @@ fun AppPinLockScreen(
                         if (isArabic) "مساحة آمنة. وصول خاص." else "A SECURE SPACE. YOUR PRIVATE ACCESS.",
                         color = PinAccent.copy(alpha = 0.75f),
                         fontSize = 10.sp,
-                        fontFamily = FontFamily.Monospace,
+                        fontFamily = if (isArabic) AyriaArabicFont else FontFamily.Monospace,
                         textAlign = TextAlign.Center
                     )
                     Spacer(Modifier.height(24.dp))
@@ -426,6 +447,7 @@ fun AppPinLockScreen(
                                     if (isArabic) "تم إيقاف المحاولات مؤقتاً" else "RETRY TEMPORARILY PAUSED",
                                     color = PinDanger,
                                     fontSize = 11.sp,
+                                    fontFamily = if (isArabic) AyriaArabicFont else FontFamily.Default,
                                     fontWeight = FontWeight.Bold
                                 )
                             }
@@ -433,7 +455,8 @@ fun AppPinLockScreen(
                             Text(
                                 if (isArabic) "يمكنك إعادة المحاولة بعد $cooldownSeconds ثانية" else "You can retry in $cooldownSeconds seconds",
                                 color = Color.White.copy(alpha = 0.78f),
-                                fontSize = 12.sp
+                                fontSize = 12.sp,
+                                fontFamily = if (isArabic) AyriaArabicFont else FontFamily.Default
                             )
                             Spacer(Modifier.height(10.dp))
                             LinearProgressIndicator(
@@ -455,6 +478,7 @@ fun AppPinLockScreen(
                             Text(
                                 if (isArabic) "نسيت رمز التطبيق؟ استرد الوصول" else "Forgot app PIN? Recover access",
                                 color = AmberZen,
+                                fontFamily = if (isArabic) AyriaArabicFont else FontFamily.Default,
                                 fontWeight = FontWeight.Bold
                             )
                         }
@@ -464,7 +488,8 @@ fun AppPinLockScreen(
                         if (isArabic) "استرداد الوصول" else "ACCESS RECOVERY",
                         color = AmberZen,
                         fontWeight = FontWeight.ExtraBold,
-                        fontSize = 21.sp
+                        fontSize = 21.sp,
+                        fontFamily = if (isArabic) AyriaArabicFont else FontFamily.Default
                     )
                     Spacer(Modifier.height(8.dp))
                     Text(
@@ -472,6 +497,7 @@ fun AppPinLockScreen(
                         color = Color.White.copy(alpha = 0.62f),
                         fontSize = 12.sp,
                         lineHeight = 19.sp,
+                        fontFamily = if (isArabic) AyriaArabicFont else FontFamily.Default,
                         textAlign = TextAlign.Center
                     )
                     Spacer(Modifier.height(20.dp))
