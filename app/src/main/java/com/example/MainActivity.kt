@@ -594,17 +594,20 @@ class MainActivity : FragmentActivity() {
                                 val isArLocal by vm.isArabic.collectAsState()
                                 var activeTab by remember { mutableStateOf("home") }
 
-                                DisposableEffect(vm) {
+                                DisposableEffect(vm, appPinEnabled, appPinUnlocked) {
+                                    fun startDashboardServices() {
+                                        if (appPinEnabled && !appPinUnlocked) return
+                                        runCatching {
+                                            vm.startTelemetry()
+                                            vm.startSensors()
+                                        }.onFailure { error ->
+                                            android.util.Log.e("A.SYRIA.Startup", "Dashboard telemetry could not start", error)
+                                        }
+                                    }
+
                                     val observer = LifecycleEventObserver { _, event ->
                                         when (event) {
-                                            Lifecycle.Event.ON_RESUME -> {
-                                                runCatching {
-                                                    vm.startTelemetry()
-                                                    vm.startSensors()
-                                                }.onFailure { error ->
-                                                    android.util.Log.e("A.SYRIA.Startup", "Dashboard telemetry could not start", error)
-                                                }
-                                            }
+                                            Lifecycle.Event.ON_RESUME -> startDashboardServices()
                                             Lifecycle.Event.ON_PAUSE -> vm.stopSensors()
                                             Lifecycle.Event.ON_STOP -> {
                                                 vm.stopSensors()
@@ -614,6 +617,11 @@ class MainActivity : FragmentActivity() {
                                         }
                                     }
                                     lifecycle.addObserver(observer)
+
+                                    // ON_RESUME may have happened before this observer was attached
+                                    // during an in-app navigation. Start explicitly for that case.
+                                    startDashboardServices()
+
                                     onDispose {
                                         lifecycle.removeObserver(observer)
                                         vm.stopSensors()
@@ -624,8 +632,11 @@ class MainActivity : FragmentActivity() {
                                 LaunchedEffect(appPinEnabled, appPinUnlocked) {
                                     if (!appPinEnabled || appPinUnlocked) {
                                         requestEssentialPermissionsOnce()
+                                        scheduleBackgroundWorkSafely()
+                                    } else {
+                                        vm.stopSensors()
+                                        vm.stopTelemetry()
                                     }
-                                    scheduleBackgroundWorkSafely()
                                 }
                                 val isAcademyOpen   by vm.isAcademyOpen.collectAsState()
                                 val isResourcesOpen by vm.isResourcesOpen.collectAsState()
@@ -697,8 +708,10 @@ class MainActivity : FragmentActivity() {
                                                 ) {
                                                     when (activeTab) {
                                                         "home"      -> {
-                                                            val prayerVm: com.example.ui.viewmodel.PrayerViewModel = viewModel()
-                                                            DashboardScreen(vm, prayerVm, { navController.navigate("link_scanner") }, { t, s, ok -> triggerBiometricAuth(t, s, ok) })
+                                                            if (!appPinEnabled || appPinUnlocked) {
+                                                                val prayerVm: com.example.ui.viewmodel.PrayerViewModel = viewModel()
+                                                                DashboardScreen(vm, prayerVm, { navController.navigate("link_scanner") }, { t, s, ok -> triggerBiometricAuth(t, s, ok) })
+                                                            }
                                                         }
                                                         "academy"   -> AcademyScreen(vm, onNavigateToGlossary = { navController.navigate("glossary") }, onNavigateToChecklist = { navController.navigate("checklist") })
                                                         "resources" -> ResourcesScreen(vm) { activeTab = "home" }
