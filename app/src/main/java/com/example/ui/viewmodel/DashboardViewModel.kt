@@ -22,6 +22,7 @@ import com.example.adaptive.FeedbackResult
 import com.example.adaptive.FeedbackService
 import com.example.adaptive.UIChange
 import com.example.data.SovereignDataStore
+import com.example.data.AppPinSettingsSnapshot
 import com.example.data.remote.GeminiRepository
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
@@ -29,6 +30,13 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlin.random.Random
+
+private data class InitialStartupState(
+    val isArabic: Boolean,
+    val calibrationCompleted: Boolean,
+    val onboardingCompleted: Boolean,
+    val pinSettings: AppPinSettingsSnapshot
+)
 
 class DashboardViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -512,8 +520,14 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
     }
 
     init {
-        viewModelScope.launch { dataStore.clearLegacyAiSettings() }
-        viewModelScope.launch(Dispatchers.IO) { dataStore.migrateLegacyGeminiApiKey() }
+        viewModelScope.launch(Dispatchers.IO) {
+            runCatching { dataStore.clearLegacyAiSettings() }
+                .onFailure { android.util.Log.w("A.SYRIA.Startup", "Legacy AI preference cleanup skipped", it) }
+        }
+        viewModelScope.launch(Dispatchers.IO) {
+            runCatching { dataStore.migrateLegacyGeminiApiKey() }
+                .onFailure { android.util.Log.w("A.SYRIA.Startup", "Legacy Gemini key migration skipped", it) }
+        }
         // Telemetry starts only when the dashboard is actually opened.
         viewModelScope.launch { dataStore.isArabic.collect { _isArabic.value = it } }
         viewModelScope.launch { dataStore.stealthMode.collect { _isStealthMode.value = it } }
@@ -547,17 +561,34 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
         viewModelScope.launch { dataStore.userGender.collect { _userGender.value = it } }
         viewModelScope.launch { dataStore.userBirthYear.collect { _userBirthYear.value = it } }
         viewModelScope.launch { dataStore.userProfileAnalysis.collect { _userProfileAnalysis.value = it } }
-        // Mark data as loaded after critical fields are available
+        // Publish the complete routing state atomically. The splash route must not
+        // race the independent preference collectors and navigate to the wrong screen.
         viewModelScope.launch {
             _lockAppOnLaunch.value = false
-            val pinSettings = dataStore.appPinSettings.first()
-            _hasAppPin.value = pinSettings.hasCredential
-            _isAppPinEnabled.value = pinSettings.enabled
-            _appPinFailedAttempts.value = pinSettings.failedAttempts
-            _appPinLockoutUntilMillis.value = pinSettings.lockoutUntilMillis
+            val initial = combine(
+                dataStore.isArabic,
+                dataStore.calibrationCompleted,
+                dataStore.onboardingCompleted,
+                dataStore.appPinSettings
+            ) { isArabic, calibrationCompleted, onboardingCompleted, pinSettings ->
+                InitialStartupState(
+                    isArabic = isArabic,
+                    calibrationCompleted = calibrationCompleted,
+                    onboardingCompleted = onboardingCompleted,
+                    pinSettings = pinSettings
+                )
+            }.first()
+
+            _isArabic.value = initial.isArabic
+            _calibrationCompleted.value = initial.calibrationCompleted
+            _onboardingCompleted.value = initial.onboardingCompleted
+            _hasAppPin.value = initial.pinSettings.hasCredential
+            _isAppPinEnabled.value = initial.pinSettings.enabled
+            _appPinFailedAttempts.value = initial.pinSettings.failedAttempts
+            _appPinLockoutUntilMillis.value = initial.pinSettings.lockoutUntilMillis
             _isAppPinSettingsLoaded.value = true
-            dataStore.onboardingCompleted.first()
             _isDataLoaded.value = true
+            android.util.Log.i("A.SYRIA.Startup", "Initial routing preferences loaded")
         }
     }
 
