@@ -19,9 +19,11 @@ object SovereigntyCipher {
     private const val KEYSTORE_PROVIDER = "AndroidKeyStore"
     private const val VAULT_KEY_ALIAS = "asyria.vault.aes.gcm.v2"
     private const val API_KEY_ALIAS = "asyria.api-key.aes.gcm.v1"
+    private const val APP_PIN_KEY_ALIAS = "asyria.app-pin.aes.gcm.v1"
     private const val VAULT_FILE_KEY_ALIAS = "asyria.vault.files.aes.gcm.v1"
     private const val VAULT_PREFIX = "vault:v2:"
     private const val SECRET_PREFIX = "secret:v1:"
+    private const val APP_PIN_PREFIX = "app-pin:v1:"
     private const val TRANSFORMATION = "AES/GCM/NoPadding"
     private const val LEGACY_TRANSFORMATION = "AES"
     private const val IV_LENGTH_BYTES = 12
@@ -64,6 +66,16 @@ object SovereigntyCipher {
 
     fun isSecretEncrypted(value: String?): Boolean =
         value?.startsWith(SECRET_PREFIX) == true
+
+    /** Encrypts the salted PIN verifier with a dedicated Android Keystore AES-GCM key. */
+    fun encryptAppPinRecord(value: String): String =
+        encryptWithAlias(value, APP_PIN_KEY_ALIAS, APP_PIN_PREFIX)
+
+    /** Decrypts only the app-PIN verifier; the plaintext PIN is never persisted. */
+    fun decryptAppPinRecord(value: String): String {
+        require(value.startsWith(APP_PIN_PREFIX)) { "Unsupported app PIN record." }
+        return decryptWithAlias(value.removePrefix(APP_PIN_PREFIX), APP_PIN_KEY_ALIAS)
+    }
 
     fun isVaultEncrypted(value: String?): Boolean =
         value?.startsWith(VAULT_PREFIX) == true
