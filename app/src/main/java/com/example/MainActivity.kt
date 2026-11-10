@@ -184,16 +184,22 @@ class MainActivity : FragmentActivity() {
                         ProvideWindowAdaptiveLayout {
                         NavHost(navController = navController, startDestination = "splash", enterTransition = { fadeIn(animationSpec = tween(500)) }, exitTransition = { fadeOut(animationSpec = tween(500)) }) {
                             composable("splash") {
-                                SplashScreen {
-                                    // SplashScreen uses rememberUpdatedState so this always gets latest startDestination
-                                    if (startDestination != "splash") {
-                                        navController.navigate(startDestination) { popUpTo("splash") { inclusive = true } }
+                                var splashFinished by remember { mutableStateOf(false) }
+
+                                LaunchedEffect(splashFinished, startDestination) {
+                                    if (splashFinished && startDestination != "splash") {
+                                        navController.navigate(startDestination) {
+                                            popUpTo("splash") { inclusive = true }
+                                        }
                                     }
-                                    // If still loading, splash will keep running until DataStore loads and callback is refreshed
+                                }
+
+                                SplashScreen(isArabic = isAr) {
+                                    splashFinished = true
                                 }
                             }
                             composable("onboarding") {
-                                OnboardingScreen { profile ->
+                                OnboardingScreen(isArabic = isAr) { profile ->
                                     vm.completeOnboarding()
                                     if (profile != null) vm.saveUserProfile(profile.gender, profile.birthYear)
                                     navController.navigate("calibration") { popUpTo("onboarding") { inclusive = true } }
