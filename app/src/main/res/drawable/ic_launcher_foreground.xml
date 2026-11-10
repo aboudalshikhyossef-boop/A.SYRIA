@@ -6,137 +6,109 @@
     android:viewportWidth="108"
     android:viewportHeight="108">
 
-    <!-- Left crystal wing -->
+    <!-- Deep glossy shadow beneath the liquid-glass triangular ribbon. -->
     <path
-        android:pathData="M54,18 L24,81.5 Q21.5,88 29,88 L40,88 L54,61 Z">
+        android:pathData="M54,10 C45,10 39,17 35,27 L13,76 C9,85 15,96 26,96 L82,96 C93,96 99,85 95,76 L73,27 C69,17 63,10 54,10 Z"
+        android:fillColor="#FF020817"
+        android:fillAlpha="0.78"/>
+
+    <!-- Main continuous glass ribbon with a clean open centre. -->
+    <path
+        android:fillType="evenOdd"
+        android:pathData="M54,8 C44,8 38,16 34,26 L12,75 C7,87 14,98 27,98 L81,98 C94,98 101,87 96,75 L74,26 C70,16 64,8 54,8 Z M54,24 C59,24 62,29 65,36 L83,77 C86,83 82,90 75,90 L33,90 C26,90 22,83 25,77 L43,36 C46,29 49,24 54,24 Z">
         <aapt:attr name="android:fillColor">
             <gradient
                 android:type="linear"
-                android:startX="24"
+                android:startX="21"
+                android:startY="11"
+                android:endX="91"
+                android:endY="98">
+                <item android:offset="0" android:color="#FFFFFFFF"/>
+                <item android:offset="0.16" android:color="#FFBDEEFF"/>
+                <item android:offset="0.34" android:color="#FF39C9F7"/>
+                <item android:offset="0.53" android:color="#FF154A9C"/>
+                <item android:offset="0.72" android:color="#FF081A45"/>
+                <item android:offset="0.88" android:color="#FF5DCEFF"/>
+                <item android:offset="1" android:color="#FFE7FAFF"/>
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- Left polished bevel. -->
+    <path
+        android:pathData="M53,13 C47,14 43,23 40,31 L18,77 C15,83 19,90 26,91 L34,91 L54,48 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:type="linear"
+                android:startX="18"
                 android:startY="20"
-                android:endX="51"
+                android:endX="54"
                 android:endY="91">
-                <item android:offset="0" android:color="#FFE4FFFC"/>
-                <item android:offset="0.22" android:color="#FF86EAE2"/>
-                <item android:offset="0.55" android:color="#FF2496A2"/>
-                <item android:offset="1" android:color="#FF073B4B"/>
+                <item android:offset="0" android:color="#FFFFFFFF"/>
+                <item android:offset="0.26" android:color="#FF8DEBFF"/>
+                <item android:offset="0.56" android:color="#FF216FCE"/>
+                <item android:offset="1" android:color="#FF07183F"/>
             </gradient>
         </aapt:attr>
     </path>
 
-    <!-- Left inner bevel -->
+    <!-- Right polished bevel. -->
     <path
-        android:pathData="M54,18 L47,59 L29,86 L25,85 Z">
+        android:pathData="M55,13 C61,14 65,23 68,31 L90,77 C93,83 89,90 82,91 L74,91 L54,48 Z">
         <aapt:attr name="android:fillColor">
             <gradient
                 android:type="linear"
-                android:startX="30"
-                android:startY="24"
-                android:endX="52"
-                android:endY="86">
-                <item android:offset="0" android:color="#FFBFFFF7"/>
-                <item android:offset="0.48" android:color="#FF3CAFB7"/>
-                <item android:offset="1" android:color="#FF0A4657"/>
+                android:startX="54"
+                android:startY="15"
+                android:endX="91"
+                android:endY="92">
+                <item android:offset="0" android:color="#FFF9FFFF"/>
+                <item android:offset="0.24" android:color="#FF83E4FF"/>
+                <item android:offset="0.53" android:color="#FF286FCE"/>
+                <item android:offset="0.82" android:color="#FF09265D"/>
+                <item android:offset="1" android:color="#FF040E2A"/>
             </gradient>
         </aapt:attr>
     </path>
 
-    <!-- Left shadow facet -->
+    <!-- Inner glass reflection and soft curved bridge. -->
     <path
-        android:pathData="M47,59 L54,61 L40,88 L29,88 Z"
-        android:fillColor="#FF0B5667"/>
-
-    <!-- Right crystal wing -->
-    <path
-        android:pathData="M54,18 L84,81.5 Q86.5,88 79,88 L68,88 L54,61 Z">
+        android:pathData="M32,72 C43,66 65,66 76,72 L83,87 C83,88 80,89 77,89 L31,89 C28,89 25,88 25,87 Z">
         <aapt:attr name="android:fillColor">
             <gradient
                 android:type="linear"
-                android:startX="57"
-                android:startY="18"
-                android:endX="86"
+                android:startX="31"
+                android:startY="68"
+                android:endX="76"
                 android:endY="91">
-                <item android:offset="0" android:color="#FFD9F8FF"/>
-                <item android:offset="0.24" android:color="#FF70CBEA"/>
-                <item android:offset="0.58" android:color="#FF2869B0"/>
-                <item android:offset="1" android:color="#FF092B57"/>
+                <item android:offset="0" android:color="#FFEAFBFF"/>
+                <item android:offset="0.24" android:color="#FF65D8FF"/>
+                <item android:offset="0.58" android:color="#FF1554B2"/>
+                <item android:offset="1" android:color="#FF071B49"/>
             </gradient>
         </aapt:attr>
     </path>
 
-    <!-- Right inner bevel -->
+    <!-- Thin liquid highlights along both outer edges. -->
     <path
-        android:pathData="M54,18 L61,59 L79,86 L83,85 Z">
-        <aapt:attr name="android:fillColor">
-            <gradient
-                android:type="linear"
-                android:startX="55"
-                android:startY="22"
-                android:endX="83"
-                android:endY="86">
-                <item android:offset="0" android:color="#FF9EEFFF"/>
-                <item android:offset="0.5" android:color="#FF367DCB"/>
-                <item android:offset="1" android:color="#FF0A315F"/>
-            </gradient>
-        </aapt:attr>
-    </path>
-
-    <!-- Right shadow facet -->
-    <path
-        android:pathData="M61,59 L54,61 L68,88 L79,88 Z"
-        android:fillColor="#FF0A356D"/>
-
-    <!-- Inner glass bridge / refraction -->
-    <path
-        android:pathData="M54,43 C47,51 41.5,64 38,81 L54,70 L70,81 C66.5,64 61,51 54,43 Z">
-        <aapt:attr name="android:fillColor">
-            <gradient
-                android:type="linear"
-                android:startX="43"
-                android:startY="47"
-                android:endX="67"
-                android:endY="82">
-                <item android:offset="0" android:color="#FFB7F9F0"/>
-                <item android:offset="0.42" android:color="#FF3EABB7"/>
-                <item android:offset="1" android:color="#FF0B4B66"/>
-            </gradient>
-        </aapt:attr>
-    </path>
-
-    <!-- Inner crystalline facet -->
-    <path
-        android:pathData="M54,48 L54,70 L38,81 Z"
-        android:fillColor="#FF77D9D2"
-        android:fillAlpha="0.55"/>
-
-    <path
-        android:pathData="M54,48 L70,81 L54,70 Z"
-        android:fillColor="#FF5B9FD6"
-        android:fillAlpha="0.7"/>
-
-    <!-- Fine glass edge highlights -->
-    <path
-        android:pathData="M54,19 L25,82"
+        android:pathData="M53,11 C45,13 41,23 37,32 L16,77"
         android:fillColor="#00000000"
-        android:strokeColor="#FFDDFEFC"
-        android:strokeAlpha="0.72"
-        android:strokeWidth="0.8"
+        android:strokeColor="#FFF4FFFF"
+        android:strokeAlpha="0.88"
+        android:strokeWidth="1.15"
         android:strokeLineCap="round"/>
-
     <path
-        android:pathData="M54,19 L83,82"
+        android:pathData="M55,11 C63,13 67,23 71,32 L92,77"
         android:fillColor="#00000000"
-        android:strokeColor="#FFD7F5FF"
-        android:strokeAlpha="0.64"
-        android:strokeWidth="0.8"
+        android:strokeColor="#FFB9F1FF"
+        android:strokeAlpha="0.82"
+        android:strokeWidth="1.05"
         android:strokeLineCap="round"/>
-
     <path
-        android:pathData="M29,87 L40,87 L54,61 L68,87 L79,87"
+        android:pathData="M28,92 C41,95 67,95 80,92"
         android:fillColor="#00000000"
-        android:strokeColor="#FFB9F7F0"
-        android:strokeAlpha="0.58"
-        android:strokeWidth="0.65"
-        android:strokeLineCap="round"
-        android:strokeLineJoin="round"/>
+        android:strokeColor="#FFB9F5FF"
+        android:strokeAlpha="0.78"
+        android:strokeWidth="0.85"
+        android:strokeLineCap="round"/>
 </vector>
