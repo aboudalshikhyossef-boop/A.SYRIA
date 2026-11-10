@@ -545,6 +545,7 @@ class MainActivity : FragmentActivity() {
 
                     CompositionLocalProvider(LocalAdaptiveConfig provides uiConfig) {
                         ProvideWindowAdaptiveLayout {
+                        Box(modifier = Modifier.fillMaxSize()) {
                         NavHost(navController = navController, startDestination = "splash", enterTransition = { fadeIn(animationSpec = tween(500)) }, exitTransition = { fadeOut(animationSpec = tween(500)) }) {
                             composable("splash") {
                                 var splashFinished by remember { mutableStateOf(false) }
@@ -729,7 +730,7 @@ class MainActivity : FragmentActivity() {
                                 }
                             )
                         }
-
+                        }
                         }
                         }
                     }
