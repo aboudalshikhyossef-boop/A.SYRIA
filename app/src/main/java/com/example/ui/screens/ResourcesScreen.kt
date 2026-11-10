@@ -31,8 +31,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.ui.theme.AmberZen
-import com.example.ui.theme.CyberCyan
 import com.example.ui.theme.VoidBlack
 import com.example.ui.viewmodel.DashboardViewModel
 import androidx.activity.compose.BackHandler
@@ -82,7 +80,7 @@ fun ResourcesScreen(
             descriptionEn = "Deep diagnostic analysis of files, URLs, and IPs against global antivirus engines.",
             url = "https://www.virustotal.com",
             icon = "🛡",
-            color = CyberCyan
+            color = Color(0xFFA8DDEB)
         ),
         SecureResource(
             titleAr = "فاحص التسريبات الدولي",
@@ -91,7 +89,7 @@ fun ResourcesScreen(
             descriptionEn = "Check if your personal credentials or emails have been leaked in historic data breaches.",
             url = "https://haveibeenpwned.com",
             icon = "🔑",
-            color = AmberZen
+            color = Color(0xFFB8DDE9)
         ),
         SecureResource(
             titleAr = "تقييم أمان المواقع",
@@ -100,7 +98,7 @@ fun ResourcesScreen(
             descriptionEn = "Execute DNS reputation and domain security analysis to filter rogue or phishing urls.",
             url = "https://www.urlvoid.com",
             icon = "🌐",
-            color = CyberCyan
+            color = Color(0xFFA8DDEB)
         ),
         SecureResource(
             titleAr = "معايير أمن الويب OWASP",
@@ -109,7 +107,7 @@ fun ResourcesScreen(
             descriptionEn = "Direct link to standard awareness guidelines for top app vulnerabilities and web defense.",
             url = "https://owasp.org",
             icon = "📚",
-            color = AmberZen
+            color = Color(0xFFB8DDE9)
         )
     )
 
@@ -138,7 +136,7 @@ fun ResourcesScreen(
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
                             text = if (isAr) "مصادر الاستخبارات" else "INTELLIGENCE NODES",
-                            color = AmberZen,
+                            color = Color(0xFFB8DDE9),
                             fontSize = 18.sp,
                             fontWeight = FontWeight.ExtraBold,
                             letterSpacing = 1.sp,
@@ -162,8 +160,8 @@ fun ResourcesScreen(
                     Box(
                         modifier = Modifier
                             .minimumInteractiveComponentSize()
-                            .border(1.dp, AmberZen.copy(alpha = 0.3f), RoundedCornerShape(8.dp))
-                            .background(Color.White.copy(alpha = 0.05f), RoundedCornerShape(8.dp))
+                            .border(1.dp, Color(0xFFB8DDE9).copy(alpha = 0.3f), RoundedCornerShape(16.dp))
+                            .background(Color(0x2B9BC8D8), RoundedCornerShape(16.dp))
                             .clickable {
                                 haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
                                 onClose()
@@ -173,7 +171,7 @@ fun ResourcesScreen(
                     ) {
                         Text(
                             text = if (isAr) "رجوع" else "BACK",
-                            color = AmberZen,
+                            color = Color(0xFFB8DDE9),
                             fontSize = 10.sp,
                             fontWeight = FontWeight.Bold,
                             fontFamily = FontFamily.Monospace
@@ -215,11 +213,11 @@ fun ResourcesScreen(
                                 .fillMaxWidth()
                                 .height(190.dp) // Ensures consistent card sizing, avoiding layout shifting
                                 .border(
-                                    width = 0.5.dp,
+                                    width = 0.8.dp,
                                     color = resource.color.copy(alpha = 0.35f),
-                                    shape = RoundedCornerShape(12.dp)
+                                    shape = RoundedCornerShape(22.dp)
                                 )
-                                .background(Color(0xFF070B12).copy(alpha = 0.85f), RoundedCornerShape(12.dp))
+                                .background(Color(0xB91B3A50), RoundedCornerShape(22.dp))
                                 .clickable {
                                     haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
                                     openIntelligenceLink(resource.url, title)
@@ -236,8 +234,8 @@ fun ResourcesScreen(
                                     Box(
                                         modifier = Modifier
                                             .size(34.dp)
-                                            .border(0.5.dp, resource.color.copy(alpha = 0.5f), RoundedCornerShape(8.dp))
-                                            .background(resource.color.copy(alpha = 0.08f), RoundedCornerShape(8.dp)),
+                                            .border(0.5.dp, resource.color.copy(alpha = 0.5f), RoundedCornerShape(16.dp))
+                                            .background(resource.color.copy(alpha = 0.08f), RoundedCornerShape(16.dp)),
                                         contentAlignment = Alignment.Center
                                     ) {
                                         Text(

@@ -42,156 +42,196 @@ fun SettingsScreen(
     onOpenCustomize: () -> Unit = {},
     onOpenAppLock: () -> Unit = {}
 ) {
-    val haptic = LocalHapticFeedback.current
     val isAr by viewModel.isArabic.collectAsState()
-    val isStealth by viewModel.isStealthMode.collectAsState()
     val appPinEnabled by viewModel.isAppPinEnabled.collectAsState()
     val apiKey by viewModel.customApiKey.collectAsState()
-    val operatorName by viewModel.operatorName.collectAsState()
-    val neuralRole by viewModel.neuralRole.collectAsState()
+    var tempApiKey by remember(apiKey) { mutableStateOf(apiKey) }
+    var showGeminiKey by remember { mutableStateOf(false) }
     val layoutDirection = if (isAr) LayoutDirection.Rtl else LayoutDirection.Ltr
+    val transition = rememberInfiniteTransition(label = "settings_frost")
+    val edgeGlow by transition.animateFloat(
+        initialValue = 0.48f,
+        targetValue = 0.78f,
+        animationSpec = infiniteRepeatable(tween(4200), RepeatMode.Reverse),
+        label = "settings_edge_glow"
+    )
 
     BackHandler { onClose() }
 
-    var tempOperatorName by remember(operatorName) { mutableStateOf(operatorName) }
-    var tempNeuralRole by remember(neuralRole) { mutableStateOf(neuralRole) }
-    var tempApiKey by remember(apiKey) { mutableStateOf(apiKey) }
-    var showGeminiKey by remember { mutableStateOf(false) }
-
-    val infiniteTransition = rememberInfiniteTransition(label = "settings_glow")
-    val borderGlow by infiniteTransition.animateFloat(initialValue = 0.3f, targetValue = 0.8f, animationSpec = infiniteRepeatable(tween(2500), RepeatMode.Reverse), label = "glow")
-
     CompositionLocalProvider(LocalLayoutDirection provides layoutDirection) {
         Box(modifier = Modifier.fillMaxSize().background(Color.Transparent)) {
-            // Subtle top gradient
-            Box(modifier = Modifier.fillMaxWidth().height(200.dp).background(Brush.verticalGradient(listOf(AmberZen.copy(alpha = 0.06f), Color.Transparent))))
-
-            Column(modifier = Modifier.fillMaxSize().statusBarsPadding()) {
-                // Header
-                Box(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 16.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Box(modifier = Modifier.size(36.dp).background(AmberZen.copy(alpha = 0.1f), CircleShape).border(1.dp, AmberZen.copy(alpha = 0.3f), CircleShape).clickable { haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress); onClose() }, contentAlignment = Alignment.Center) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, null, tint = AmberZen, modifier = Modifier.size(18.dp))
-                        }
-                        Spacer(Modifier.width(12.dp))
-                        Column {
-                            Text(if (isAr) "مركز التحكم" else "CONTROL CENTER", color = AmberZen, fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, fontFamily = FontFamily.Monospace)
-                            Text(if (isAr) "الإعدادات والتخصيص" else "Settings & Personalization", color = AmberZen.copy(alpha = 0.5f), fontSize = 10.sp, fontFamily = FontFamily.Monospace)
-                        }
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .statusBarsPadding()
+                    .padding(horizontal = 18.dp, vertical = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text(
+                            if (isAr) "الإعدادات" else "SETTINGS",
+                            color = Color(0xFFD8F1FA),
+                            fontSize = 20.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            fontFamily = FontFamily.Monospace,
+                            letterSpacing = 1.5.sp
+                        )
+                        Text(
+                            if (isAr) "إعدادان أساسيان فقط" else "ONLY THE ESSENTIAL CONTROLS",
+                            color = Color(0xFFA7C5D4).copy(alpha = 0.58f),
+                            fontSize = 9.sp,
+                            fontFamily = FontFamily.Monospace,
+                            letterSpacing = 1.sp
+                        )
+                    }
+                    IconButton(onClick = onClose) {
+                        Icon(
+                            Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = if (isAr) "إغلاق الإعدادات" else "Close settings",
+                            tint = Color(0xFFC5E6F0)
+                        )
                     }
                 }
 
-                Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp).padding(bottom = 60.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-
-                    // ── NEURAL PROFILE ────────────────────────────────────────────────
-                    SettingsCard(title = if (isAr) "الملف العصبي" else "NEURAL PROFILE", icon = Icons.Default.Person, color = CyberCyan, glowAlpha = borderGlow) {
-                        GlowTextField(label = if (isAr) "اسم المشغل" else "OPERATOR NAME", value = tempOperatorName, onValueChange = { tempOperatorName = it; viewModel.updateOperatorName(it) }, color = CyberCyan, isAr = isAr)
-                        Spacer(Modifier.height(8.dp))
-                        GlowTextField(label = if (isAr) "الدور العصبي" else "NEURAL ROLE", value = tempNeuralRole, onValueChange = { tempNeuralRole = it; viewModel.updateNeuralRole(it) }, color = CyberCyan, isAr = isAr)
-                        Spacer(Modifier.height(10.dp))
-                        SettingsToggleRow(label = if (isAr) "اللغة العربية" else "Arabic Language", checked = isAr, onCheckedChange = { viewModel.setArabic(it) }, icon = Icons.Default.Language, color = CyberCyan)
-                    }
-
-                    // ── GEMINI API ────────────────────────────────────────────────
-                    SettingsCard(
-                        title = if (isAr) "الذكاء الاصطناعي — Gemini" else "AI ENGINE — GEMINI",
-                        icon = Icons.Default.Key,
-                        color = CyberCyan,
-                        glowAlpha = borderGlow
+                SettingsCard(
+                    title = if (isAr) "مفتاح Gemini API" else "GEMINI API KEY",
+                    icon = Icons.Default.Key,
+                    color = Color(0xFF9BDCF0),
+                    glowAlpha = edgeGlow
+                ) {
+                    Text(
+                        if (isAr) {
+                            "أدخل مفتاح Gemini لاستخدام المساعد الذكي. يبقى المفتاح ضمن إعدادات التطبيق على هذا الجهاز."
+                        } else {
+                            "Add your Gemini API key to enable the AI assistant. The key is stored in this app's local preferences."
+                        },
+                        color = Color(0xFFC4DAE4).copy(alpha = 0.68f),
+                        fontSize = 11.sp,
+                        lineHeight = 17.sp
+                    )
+                    Spacer(Modifier.height(12.dp))
+                    PasswordField(
+                        label = if (isAr) "مفتاح API" else "API KEY",
+                        value = tempApiKey,
+                        onValueChange = {
+                            tempApiKey = it
+                            viewModel.updateCustomApiKey(it)
+                        },
+                        show = showGeminiKey,
+                        onToggleShow = { showGeminiKey = !showGeminiKey },
+                        color = Color(0xFF9BDCF0),
+                        isAr = isAr
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Text(
-                            text = if (isAr)
-                                "يستخدم التطبيق Gemini 3.6 Flash للدردشة والتحليل وتوليد محتوى الأكاديمية."
-                            else
-                                "Gemini 3.6 Flash powers chat, analysis, and academy content generation.",
-                            color = Color.White.copy(alpha = 0.55f),
-                            fontSize = 10.sp,
-                            lineHeight = 15.sp
-                        )
-                        Spacer(Modifier.height(10.dp))
-                        PasswordField(
-                            label = if (isAr) "مفتاح Gemini API" else "GEMINI API KEY",
-                            value = tempApiKey,
-                            onValueChange = { tempApiKey = it; viewModel.updateCustomApiKey(it) },
-                            show = showGeminiKey,
-                            onToggleShow = { showGeminiKey = !showGeminiKey },
-                            color = CyberCyan,
-                            isAr = isAr
-                        )
-                    }
-
-                    // ── SECURITY ──────────────────────────────────────────────────────
-                    SettingsCard(title = if (isAr) "الحماية والأمان" else "SECURITY CORE", icon = Icons.Default.Security, color = Color(0xFFFF4D6D), glowAlpha = borderGlow) {
-                        SettingsToggleRow(label = if (isAr) "وضع التخفي" else "Stealth Mode", checked = isStealth, onCheckedChange = { viewModel.setStealthMode(it) }, icon = Icons.Default.VisibilityOff, color = Color(0xFFFF4D6D))
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clip(RoundedCornerShape(12.dp))
-                                .background(Color(0xFFFF4D6D).copy(alpha = 0.07f))
-                                .border(1.dp, Color(0xFFFF4D6D).copy(alpha = 0.22f), RoundedCornerShape(12.dp))
-                                .clickable {
-                                    haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
-                                    onOpenAppLock()
-                                }
-                                .padding(14.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(12.dp)
-                        ) {
-                            Icon(Icons.Default.Lock, null, tint = Color(0xFFFF4D6D), modifier = Modifier.size(21.dp))
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(if (isAr) "قفل التطبيق" else "App PIN Lock", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
-                                Text(
-                                    if (isAr) {
-                                        if (appPinEnabled) "مفعّل · رمز محلي مشفّر من 6 أرقام" else "غير مفعّل · أنشئ رمزاً محلياً من 6 أرقام"
-                                    } else {
-                                        if (appPinEnabled) "Enabled · encrypted six-digit local PIN" else "Disabled · create a six-digit local PIN"
-                                    },
-                                    color = Color.White.copy(alpha = 0.48f),
-                                    fontSize = 10.sp,
-                                    lineHeight = 14.sp
+                        Box(
+                            Modifier
+                                .size(7.dp)
+                                .background(
+                                    if (apiKey.isNotBlank()) Color(0xFF9FE0D0) else Color(0xFF8EA9B9),
+                                    CircleShape
                                 )
-                            }
-                            Icon(Icons.Default.ChevronRight, null, tint = Color(0xFFFF4D6D).copy(alpha = 0.7f), modifier = Modifier.size(18.dp))
-                        }
-                        Text(
-                            text = if (isAr) "قفل مستقل داخل A.SYRIA، لا يستخدم بصمة الهاتف أو رمز الشاشة في الاستخدام اليومي. تُستخدم مصادقة الجهاز فقط عند طلب استرداد الرمز المنسي." else "An independent A.SYRIA lock. Daily access never uses the phone's biometrics or screen PIN; device authentication is used only to recover a forgotten app PIN.",
-                            color = Color.White.copy(alpha = 0.48f),
-                            fontSize = 10.sp,
-                            lineHeight = 15.sp
                         )
-                    }
-
-                    // ── CUSTOMIZATION ────────────────────────────────────────────────
-                    SettingsCard(title = if (isAr) "التخصيص والمظهر" else "CUSTOMIZATION", icon = Icons.Default.Palette, color = Color(0xFFBB66FF), glowAlpha = borderGlow) {
-                        // AI Customizer button
-                        Row(modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(Color(0xFFBB66FF).copy(alpha = 0.08f)).border(1.dp, Color(0xFFBB66FF).copy(alpha = 0.3f), RoundedCornerShape(10.dp)).clickable { haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress); onOpenCustomize() }.padding(14.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                            Icon(Icons.Default.AutoAwesome, null, tint = Color(0xFFBB66FF), modifier = Modifier.size(20.dp))
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(if (isAr) "تخصيص الواجهة بالذكاء الاصطناعي" else "AI UI Customizer", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
-                                Text(if (isAr) "اطلب تغييرات الألوان والخطوط والمظهر بالعربية أو الإنجليزية" else "Change colors, fonts & style with natural language", color = Color.White.copy(alpha = 0.4f), fontSize = 10.sp)
-                            }
-                            Icon(Icons.Default.ChevronRight, null, tint = Color(0xFFBB66FF).copy(alpha = 0.6f), modifier = Modifier.size(18.dp))
-                        }
-                    }
-
-                    // ── DOCUMENTATION ─────────────────────────────────────────────────
-                    SettingsCard(title = if (isAr) "التوثيق والمعلومات" else "DOCUMENTATION", icon = Icons.AutoMirrored.Filled.MenuBook, color = Color(0xFF00FF88), glowAlpha = borderGlow) {
-                        Row(modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(Color(0xFF00FF88).copy(alpha = 0.05f)).border(1.dp, Color(0xFF00FF88).copy(alpha = 0.2f), RoundedCornerShape(10.dp)).clickable { haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress); onOpenAbout() }.padding(14.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                            Icon(Icons.Default.Info, null, tint = Color(0xFF00FF88), modifier = Modifier.size(20.dp))
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(if (isAr) "دليل التشغيل الكامل" else "Full Operator Manual", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
-                                Text(if (isAr) "شرح كامل لجميع ميزات وقدرات التطبيق" else "Complete guide to all app features & capabilities", color = Color.White.copy(alpha = 0.4f), fontSize = 10.sp)
-                            }
-                            Icon(Icons.Default.ChevronRight, null, tint = Color(0xFF00FF88).copy(alpha = 0.6f), modifier = Modifier.size(18.dp))
-                        }
-                    }
-
-                    // Footer
-                    Column(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text("A.SYRIA SOVEREIGN OS v5.0.0", color = Color.White.copy(alpha = 0.2f), fontSize = 10.sp, fontFamily = FontFamily.Monospace, letterSpacing = 2.sp, textAlign = TextAlign.Center)
-                        Text("BUILT BY ABOUDA.AL.SHEKH.YOSSEF", color = AmberZen.copy(alpha = 0.15f), fontSize = 8.sp, fontFamily = FontFamily.Monospace, letterSpacing = 1.sp, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 3.dp))
+                        Text(
+                            if (apiKey.isNotBlank()) {
+                                if (isAr) "تم إدخال مفتاح API" else "API KEY CONFIGURED"
+                            } else {
+                                if (isAr) "لم يتم إدخال المفتاح بعد" else "API KEY NOT SET"
+                            },
+                            color = Color(0xFFAFC9D5).copy(alpha = 0.66f),
+                            fontSize = 8.sp,
+                            fontFamily = FontFamily.Monospace,
+                            letterSpacing = 0.8.sp
+                        )
                     }
                 }
+
+                SettingsCard(
+                    title = if (isAr) "قفل التطبيق" else "APP LOCK",
+                    icon = Icons.Default.Lock,
+                    color = Color(0xFFB6DCEB),
+                    glowAlpha = edgeGlow
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(
+                                Brush.linearGradient(
+                                    listOf(Color(0x2B8AC6DB), Color(0x151A455E), Color(0x14FFFFFF))
+                                ),
+                                RoundedCornerShape(20.dp)
+                            )
+                            .border(0.8.dp, Color(0x557EBAD0), RoundedCornerShape(20.dp))
+                            .clickable { onOpenAppLock() }
+                            .padding(14.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(42.dp)
+                                .background(Color(0x2B9BD7EB), CircleShape)
+                                .border(0.8.dp, Color(0x668AC9DE), CircleShape),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(Icons.Default.Lock, null, tint = Color(0xFFD7F0F8), modifier = Modifier.size(20.dp))
+                        }
+                        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Text(
+                                if (isAr) "إدارة رمز قفل التطبيق" else "Manage app PIN",
+                                color = Color(0xFFE2F4FA),
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            Text(
+                                if (appPinEnabled) {
+                                    if (isAr) "القفل مفعّل · اضغط لإدارة الرمز" else "LOCK ENABLED · TAP TO MANAGE"
+                                } else {
+                                    if (isAr) "القفل غير مفعّل · اضغط لإعداد رمز" else "LOCK DISABLED · TAP TO SET UP"
+                                },
+                                color = Color(0xFFA9C8D6).copy(alpha = 0.68f),
+                                fontSize = 9.sp,
+                                fontFamily = FontFamily.Monospace
+                            )
+                        }
+                        Icon(
+                            Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = null,
+                            tint = Color(0xFFB5DBE9).copy(alpha = 0.7f),
+                            modifier = Modifier.size(17.dp)
+                        )
+                    }
+                    Spacer(Modifier.height(7.dp))
+                    Text(
+                        if (isAr) {
+                            "قفل محلي مستقل عن قفل شاشة الهاتف. يمكنك تفعيله أو تغيير رمزه من هنا."
+                        } else {
+                            "A local app-only lock, separate from your phone's screen lock. Enable it or change the PIN here."
+                        },
+                        color = Color(0xFFABC4D0).copy(alpha = 0.55f),
+                        fontSize = 10.sp,
+                        lineHeight = 15.sp
+                    )
+                }
+
+                Spacer(Modifier.weight(1f))
+                Text(
+                    "A.SYRIA  ·  QUIET CONTROL",
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+                    color = Color(0xFFA5C3D0).copy(alpha = 0.30f),
+                    fontSize = 8.sp,
+                    fontFamily = FontFamily.Monospace,
+                    textAlign = TextAlign.Center,
+                    letterSpacing = 1.4.sp
+                )
             }
         }
     }
@@ -199,7 +239,7 @@ fun SettingsScreen(
 
 @Composable
 private fun SettingsCard(title: String, icon: ImageVector, color: Color, glowAlpha: Float, content: @Composable ColumnScope.() -> Unit) {
-    Column(modifier = Modifier.fillMaxWidth().border(1.dp, color.copy(alpha = glowAlpha * 0.4f), RoundedCornerShape(16.dp)).background(color.copy(alpha = 0.03f), RoundedCornerShape(16.dp)).padding(16.dp)) {
+    Column(modifier = Modifier.fillMaxWidth().border(1.dp, color.copy(alpha = glowAlpha * 0.4f), RoundedCornerShape(24.dp)).background(color.copy(alpha = 0.03f), RoundedCornerShape(24.dp)).padding(16.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(bottom = 14.dp)) {
             Box(modifier = Modifier.size(32.dp).background(color.copy(alpha = 0.12f), CircleShape).border(1.dp, color.copy(alpha = 0.3f), CircleShape), contentAlignment = Alignment.Center) {
                 Icon(icon, null, tint = color, modifier = Modifier.size(16.dp))

@@ -12,6 +12,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -22,7 +23,9 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -30,7 +33,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.database.InventorIdea
 import com.example.data.database.VaultItem
-import com.example.ui.theme.CyberCyan
 import com.example.ui.theme.VoidBlack
 import com.example.ui.viewmodel.DashboardViewModel
 import kotlinx.coroutines.CancellationException
@@ -169,21 +171,38 @@ fun SecureVaultScreen(viewModel: DashboardViewModel, isArabic: Boolean, onClose:
         exportLauncher.launch(intent)
     }
 
-    Box(Modifier.fillMaxSize().background(Color.Transparent)) {
+    Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.42f))) {
+        Box(
+            Modifier
+                .fillMaxSize()
+                .padding(8.dp)
+                .clip(RoundedCornerShape(30.dp))
+                .background(
+                    Brush.verticalGradient(
+                        listOf(Color(0xF019354B), Color(0xF20C1E32), Color(0xF2071424))
+                    ),
+                    RoundedCornerShape(30.dp)
+                )
+                .border(
+                    0.9.dp,
+                    Brush.linearGradient(listOf(Color(0x7799D5E9), Color(0x254A8DAB), Color(0x22FFFFFF))),
+                    RoundedCornerShape(30.dp)
+                )
+        ) {
         Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().padding(18.dp)) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
-                    Text(if (isArabic) "الخزينة الآمنة" else "SECURE VAULT", color = CyberCyan, fontSize = 19.sp, fontWeight = FontWeight.Bold)
+                    Text(if (isArabic) "الخزينة الآمنة" else "SECURE VAULT", color = Color(0xFFB7E3F0), fontSize = 19.sp, fontWeight = FontWeight.Bold)
                     Text(if (isArabic) "تخزين محلي مشفّر للصور والملفات والنصوص" else "Encrypted local storage for images, files and text", color = Color.White.copy(alpha = 0.55f), fontSize = 10.sp)
                 }
-                TextButton(onClick = onClose) { Text(if (isArabic) "إغلاق" else "CLOSE", color = CyberCyan) }
+                TextButton(onClick = onClose) { Text(if (isArabic) "إغلاق" else "CLOSE", color = Color(0xFFB7E3F0)) }
             }
             Spacer(Modifier.height(12.dp))
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Button(
                     onClick = { showAddMenu = true },
                     modifier = Modifier.weight(1f),
-                    colors = ButtonDefaults.buttonColors(containerColor = CyberCyan, contentColor = VoidBlack)
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFB7E3F0), contentColor = Color(0xFF071725))
                 ) { Text(if (isArabic) "إضافة إلى الخزينة" else "ADD TO VAULT", fontSize = 11.sp, fontWeight = FontWeight.Bold) }
                 TextButton(
                     onClick = { showWipeConfirmation = true },
@@ -191,13 +210,13 @@ fun SecureVaultScreen(viewModel: DashboardViewModel, isArabic: Boolean, onClose:
                 ) { Text(if (isArabic) "مسح الكل" else "WIPE ALL", color = Color.Red, fontSize = 10.sp) }
             }
             message?.let {
-                Card(Modifier.fillMaxWidth().padding(top = 8.dp), colors = CardDefaults.cardColors(containerColor = Color(0xFF10202A))) {
+                Card(Modifier.fillMaxWidth().padding(top = 8.dp), colors = CardDefaults.cardColors(containerColor = Color(0xB91D3B50))) {
                     Text(it, Modifier.padding(10.dp), color = Color.White, fontSize = 10.sp)
                 }
             }
             Spacer(Modifier.height(8.dp))
-            Text(if (isArabic) "العناصر المشفّرة: ${vaultItems.size}" else "ENCRYPTED ITEMS: ${vaultItems.size}", color = CyberCyan, fontSize = 10.sp, fontWeight = FontWeight.Bold)
-            HorizontalDivider(color = CyberCyan.copy(alpha = 0.2f), modifier = Modifier.padding(vertical = 7.dp))
+            Text(if (isArabic) "العناصر المشفّرة: ${vaultItems.size}" else "ENCRYPTED ITEMS: ${vaultItems.size}", color = Color(0xFFB7E3F0), fontSize = 10.sp, fontWeight = FontWeight.Bold)
+            HorizontalDivider(color = Color(0xFFB7E3F0).copy(alpha = 0.2f), modifier = Modifier.padding(vertical = 7.dp))
             Text(
                 if (isArabic) "تُخزّن البيانات على هذا الجهاز فقط. حذف التطبيق أو مسح بياناته يزيل الخزينة؛ صدّر نسخة خارجية عند الحاجة."
                 else "Vault data stays on this device. Uninstalling the app or clearing its data removes it; export a copy when needed.",
@@ -217,36 +236,37 @@ fun SecureVaultScreen(viewModel: DashboardViewModel, isArabic: Boolean, onClose:
                     }
                 }
                 if (vaultItems.isNotEmpty()) {
-                    item { Text(if (isArabic) "الصور والملفات والنصوص" else "FILES, IMAGES AND TEXT", color = CyberCyan, fontSize = 10.sp, fontWeight = FontWeight.Bold) }
+                    item { Text(if (isArabic) "الصور والملفات والنصوص" else "FILES, IMAGES AND TEXT", color = Color(0xFFB7E3F0), fontSize = 10.sp, fontWeight = FontWeight.Bold) }
                     items(vaultItems, key = { "file-${it.id}" }) { item ->
                         VaultItemCard(item, isArabic, { exportSelected(item) }, { deleteItem = item })
                     }
                 }
                 if (legacyIdeas.isNotEmpty()) {
-                    item { Text(if (isArabic) "المخططات المحفوظة سابقاً" else "LEGACY BLUEPRINTS", color = CyberCyan, fontSize = 10.sp, fontWeight = FontWeight.Bold) }
+                    item { Text(if (isArabic) "المخططات المحفوظة سابقاً" else "LEGACY BLUEPRINTS", color = Color(0xFFB7E3F0), fontSize = 10.sp, fontWeight = FontWeight.Bold) }
                     items(legacyIdeas, key = { "idea-${it.id}" }) { idea ->
                         Card(
                             Modifier.fillMaxWidth().clickable { selectedIdea = idea },
-                            colors = CardDefaults.cardColors(containerColor = Color(0xFF0B151C))
+                            colors = CardDefaults.cardColors(containerColor = Color(0xB91A3549))
                         ) {
                             Column(Modifier.padding(12.dp)) {
                                 Text(idea.getDecryptedTitle(), color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
-                                Text(if (isArabic) "مخطط قديم محفوظ" else "Previously saved blueprint", color = CyberCyan.copy(alpha = 0.65f), fontSize = 9.sp)
+                                Text(if (isArabic) "مخطط قديم محفوظ" else "Previously saved blueprint", color = Color(0xFFB7E3F0).copy(alpha = 0.65f), fontSize = 9.sp)
                             }
                         }
                     }
                 }
             }
         }
-        if (busy) Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.45f)), contentAlignment = Alignment.Center) {
-            CircularProgressIndicator(color = CyberCyan)
+        }
+        if (busy) Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.52f)), contentAlignment = Alignment.Center) {
+            CircularProgressIndicator(color = Color(0xFFB8E4F0))
         }
     }
 
     if (showAddMenu) AlertDialog(
         onDismissRequest = { showAddMenu = false },
-        containerColor = Color(0xFF101820),
-        title = { Text(if (isArabic) "ماذا تريد حفظه؟" else "WHAT TO SAVE?", color = CyberCyan) },
+        containerColor = Color(0xF20D2033), shape = RoundedCornerShape(24.dp),
+        title = { Text(if (isArabic) "ماذا تريد حفظه؟" else "WHAT TO SAVE?", color = Color(0xFFB7E3F0)) },
         text = {
             Column {
                 TextButton(onClick = { imagePicker.launch(arrayOf("image/*")) }) { Text(if (isArabic) "اختيار صورة" else "Choose image", color = Color.White) }
@@ -259,19 +279,19 @@ fun SecureVaultScreen(viewModel: DashboardViewModel, isArabic: Boolean, onClose:
 
     if (showTextEditor) AlertDialog(
         onDismissRequest = { showTextEditor = false },
-        containerColor = Color(0xFF101820),
-        title = { Text(if (isArabic) "حفظ نص مشفّر" else "SAVE ENCRYPTED TEXT", color = CyberCyan) },
+        containerColor = Color(0xF20D2033), shape = RoundedCornerShape(24.dp),
+        title = { Text(if (isArabic) "حفظ نص مشفّر" else "SAVE ENCRYPTED TEXT", color = Color(0xFFB7E3F0)) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedTextField(
                     value = noteTitle, onValueChange = { noteTitle = it }, singleLine = true,
                     label = { Text(if (isArabic) "اسم النص" else "Title") },
-                    colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White, focusedBorderColor = CyberCyan, unfocusedBorderColor = CyberCyan.copy(alpha = 0.4f))
+                    colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White, focusedBorderColor = Color(0xFFB7E3F0), unfocusedBorderColor = Color(0xFFB7E3F0).copy(alpha = 0.4f))
                 )
                 OutlinedTextField(
                     value = noteText, onValueChange = { noteText = it }, minLines = 4, maxLines = 8,
                     label = { Text(if (isArabic) "النص" else "Text") },
-                    colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White, focusedBorderColor = CyberCyan, unfocusedBorderColor = CyberCyan.copy(alpha = 0.4f))
+                    colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White, focusedBorderColor = Color(0xFFB7E3F0), unfocusedBorderColor = Color(0xFFB7E3F0).copy(alpha = 0.4f))
                 )
             }
         },
@@ -291,15 +311,15 @@ fun SecureVaultScreen(viewModel: DashboardViewModel, isArabic: Boolean, onClose:
                         message = (if (isArabic) "فشل حفظ النص: " else "Save failed: ") + (error.message ?: "")
                     } finally { busy = false }
                 }
-            }) { Text(if (isArabic) "حفظ مشفّر" else "SAVE ENCRYPTED", color = CyberCyan) }
+            }) { Text(if (isArabic) "حفظ مشفّر" else "SAVE ENCRYPTED", color = Color(0xFFB7E3F0)) }
         },
         dismissButton = { TextButton(onClick = { showTextEditor = false }) { Text(if (isArabic) "إلغاء" else "CANCEL", color = Color.White) } }
     )
 
     if (showImportChoice && pendingUri != null) AlertDialog(
         onDismissRequest = { showImportChoice = false; pendingUri = null },
-        containerColor = Color(0xFF101820),
-        title = { Text(if (isArabic) "طريقة الحفظ" else "SAVE MODE", color = CyberCyan) },
+        containerColor = Color(0xF20D2033), shape = RoundedCornerShape(24.dp),
+        title = { Text(if (isArabic) "طريقة الحفظ" else "SAVE MODE", color = Color(0xFFB7E3F0)) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(pendingName, color = Color.White, fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis)
@@ -310,7 +330,7 @@ fun SecureVaultScreen(viewModel: DashboardViewModel, isArabic: Boolean, onClose:
                 )
             }
         },
-        confirmButton = { TextButton(onClick = { importSelected(true) }) { Text(if (isArabic) "نقل الأصل للخزينة" else "MOVE ORIGINAL", color = CyberCyan) } },
+        confirmButton = { TextButton(onClick = { importSelected(true) }) { Text(if (isArabic) "نقل الأصل للخزينة" else "MOVE ORIGINAL", color = Color(0xFFB7E3F0)) } },
         dismissButton = {
             Row {
                 TextButton(onClick = { importSelected(false) }) { Text(if (isArabic) "حفظ نسخة" else "KEEP A COPY", color = Color.White) }
@@ -320,7 +340,7 @@ fun SecureVaultScreen(viewModel: DashboardViewModel, isArabic: Boolean, onClose:
     )
 
     deleteItem?.let { item -> AlertDialog(
-        onDismissRequest = { deleteItem = null }, containerColor = Color(0xFF101820),
+        onDismissRequest = { deleteItem = null }, containerColor = Color(0xF20D2033), shape = RoundedCornerShape(24.dp),
         title = { Text(if (isArabic) "حذف من الخزينة؟" else "DELETE FROM VAULT?", color = Color.Red) },
         text = { Text(if (isArabic) "سيُحذف الملف المشفّر من التطبيق فقط. لن يتأثر أي أصل بقي خارج الخزينة." else "Only the encrypted vault copy will be deleted; external originals are unaffected.", color = Color.White) },
         confirmButton = { TextButton(onClick = {
@@ -339,22 +359,22 @@ fun SecureVaultScreen(viewModel: DashboardViewModel, isArabic: Boolean, onClose:
     ) }
 
     selectedIdea?.let { idea -> AlertDialog(
-        onDismissRequest = { selectedIdea = null }, containerColor = Color(0xFF101820),
-        title = { Text(idea.getDecryptedTitle(), color = CyberCyan, fontWeight = FontWeight.Bold) },
+        onDismissRequest = { selectedIdea = null }, containerColor = Color(0xF20D2033), shape = RoundedCornerShape(24.dp),
+        title = { Text(idea.getDecryptedTitle(), color = Color(0xFFB7E3F0), fontWeight = FontWeight.Bold) },
         text = { SelectionContainer {
             Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
-                Text(idea.getDecryptedCategory(), color = CyberCyan, fontSize = 10.sp)
+                Text(idea.getDecryptedCategory(), color = Color(0xFFB7E3F0), fontSize = 10.sp)
                 Text(idea.getDecryptedOriginalIdea(), color = Color.White, fontSize = 12.sp)
-                HorizontalDivider(color = CyberCyan.copy(alpha = 0.2f))
+                HorizontalDivider(color = Color(0xFFB7E3F0).copy(alpha = 0.2f))
                 Text(idea.getDecryptedGeminiBlueprint(), color = Color.White.copy(alpha = 0.8f), fontSize = 11.sp)
             }
         } },
         confirmButton = { TextButton(onClick = { viewModel.deleteIdea(idea.id); selectedIdea = null }) { Text(if (isArabic) "حذف" else "DELETE", color = Color.Red) } },
-        dismissButton = { TextButton(onClick = { selectedIdea = null }) { Text(if (isArabic) "إغلاق" else "CLOSE", color = CyberCyan) } }
+        dismissButton = { TextButton(onClick = { selectedIdea = null }) { Text(if (isArabic) "إغلاق" else "CLOSE", color = Color(0xFFB7E3F0)) } }
     ) }
 
     if (showWipeConfirmation) AlertDialog(
-        onDismissRequest = { showWipeConfirmation = false }, containerColor = Color(0xFF101820),
+        onDismissRequest = { showWipeConfirmation = false }, containerColor = Color(0xF20D2033), shape = RoundedCornerShape(24.dp),
         title = { Text(if (isArabic) "مسح الخزينة بالكامل؟" else "WIPE THE VAULT?", color = Color.Red) },
         text = { Text(if (isArabic) "سيُحذف المحتوى المشفّر والمخططات القديمة من هذا الجهاز. لا يمكن التراجع." else "All encrypted files and legacy blueprints on this device will be deleted. This cannot be undone.", color = Color.White) },
         confirmButton = { TextButton(onClick = {
@@ -375,12 +395,12 @@ fun SecureVaultScreen(viewModel: DashboardViewModel, isArabic: Boolean, onClose:
 
 @Composable
 private fun VaultItemCard(item: VaultItem, isArabic: Boolean, onExport: () -> Unit, onDelete: () -> Unit) {
-    Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = Color(0xFF0B151C))) {
+    Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = Color(0xB91A3549))) {
         Column(Modifier.padding(12.dp)) {
             Text(item.getDisplayName(), color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis)
-            Text("${formatBytes(item.sizeBytes)} • ${item.getMimeType()}", color = CyberCyan.copy(alpha = 0.72f), fontSize = 9.sp)
+            Text("${formatBytes(item.sizeBytes)} • ${item.getMimeType()}", color = Color(0xFFB7E3F0).copy(alpha = 0.72f), fontSize = 9.sp)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                TextButton(onClick = onExport) { Text(if (isArabic) "تصدير نسخة" else "EXPORT COPY", color = CyberCyan, fontSize = 9.sp) }
+                TextButton(onClick = onExport) { Text(if (isArabic) "تصدير نسخة" else "EXPORT COPY", color = Color(0xFFB7E3F0), fontSize = 9.sp) }
                 TextButton(onClick = onDelete) { Text(if (isArabic) "حذف" else "DELETE", color = Color.Red, fontSize = 9.sp) }
             }
         }

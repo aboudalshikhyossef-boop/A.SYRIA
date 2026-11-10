@@ -22,6 +22,7 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -167,6 +168,7 @@ fun DashboardScreen(
 
     val nextPrayerName by prayerViewModel.nextPrayerName.collectAsState()
     val nextPrayerCountdown by prayerViewModel.nextPrayerCountdown.collectAsState()
+    val nextPrayerProgress by prayerViewModel.nextPrayerProgress.collectAsState()
     val nextPrayerTime by prayerViewModel.nextPrayerTime.collectAsState()
     val allPrayerTimes by prayerViewModel.allPrayerTimes.collectAsState()
 
@@ -301,6 +303,7 @@ fun DashboardScreen(
                     allPrayerTimes = allPrayerTimes,
                     isAr = isAr,
                     isOnline = !isNeuralLinkOffline,
+                    nextPrayerProgress = nextPrayerProgress,
                     onClose = { isDesktopModeOpen = false }
                 )
             }
@@ -1439,47 +1442,16 @@ fun DesktopModeScreen(
     allPrayerTimes: Map<String, String>,
     isAr: Boolean,
     isOnline: Boolean = true,
+    nextPrayerProgress: Float = 0f,
     onClose: () -> Unit
 ) {
     val isLandscape = LocalWindowAdaptiveInfo.current.prefersLandscapeLayout
-
-    val calendar = Calendar.getInstance()
-    val dayNames = listOf("الأحد", "الاثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت")
-    val monthNames = listOf("يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو", "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر")
-
-    val dayOfWeek = dayNames[calendar.get(Calendar.DAY_OF_WEEK) - 1]
-    val dayOfMonth = calendar.get(Calendar.DAY_OF_MONTH)
-    val monthName = monthNames[calendar.get(Calendar.MONTH)]
-    val year = calendar.get(Calendar.YEAR)
-    val dateString = "$dayOfWeek  $dayOfMonth $monthName $year"
-
-    // Approximate Hijri date
-    val hijriMonths = listOf("محرم", "صفر", "ربيع الأول", "ربيع الثاني", "جمادى الأولى", "جمادى الآخرة", "رجب", "شعبان", "رمضان", "شوال", "ذو القعدة", "ذو الحجة")
-    val epochMillis = calendar.timeInMillis
-    val hijriDaysSinceEpoch = ((epochMillis / 86400000L) - 10643)
-    val hijriCycleYears = (hijriDaysSinceEpoch / 10631L) * 30L
-    val remainingDays = hijriDaysSinceEpoch % 10631L
-    val hijriYear = (hijriCycleYears + (remainingDays / 354L) + 1).toInt()
-    val hijriDayInYear = (remainingDays % 354L).toInt()
-    val hijriMonth = (hijriDayInYear / 29).coerceIn(0, 11)
-    val hijriDay = (hijriDayInYear % 29) + 1
-    val hijriString = "$hijriDay ${hijriMonths[hijriMonth]} $hijriYear هـ"
-
-    val arabicPrayerName = prayerNameToArabic(prayerName)
-
-    // ── AI-driven accent for Desk Mode — reads LocalAdaptiveConfig directly
-    //    so color changes from AI Brain apply here too without restarting Desk Mode
-    val deskAdaptiveConfig = LocalAdaptiveConfig.current
-    val deskThemeAccent = resolveAccentFromConfig(deskAdaptiveConfig)
-    val accentColor = if (isOnline) deskThemeAccent else AmberZen
-
-    // 12/24 hour format — toggled by AI Brain via is12HourFormat key
-    val use12Hour = deskAdaptiveConfig.is12HourFormat
-
-    // Live digital time — LaunchedEffect key includes use12Hour so format
-    // switches immediately the moment the AI Brain flips the flag
+    val adaptiveConfig = LocalAdaptiveConfig.current
+    val use12Hour = adaptiveConfig.is12HourFormat
     var currentTime by remember { mutableStateOf(getCurrentTimeFormatted(use12Hour)) }
     var currentSeconds by remember { mutableStateOf(getCurrentSecondsFormatted()) }
+    var selectedReflection by remember { mutableStateOf(0) }
+
     LaunchedEffect(use12Hour) {
         while (true) {
             currentTime = getCurrentTimeFormatted(use12Hour)
@@ -1488,437 +1460,555 @@ fun DesktopModeScreen(
         }
     }
 
-    // Animated subtle pulse
-    val infiniteTransition = rememberInfiniteTransition(label = "desktopBg")
-    val pulseBright by infiniteTransition.animateFloat(
-        initialValue = 0.65f, targetValue = 1.0f,
-        animationSpec = infiniteRepeatable(tween(2200, easing = LinearEasing), RepeatMode.Reverse),
-        label = "pulseBright"
-    )
-    val ringRotation by infiniteTransition.animateFloat(
-        initialValue = 0f, targetValue = 360f,
-        animationSpec = infiniteRepeatable(tween(45000, easing = LinearEasing), RepeatMode.Restart),
-        label = "ringRotation"
-    )
-    val ambientShift by infiniteTransition.animateFloat(
-        initialValue = 0f, targetValue = 1f,
-        animationSpec = infiniteRepeatable(tween(12000, easing = LinearEasing), RepeatMode.Reverse),
-        label = "ambientShift"
+    val atmosphere = rememberInfiniteTransition(label = "polar_desk_atmosphere")
+    val auroraDrift by atmosphere.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 24000, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "polar_aurora_drift"
     )
 
-    // Static particles (deeper, fewer for clean look)
-    val particles = remember {
-        List(60) {
-            SpaceParticle(
-                x = Random.nextFloat(),
-                y = Random.nextFloat(),
-                size = Random.nextFloat() * 1.8f + 0.4f,
-                opacity = Random.nextFloat() * 0.5f + 0.1f
-            )
+    val context = LocalContext.current
+    val activity = context as? android.app.Activity
+    androidx.compose.runtime.DisposableEffect(activity) {
+        val window = activity?.window
+        val alreadyKeptOn = window?.attributes?.flags
+            ?.and(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON) != 0
+        window?.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        onDispose {
+            if (window != null && alreadyKeptOn != true) {
+                window.clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+            }
         }
     }
 
-    // ===== ROOT MODAL CONTAINER — FULLY OPAQUE =====
+    val todayLabel = remember(isAr) {
+        val locale = if (isAr) java.util.Locale("ar") else java.util.Locale.getDefault()
+        java.text.SimpleDateFormat(if (isAr) "EEEE، d MMMM yyyy" else "EEEE, d MMMM yyyy", locale)
+            .format(java.util.Date())
+    }
+    val arabicPrayerName = prayerNameToArabic(prayerName)
+
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFF000308))
-            .pointerInput(Unit) { detectTapGestures { } },
-        contentAlignment = Alignment.Center
-    ) {
-        // Solid deep-space gradient layer
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(
-                    Brush.radialGradient(
-                        colors = listOf(
-                            accentColor.copy(alpha = 0.10f),
-                            Color(0xFF030812),
-                            Color(0xFF000204)
-                        ),
-                        radius = 1800f
+            .background(
+                Brush.verticalGradient(
+                    colors = listOf(
+                        Color(0xFF071426),
+                        Color(0xFF0B2035),
+                        Color(0xFF061322),
+                        Color(0xFF030B16)
                     )
                 )
-        )
-
-        // Ambient particles
-        Canvas(modifier = Modifier.fillMaxSize()) {
-            particles.forEach { p ->
-                val px = p.x * size.width
-                val py = ((p.y + ambientShift * 0.05f) % 1f) * size.height
+            )
+    ) {
+        Canvas(Modifier.fillMaxSize()) {
+            val width = size.width
+            val height = size.height
+            val glowOne = Offset(width * (0.12f + auroraDrift * 0.10f), height * 0.12f)
+            val glowTwo = Offset(width * (0.88f - auroraDrift * 0.08f), height * 0.56f)
+            drawCircle(
+                brush = Brush.radialGradient(
+                    colors = listOf(Color(0x223FBDD5), Color(0x102C83A6), Color.Transparent),
+                    center = glowOne,
+                    radius = width * 0.82f
+                ),
+                radius = width * 0.82f,
+                center = glowOne
+            )
+            drawCircle(
+                brush = Brush.radialGradient(
+                    colors = listOf(Color(0x1D80D6D0), Color(0x0A477F9B), Color.Transparent),
+                    center = glowTwo,
+                    radius = width * 0.64f
+                ),
+                radius = width * 0.64f,
+                center = glowTwo
+            )
+            for (index in 0..30) {
+                val x = width * ((index * 37 % 101) / 100f)
+                val y = height * ((index * 61 % 97) / 100f)
+                val alpha = 0.06f + 0.05f * (0.5f + 0.5f * sin(auroraDrift * 6.283f + index))
                 drawCircle(
-                    color = accentColor.copy(alpha = p.opacity * pulseBright * 0.7f),
-                    radius = p.size.dp.toPx(),
-                    center = Offset(px, py)
+                    color = Color(0xFFD9F5FF).copy(alpha = alpha),
+                    radius = if (index % 5 == 0) 1.25.dp.toPx() else 0.75.dp.toPx(),
+                    center = Offset(x, y)
+                )
+            }
+            drawLine(
+                color = Color(0xFFB9ECF5).copy(alpha = 0.045f),
+                start = Offset(0f, height * 0.76f),
+                end = Offset(width, height * 0.63f),
+                strokeWidth = 1.dp.toPx()
+            )
+        }
+
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .statusBarsPadding()
+                .navigationBarsPadding()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = if (isLandscape) 28.dp else 18.dp, vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                    Text(
+                        if (isAr) "وضع المكتب" else "POLAR DESK",
+                        color = Color(0xFFD7F2FA),
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        letterSpacing = 2.4.sp,
+                        fontFamily = FontFamily.Monospace
+                    )
+                    Text(
+                        if (isAr) "مساحة هادئة للتركيز والقراءة" else "A quiet space for focus, reading and work",
+                        color = Color(0xFFA8C5D3).copy(alpha = 0.66f),
+                        fontSize = 10.sp,
+                        fontFamily = AyriaArabicFont
+                    )
+                }
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Box(
+                        modifier = Modifier
+                            .size(7.dp)
+                            .background(
+                                if (isOnline) Color(0xFF9BE5D5) else Color(0xFF8AA6B8),
+                                CircleShape
+                            )
+                    )
+                    Text(
+                        if (isOnline) (if (isAr) "متصل" else "CONNECTED") else (if (isAr) "دون اتصال" else "OFFLINE"),
+                        color = Color(0xFFB8D0DA).copy(alpha = 0.62f),
+                        fontSize = 8.sp,
+                        fontFamily = FontFamily.Monospace
+                    )
+                    IconButton(onClick = onClose) {
+                        Icon(
+                            Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = if (isAr) "إغلاق وضع المكتب" else "Close desk mode",
+                            tint = Color(0xFFD6EEF7)
+                        )
+                    }
+                }
+            }
+
+            if (isLandscape) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(14.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    DeskClockPanel(
+                        modifier = Modifier.weight(1f),
+                        time = currentTime,
+                        seconds = currentSeconds,
+                        date = todayLabel,
+                        isArabic = isAr
+                    )
+                    Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        PrayerCountdownWheel(
+                            prayerName = arabicPrayerName,
+                            prayerTime = prayerTime,
+                            countdown = prayerCountdown,
+                            progress = nextPrayerProgress,
+                            isArabic = isAr,
+                            diameter = 190.dp
+                        )
+                        DeskPrayerSchedule(allPrayerTimes, arabicPrayerName, isAr)
+                    }
+                }
+            } else {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    DeskClockPanel(
+                        modifier = Modifier.weight(1f),
+                        time = currentTime,
+                        seconds = currentSeconds,
+                        date = todayLabel,
+                        isArabic = isAr,
+                        compact = true
+                    )
+                    PrayerCountdownWheel(
+                        prayerName = arabicPrayerName,
+                        prayerTime = prayerTime,
+                        countdown = prayerCountdown,
+                        progress = nextPrayerProgress,
+                        isArabic = isAr,
+                        diameter = 164.dp
+                    )
+                }
+                DeskPrayerSchedule(allPrayerTimes, arabicPrayerName, isAr)
+            }
+
+            DeskReflectionPanel(
+                selectedTab = selectedReflection,
+                onSelectTab = { selectedReflection = it },
+                isArabic = isAr
+            )
+
+            Text(
+                if (isAr) "خُذ نفساً هادئاً، ودع الوقت يمضي بطمأنينة." else "A little stillness makes room for better work.",
+                modifier = Modifier.fillMaxWidth(),
+                color = Color(0xFFB7D3DF).copy(alpha = 0.42f),
+                fontSize = 10.sp,
+                textAlign = TextAlign.Center,
+                fontFamily = AyriaArabicFont
+            )
+        }
+    }
+}
+
+@Composable
+private fun DeskClockPanel(
+    modifier: Modifier,
+    time: String,
+    seconds: String,
+    date: String,
+    isArabic: Boolean,
+    compact: Boolean = false
+) {
+    DeskFrostPanel(modifier = modifier) {
+        Text(
+            if (isArabic) "الوقت الآن" else "LOCAL TIME",
+            color = Color(0xFFB8D8E5).copy(alpha = 0.60f),
+            fontSize = 9.sp,
+            letterSpacing = 2.sp,
+            fontFamily = FontFamily.Monospace
+        )
+        Spacer(Modifier.height(8.dp))
+        Text(
+            time,
+            color = Color(0xFFE5F7FF),
+            fontSize = if (compact) 34.sp else 54.sp,
+            fontWeight = FontWeight.ExtraLight,
+            letterSpacing = if (compact) 0.sp else 2.sp,
+            fontFamily = FontFamily.Monospace,
+            maxLines = 1
+        )
+        Text(
+            seconds,
+            color = Color(0xFFA9C8D8).copy(alpha = 0.64f),
+            fontSize = if (compact) 10.sp else 12.sp,
+            fontFamily = FontFamily.Monospace,
+            letterSpacing = 2.sp
+        )
+        Spacer(Modifier.height(8.dp))
+        Text(
+            date,
+            color = Color(0xFFCEE6EF).copy(alpha = 0.72f),
+            fontSize = if (compact) 10.sp else 13.sp,
+            textAlign = TextAlign.Center,
+            fontFamily = AyriaArabicFont,
+            lineHeight = 18.sp
+        )
+        Spacer(Modifier.height(3.dp))
+        Text(
+            if (isArabic) "A.SYRIA · POLAR TIME" else "A.SYRIA · POLAR TIME",
+            color = Color(0xFF9CBECB).copy(alpha = 0.34f),
+            fontSize = 7.sp,
+            letterSpacing = 1.4.sp,
+            fontFamily = FontFamily.Monospace
+        )
+    }
+}
+
+@Composable
+private fun PrayerCountdownWheel(
+    prayerName: String,
+    prayerTime: String,
+    countdown: String,
+    progress: Float,
+    isArabic: Boolean,
+    diameter: androidx.compose.ui.unit.Dp
+) {
+    val remaining = (1f - progress).coerceIn(0f, 1f)
+    Box(
+        modifier = Modifier.size(diameter),
+        contentAlignment = Alignment.Center
+    ) {
+        Canvas(Modifier.fillMaxSize()) {
+            val stroke = 7.dp.toPx()
+            val inset = stroke / 2f + 2.dp.toPx()
+            val arcSize = androidx.compose.ui.geometry.Size(size.width - inset * 2f, size.height - inset * 2f)
+            val topLeft = Offset(inset, inset)
+            drawArc(
+                color = Color(0xFFB8D4E1).copy(alpha = 0.13f),
+                startAngle = -90f,
+                sweepAngle = 360f,
+                useCenter = false,
+                topLeft = topLeft,
+                size = arcSize,
+                style = Stroke(width = stroke, cap = StrokeCap.Round)
+            )
+            drawArc(
+                brush = Brush.sweepGradient(
+                    listOf(
+                        Color(0xFFBFEAF3),
+                        Color(0xFF7BB7CB),
+                        Color(0xFFB7D7EA),
+                        Color(0xFFBFEAF3)
+                    )
+                ),
+                startAngle = -90f,
+                sweepAngle = 360f * remaining,
+                useCenter = false,
+                topLeft = topLeft,
+                size = arcSize,
+                style = Stroke(width = stroke, cap = StrokeCap.Round)
+            )
+            for (index in 0 until 60 step 5) {
+                val angle = Math.toRadians((index * 6 - 90).toDouble())
+                val radius = size.minDimension * 0.47f
+                val center = Offset(
+                    size.width / 2f + kotlin.math.cos(angle).toFloat() * radius,
+                    size.height / 2f + kotlin.math.sin(angle).toFloat() * radius
+                )
+                drawCircle(
+                    color = Color(0xFFC8E7F0).copy(alpha = 0.34f),
+                    radius = 1.dp.toPx(),
+                    center = center
                 )
             }
         }
+        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
+            Text(
+                if (isArabic) "الصلاة القادمة" else "NEXT PRAYER",
+                color = Color(0xFFAFCBD8).copy(alpha = 0.56f),
+                fontSize = 8.sp,
+                letterSpacing = 1.3.sp,
+                fontFamily = FontFamily.Monospace
+            )
+            Spacer(Modifier.height(4.dp))
+            Text(
+                prayerName,
+                color = Color(0xFFE7F6FC),
+                fontSize = if (diameter < 180.dp) 17.sp else 20.sp,
+                fontWeight = FontWeight.SemiBold,
+                fontFamily = AyriaArabicFont
+            )
+            Text(
+                prayerTime,
+                color = Color(0xFFB8D7E3).copy(alpha = 0.76f),
+                fontSize = 10.sp,
+                fontFamily = FontFamily.Monospace
+            )
+            Spacer(Modifier.height(6.dp))
+            Text(
+                countdown,
+                color = Color(0xFFE7F6FC),
+                fontSize = if (diameter < 180.dp) 13.sp else 15.sp,
+                fontWeight = FontWeight.Light,
+                fontFamily = FontFamily.Monospace,
+                letterSpacing = 0.5.sp
+            )
+            Text(
+                if (isArabic) "متبقٍ" else "REMAINING",
+                color = Color(0xFFAFCBD8).copy(alpha = 0.48f),
+                fontSize = 7.sp,
+                letterSpacing = 1.sp,
+                fontFamily = FontFamily.Monospace
+            )
+        }
+    }
+}
 
-        // Close button & Connection status
+@Composable
+private fun DeskPrayerSchedule(
+    prayerTimes: Map<String, String>,
+    nextPrayer: String,
+    isArabic: Boolean
+) {
+    val prayerNames = listOf("الفجر", "الشروق", "الظهر", "العصر", "المغرب", "العشاء")
+    DeskFrostPanel(Modifier.fillMaxWidth()) {
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .statusBarsPadding()
-                .padding(horizontal = 12.dp, vertical = 8.dp)
-                .align(Alignment.TopCenter),
+            modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            IconButton(onClick = onClose) {
-                Icon(
-                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                    contentDescription = "Close",
-                    tint = accentColor
-                )
-            }
-            Row(
-                modifier = Modifier
-                    .border(0.75.dp, accentColor.copy(alpha = 0.55f), RoundedCornerShape(50))
-                    .background(accentColor.copy(alpha = 0.08f), RoundedCornerShape(50))
-                    .padding(horizontal = 12.dp, vertical = 5.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(7.dp)
-                        .background(accentColor.copy(alpha = pulseBright), RoundedCornerShape(50))
-                )
-                Spacer(modifier = Modifier.width(6.dp))
-                Text(
-                    text = if (isOnline) (if (isAr) "متصل" else "ONLINE") else (if (isAr) "غير متصل" else "OFFLINE"),
-                    color = accentColor,
-                    fontSize = 10.sp,
-                    fontFamily = FontFamily.Monospace,
-                    fontWeight = FontWeight.Bold,
-                    letterSpacing = 2.sp
-                )
-            }
+            Text(
+                if (isArabic) "مواقيت اليوم" else "TODAY'S PRAYER TIMES",
+                color = Color(0xFFD5EDF6),
+                fontSize = 10.sp,
+                fontWeight = FontWeight.SemiBold,
+                letterSpacing = 1.2.sp,
+                fontFamily = if (isArabic) AyriaArabicFont else FontFamily.Monospace
+            )
+            Text(
+                if (isArabic) "حسب الموقع المتاح" else "LOCAL CALCULATION",
+                color = Color(0xFF9CBBC9).copy(alpha = 0.50f),
+                fontSize = 7.sp,
+                fontFamily = FontFamily.Monospace
+            )
         }
-
-        // ===== MAIN CONTENT =====
-        if (isLandscape) {
-            Row(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .statusBarsPadding()
-                    
-                    .padding(horizontal = 32.dp, vertical = 16.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(40.dp, Alignment.CenterHorizontally)
-            ) {
-                // Left Side: Big Clock
-                Box(
-                    modifier = Modifier.size(300.dp),
-                    contentAlignment = Alignment.Center
+        Spacer(Modifier.height(9.dp))
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            prayerNames.chunked(3).forEach { rowNames ->
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    Canvas(modifier = Modifier.fillMaxSize()) {
-                        val radius = size.minDimension / 2f - 6f
-                        val center = Offset(size.width / 2f, size.height / 2f)
-                        rotate(ringRotation, pivot = center) {
-                            drawCircle(
-                                color = accentColor.copy(alpha = 0.20f),
-                                radius = radius,
-                                center = center,
-                                style = Stroke(width = 1f, pathEffect = PathEffect.dashPathEffect(floatArrayOf(8f, 16f), 0f))
-                            )
-                        }
-                        drawCircle(
-                            color = accentColor.copy(alpha = 0.35f),
-                            radius = radius - 18f,
-                            center = center,
-                            style = Stroke(width = 0.7f)
-                        )
-                    }
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text(
-                            text = currentTime,
-                            color = accentColor,
-                            fontSize = 64.sp,
-                            fontWeight = FontWeight.ExtraLight,
-                            fontFamily = FontFamily.Monospace,
-                            letterSpacing = 4.sp,
-                            style = TextStyle(shadow = androidx.compose.ui.graphics.Shadow(color = accentColor.copy(alpha = 0.55f), blurRadius = 30f))
-                        )
-                        Text(
-                            text = currentSeconds,
-                            color = accentColor.copy(alpha = 0.55f),
-                            fontSize = 16.sp,
-                            fontFamily = FontFamily.Monospace,
-                            letterSpacing = 6.sp
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            text = dateString,
-                            color = Color.White.copy(alpha = 0.85f),
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.Light,
-                            textAlign = TextAlign.Center
-                        )
-                        Text(
-                            text = hijriString,
-                            color = AmberZen.copy(alpha = 0.75f),
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Light,
-                            textAlign = TextAlign.Center
-                        )
-                    }
-                }
-
-                // Right Side: Prayer Info
-                Column(
-                    modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterVertically),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    // Next prayer pill
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .border(0.75.dp, accentColor.copy(alpha = 0.35f), RoundedCornerShape(18.dp))
-                            .background(accentColor.copy(alpha = 0.05f), RoundedCornerShape(18.dp))
-                            .padding(horizontal = 20.dp, vertical = 16.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Text(
-                            text = if (isAr) "الصلاة القادمة" else "NEXT PRAYER",
-                            color = accentColor.copy(alpha = 0.55f),
-                            fontSize = 10.sp,
-                            fontFamily = FontFamily.Monospace,
-                            letterSpacing = 3.sp
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = arabicPrayerName,
-                                color = AmberZen,
-                                fontSize = 32.sp,
-                                fontWeight = FontWeight.Normal,
-                                style = TextStyle(shadow = androidx.compose.ui.graphics.Shadow(color = AmberZen.copy(alpha = 0.5f), blurRadius = 16f))
-                            )
-                            Text(
-                                text = prayerTime,
-                                color = Color.White,
-                                fontSize = 28.sp,
-                                fontFamily = FontFamily.Monospace,
-                                letterSpacing = 1.sp
-                            )
-                        }
-                        Spacer(modifier = Modifier.height(10.dp))
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.Center
-                        ) {
-                            Box(modifier = Modifier.size(6.dp).background(AmberZen.copy(alpha = pulseBright), RoundedCornerShape(50)))
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                text = prayerCountdown,
-                                color = AmberZen.copy(alpha = 0.9f),
-                                fontSize = 16.sp,
-                                fontFamily = FontFamily.Monospace,
-                                letterSpacing = 1.sp
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                text = if (isAr) "متبقي" else "REMAINING",
-                                color = Color.White.copy(alpha = 0.4f),
-                                fontSize = 10.sp,
-                                fontFamily = FontFamily.Monospace,
-                                letterSpacing = 1.sp
-                            )
-                        }
-                    }
-
-                    // Prayer grid
-                    if (allPrayerTimes.isNotEmpty()) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .background(Color.White.copy(alpha = 0.025f), RoundedCornerShape(14.dp))
-                                .border(0.5.dp, accentColor.copy(alpha = 0.18f), RoundedCornerShape(14.dp))
-                                .padding(vertical = 12.dp, horizontal = 12.dp)
-                        ) {
-                            val prayerList = listOf("الفجر", "الشروق", "الظهر", "العصر", "المغرب", "العشاء")
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceEvenly
-                            ) {
-                                prayerList.forEach { name ->
-                                    PrayerItem(name, allPrayerTimes[name] ?: "--:--", isAr, name == arabicPrayerName)
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        } else {
-            // Portrait Layout (Enhanced for full screen)
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .statusBarsPadding()
-                    
-                    .padding(horizontal = 24.dp, vertical = 40.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(30.dp, Alignment.CenterVertically)
-            ) {
-                // Rotating ring & Clock
-                Box(
-                    modifier = Modifier.size(320.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Canvas(modifier = Modifier.fillMaxSize()) {
-                        val radius = size.minDimension / 2f - 6f
-                        val center = Offset(size.width / 2f, size.height / 2f)
-                        rotate(ringRotation, pivot = center) {
-                            drawCircle(
-                                color = accentColor.copy(alpha = 0.20f),
-                                radius = radius,
-                                center = center,
-                                style = Stroke(width = 1f, pathEffect = PathEffect.dashPathEffect(floatArrayOf(8f, 16f), 0f))
-                            )
-                        }
-                        drawCircle(
-                            color = accentColor.copy(alpha = 0.35f),
-                            radius = radius - 18f,
-                            center = center,
-                            style = Stroke(width = 0.7f)
-                        )
-                    }
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text(
-                            text = currentTime,
-                            color = accentColor,
-                            fontSize = 72.sp,
-                            fontWeight = FontWeight.ExtraLight,
-                            fontFamily = FontFamily.Monospace,
-                            letterSpacing = 4.sp,
-                            style = TextStyle(shadow = androidx.compose.ui.graphics.Shadow(color = accentColor.copy(alpha = 0.55f), blurRadius = 30f))
-                        )
-                        Text(
-                            text = currentSeconds,
-                            color = accentColor.copy(alpha = 0.55f),
-                            fontSize = 18.sp,
-                            fontFamily = FontFamily.Monospace,
-                            letterSpacing = 6.sp
-                        )
-                    }
-                }
-
-                // Date strip
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(
-                        text = dateString,
-                        color = Color.White.copy(alpha = 0.85f),
-                        fontSize = 20.sp,
-                        fontWeight = FontWeight.Light,
-                        textAlign = TextAlign.Center
-                    )
-                    Spacer(modifier = Modifier.height(6.dp))
-                    Text(
-                        text = hijriString,
-                        color = AmberZen.copy(alpha = 0.75f),
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Light,
-                        textAlign = TextAlign.Center
-                    )
-                }
-
-                // Next prayer pill
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth(0.95f)
-                        .border(0.75.dp, accentColor.copy(alpha = 0.35f), RoundedCornerShape(18.dp))
-                        .background(accentColor.copy(alpha = 0.05f), RoundedCornerShape(18.dp))
-                        .padding(horizontal = 24.dp, vertical = 20.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Text(
-                        text = if (isAr) "الصلاة القادمة" else "NEXT PRAYER",
-                        color = accentColor.copy(alpha = 0.55f),
-                        fontSize = 11.sp,
-                        fontFamily = FontFamily.Monospace,
-                        letterSpacing = 3.sp
-                    )
-                    Spacer(modifier = Modifier.height(10.dp))
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = arabicPrayerName,
-                            color = AmberZen,
-                            fontSize = 36.sp,
-                            fontWeight = FontWeight.Normal,
-                            style = TextStyle(shadow = androidx.compose.ui.graphics.Shadow(color = AmberZen.copy(alpha = 0.5f), blurRadius = 16f))
-                        )
-                        Text(
-                            text = prayerTime,
-                            color = Color.White,
-                            fontSize = 32.sp,
-                            fontFamily = FontFamily.Monospace,
-                            letterSpacing = 1.sp
-                        )
-                    }
-                    Spacer(modifier = Modifier.height(12.dp))
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.Center
-                    ) {
-                        Box(modifier = Modifier.size(8.dp).background(AmberZen.copy(alpha = pulseBright), RoundedCornerShape(50)))
-                        Spacer(modifier = Modifier.width(10.dp))
-                        Text(
-                            text = prayerCountdown,
-                            color = AmberZen.copy(alpha = 0.9f),
-                            fontSize = 18.sp,
-                            fontFamily = FontFamily.Monospace,
-                            letterSpacing = 1.sp
-                        )
-                        Spacer(modifier = Modifier.width(10.dp))
-                        Text(
-                            text = if (isAr) "متبقي" else "REMAINING",
-                            color = Color.White.copy(alpha = 0.4f),
-                            fontSize = 11.sp,
-                            fontFamily = FontFamily.Monospace,
-                            letterSpacing = 1.sp
-                        )
-                    }
-                }
-
-                // All Prayer Times grid
-                if (allPrayerTimes.isNotEmpty()) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth(0.95f)
-                            .background(Color.White.copy(alpha = 0.025f), RoundedCornerShape(14.dp))
-                            .border(0.5.dp, accentColor.copy(alpha = 0.18f), RoundedCornerShape(14.dp))
-                            .padding(vertical = 20.dp, horizontal = 12.dp)
-                    ) {
-                        val prayerList = listOf("الفجر", "الشروق", "الظهر", "العصر", "المغرب", "العشاء")
+                    rowNames.forEach { name ->
+                        val selected = name == nextPrayer
                         Column(
-                            modifier = Modifier.fillMaxWidth(),
+                            modifier = Modifier
+                                .weight(1f)
+                                .background(
+                                    if (selected) Color(0x2478C1D8) else Color.White.copy(alpha = 0.035f),
+                                    RoundedCornerShape(14.dp)
+                                )
+                                .border(
+                                    0.7.dp,
+                                    if (selected) Color(0x667FBFD4) else Color.White.copy(alpha = 0.06f),
+                                    RoundedCornerShape(14.dp)
+                                )
+                                .padding(horizontal = 6.dp, vertical = 8.dp),
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
-                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-                                prayerList.take(3).forEach { name -> PrayerItem(name, allPrayerTimes[name] ?: "--:--", isAr, name == arabicPrayerName) }
-                            }
-                            Spacer(modifier = Modifier.height(20.dp))
-                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-                                prayerList.drop(3).forEach { name -> PrayerItem(name, allPrayerTimes[name] ?: "--:--", isAr, name == arabicPrayerName) }
-                            }
+                            Text(
+                                name,
+                                color = if (selected) Color(0xFFE0F7FF) else Color(0xFFAFC8D6),
+                                fontSize = 9.sp,
+                                fontFamily = AyriaArabicFont
+                            )
+                            Spacer(Modifier.height(3.dp))
+                            Text(
+                                prayerTimes[name] ?: "--:--",
+                                color = if (selected) Color.White else Color(0xFFC7DDE6).copy(alpha = 0.72f),
+                                fontSize = 9.sp,
+                                fontFamily = FontFamily.Monospace,
+                                maxLines = 1
+                            )
                         }
                     }
                 }
             }
         }
     }
+}
+
+@Composable
+private fun DeskReflectionPanel(
+    selectedTab: Int,
+    onSelectTab: (Int) -> Unit,
+    isArabic: Boolean
+) {
+    DeskFrostPanel(Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text(
+                if (isArabic) "لحظة من السكينة" else "A MOMENT OF STILLNESS",
+                color = Color(0xFFD5EDF6),
+                fontSize = 10.sp,
+                fontWeight = FontWeight.SemiBold,
+                letterSpacing = 1.sp,
+                fontFamily = if (isArabic) AyriaArabicFont else FontFamily.Monospace
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                listOf(if (isArabic) "دعاء" else "DUA", if (isArabic) "حديث" else "HADITH").forEachIndexed { index, label ->
+                    val selected = selectedTab == index
+                    Box(
+                        modifier = Modifier
+                            .background(
+                                if (selected) Color(0x447ABCD1) else Color.White.copy(alpha = 0.035f),
+                                CircleShape
+                            )
+                            .border(0.8.dp, Color.White.copy(alpha = if (selected) 0.22f else 0.07f), CircleShape)
+                            .clickable { onSelectTab(index) }
+                            .padding(horizontal = 12.dp, vertical = 7.dp)
+                    ) {
+                        Text(
+                            label,
+                            color = if (selected) Color(0xFFE0F5FC) else Color(0xFF9DB8C7),
+                            fontSize = 8.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            fontFamily = if (isArabic) AyriaArabicFont else FontFamily.Monospace
+                        )
+                    }
+                }
+            }
+        }
+        Spacer(Modifier.height(11.dp))
+        if (selectedTab == 0) {
+            Text(
+                "رَبِّ اشْرَحْ لِي صَدْرِي ۝ وَيَسِّرْ لِي أَمْرِي ۝ وَاحْلُلْ عُقْدَةً مِنْ لِسَانِي ۝ يَفْقَهُوا قَوْلِي",
+                modifier = Modifier.fillMaxWidth(),
+                color = Color(0xFFE6F6FC),
+                fontSize = 16.sp,
+                lineHeight = 29.sp,
+                textAlign = TextAlign.Center,
+                fontFamily = AyriaQuranFont
+            )
+            Spacer(Modifier.height(5.dp))
+            Text(
+                if (isArabic) "سورة طه · الآيات ٢٥–٢٨" else "Qur'an · Taha 20:25–28",
+                modifier = Modifier.fillMaxWidth(),
+                color = Color(0xFFA5C5D3).copy(alpha = 0.62f),
+                fontSize = 8.sp,
+                textAlign = TextAlign.Center,
+                fontFamily = FontFamily.Monospace
+            )
+        } else {
+            Text(
+                "إِنَّمَا الْأَعْمَالُ بِالنِّيَّاتِ، وَإِنَّمَا لِكُلِّ امْرِئٍ مَا نَوَى",
+                modifier = Modifier.fillMaxWidth(),
+                color = Color(0xFFE6F6FC),
+                fontSize = 17.sp,
+                lineHeight = 29.sp,
+                textAlign = TextAlign.Center,
+                fontFamily = AyriaArabicFont
+            )
+            Spacer(Modifier.height(5.dp))
+            Text(
+                if (isArabic) "صحيح البخاري · حديث ١" else "Sahih al-Bukhari · 1",
+                modifier = Modifier.fillMaxWidth(),
+                color = Color(0xFFA5C5D3).copy(alpha = 0.62f),
+                fontSize = 8.sp,
+                textAlign = TextAlign.Center,
+                fontFamily = FontFamily.Monospace
+            )
+        }
+    }
+}
+
+@Composable
+private fun DeskFrostPanel(
+    modifier: Modifier = Modifier,
+    content: @Composable ColumnScope.() -> Unit
+) {
+    Column(
+        modifier = modifier
+            .background(
+                Brush.linearGradient(
+                    listOf(Color(0x2D9DD6E8), Color(0x191F536B), Color(0x15FFFFFF))
+                ),
+                RoundedCornerShape(24.dp)
+            )
+            .border(
+                0.8.dp,
+                Brush.linearGradient(
+                    listOf(Color(0x779CD8EA), Color(0x2848A0BC), Color(0x22FFFFFF))
+                ),
+                RoundedCornerShape(24.dp)
+            )
+            .padding(14.dp),
+        content = content
+    )
 }
 
 /**

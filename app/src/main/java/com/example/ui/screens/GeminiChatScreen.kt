@@ -21,6 +21,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
@@ -39,9 +40,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.adaptive.UIConfig
+import com.example.ui.brand.AyriaArabicFont
 import com.example.data.chat.ChatMessage
 import com.example.ui.theme.AmberGold
-import com.example.ui.theme.CyberCyan
 import com.example.ui.theme.DeepNavy
 import com.example.ui.theme.SurfaceCard
 import com.example.ui.theme.SurfaceDark
@@ -58,49 +59,29 @@ import kotlin.math.sin
 private fun formatTime(ts: Long): String =
     SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(ts))
 
+private val ChatIce = Color(0xFFB7E4F0)
+private val ChatFrost = Color(0xFF8BC8DE)
+
 @Composable
 fun GeminiChatScreen(
     viewModel: GeminiChatViewModel,
     uiConfig: UIConfig,
     isArabic: Boolean
 ) {
-    val messages  by viewModel.messages.collectAsState()
-    val isTyping  by viewModel.isTyping.collectAsState()
+    val messages by viewModel.messages.collectAsState()
+    val isTyping by viewModel.isTyping.collectAsState()
     val listState = rememberLazyListState()
-    val scope     = rememberCoroutineScope()
+    val scope = rememberCoroutineScope()
     var inputText by remember { mutableStateOf("") }
     var showClearDialog by remember { mutableStateOf(false) }
 
-    // Animated border colors cycling cyan → amber → purple → green → cyan
-    val infiniteTransition = rememberInfiniteTransition(label = "chat_border")
-    val borderPhase by infiniteTransition.animateFloat(
-        initialValue = 0f, targetValue = 1f,
-        animationSpec = infiniteRepeatable(tween(4000, easing = LinearEasing)), label = "phase"
+    val transition = rememberInfiniteTransition(label = "chat_frost")
+    val borderGlow by transition.animateFloat(
+        initialValue = 0.32f,
+        targetValue = 0.58f,
+        animationSpec = infiniteRepeatable(tween(5200), RepeatMode.Reverse),
+        label = "chat_edge_glow"
     )
-    val borderGlow by infiniteTransition.animateFloat(
-        initialValue = 0.4f, targetValue = 1.0f,
-        animationSpec = infiniteRepeatable(tween(1800), RepeatMode.Reverse), label = "glow"
-    )
-
-    // Interpolate color across the cycle
-    val borderColor = remember(borderPhase) {
-        val colors = listOf(
-            Color(0xFF00E5FF), // cyan
-            Color(0xFFFFAA00), // amber
-            Color(0xFFBB66FF), // purple
-            Color(0xFF00FF88), // green
-            Color(0xFF00E5FF)  // back to cyan
-        )
-        val step = borderPhase * (colors.size - 1)
-        val idx = step.toInt().coerceIn(0, colors.size - 2)
-        val frac = step - idx
-        val c1 = colors[idx]; val c2 = colors[idx + 1]
-        Color(
-            red   = c1.red   + (c2.red   - c1.red)   * frac,
-            green = c1.green + (c2.green - c1.green) * frac,
-            blue  = c1.blue  + (c2.blue  - c1.blue)  * frac
-        )
-    }
 
     LaunchedEffect(Unit) { viewModel.runBackgroundAnalysis(uiConfig) }
     LaunchedEffect(messages.size, isTyping) {
@@ -111,70 +92,169 @@ fun GeminiChatScreen(
     if (showClearDialog) {
         AlertDialog(
             onDismissRequest = { showClearDialog = false },
-            title = { Text(if (isArabic) "مسح المحادثة" else "Clear History", fontFamily = FontFamily.Monospace, fontSize = 15.sp, fontWeight = FontWeight.Bold) },
-            text  = { Text(if (isArabic) "سيتم حذف جميع الرسائل نهائياً. هل أنت متأكد؟" else "All messages will be permanently deleted. Proceed?", color = Color.White.copy(alpha = 0.72f), fontSize = 13.sp, lineHeight = 19.sp) },
-            confirmButton = { TextButton(onClick = { viewModel.clearHistory(); showClearDialog = false }) { Text(if (isArabic) "مسح" else "Clear", color = Color(0xFFFF4D4D), fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace) } },
-            dismissButton = { TextButton(onClick = { showClearDialog = false }) { Text(if (isArabic) "إلغاء" else "Cancel", color = CyberCyan, fontFamily = FontFamily.Monospace) } },
-            containerColor = Color(0xFF0B1628), titleContentColor = CyberCyan, shape = RoundedCornerShape(16.dp)
+            title = {
+                Text(
+                    if (isArabic) "مسح المحادثة" else "Clear conversation",
+                    color = ChatIce,
+                    fontWeight = FontWeight.SemiBold
+                )
+            },
+            text = {
+                Text(
+                    if (isArabic) "سيتم حذف الرسائل المحفوظة في سجل المحادثة. هل تريد المتابعة؟"
+                    else "This will clear the saved conversation history. Continue?",
+                    color = Color(0xFFC6DDE6),
+                    fontSize = 13.sp,
+                    lineHeight = 19.sp
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = { viewModel.clearHistory(); showClearDialog = false }) {
+                    Text(if (isArabic) "مسح" else "Clear", color = Color(0xFFE4B9B9))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showClearDialog = false }) {
+                    Text(if (isArabic) "إلغاء" else "Cancel", color = ChatIce)
+                }
+            },
+            containerColor = Color(0xF20D2033),
+            titleContentColor = ChatIce,
+            shape = RoundedCornerShape(26.dp)
         )
     }
 
-    // Outer container with animated glowing border
-    Box(modifier = Modifier.fillMaxSize().statusBarsPadding().drawBehind {
-        val strokeWidth = 1.5.dp.toPx()
-        val radius = 0f
-        // Draw animated glow border
-        drawRoundRect(color = borderColor.copy(alpha = borderGlow * 0.6f), style = Stroke(strokeWidth), cornerRadius = androidx.compose.ui.geometry.CornerRadius(radius))
-        // Draw pulsing light spots along the border
-        val perimeter = 2 * (size.width + size.height)
-        val spotPos = (borderPhase * perimeter) % perimeter
-        val spotX: Float; val spotY: Float
-        when {
-            spotPos < size.width -> { spotX = spotPos; spotY = 0f }
-            spotPos < size.width + size.height -> { spotX = size.width; spotY = spotPos - size.width }
-            spotPos < 2 * size.width + size.height -> { spotX = size.width - (spotPos - size.width - size.height); spotY = size.height }
-            else -> { spotX = 0f; spotY = size.height - (spotPos - 2 * size.width - size.height) }
-        }
-        drawCircle(brush = Brush.radialGradient(listOf(borderColor.copy(alpha = 0.9f), borderColor.copy(alpha = 0.3f), Color.Transparent), center = Offset(spotX, spotY), radius = 40.dp.toPx()), radius = 40.dp.toPx(), center = Offset(spotX, spotY))
-    }) {
-        Column(modifier = Modifier.fillMaxSize().background(Color.Transparent)) {
-            ChatTopBar(onClear = { showClearDialog = true }, borderColor = borderColor, glowAlpha = borderGlow)
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(horizontal = 8.dp, vertical = 7.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .clip(RoundedCornerShape(30.dp))
+                .background(
+                    Brush.linearGradient(
+                        listOf(
+                            Color(0xE8173146),
+                            Color(0xE90A1B2D),
+                            Color(0xE8172F43)
+                        )
+                    ),
+                    RoundedCornerShape(30.dp)
+                )
+                .border(
+                    0.9.dp,
+                    Brush.linearGradient(
+                        listOf(
+                            Color.White.copy(alpha = borderGlow),
+                            ChatFrost.copy(alpha = 0.38f),
+                            Color.White.copy(alpha = 0.10f)
+                        )
+                    ),
+                    RoundedCornerShape(30.dp)
+                )
+        ) {
+            ChatTopBar(
+                onClear = { showClearDialog = true },
+                borderColor = ChatIce,
+                glowAlpha = borderGlow,
+                isArabic = isArabic
+            )
+            HorizontalDivider(color = Color.White.copy(alpha = 0.07f))
 
             if (messages.isEmpty() && !isTyping) {
-                ChatEmptyState(modifier = Modifier.weight(1f), isArabic = isArabic, onPrompt = { viewModel.sendMessage(it, uiConfig) })
+                ChatEmptyState(
+                    modifier = Modifier.weight(1f),
+                    isArabic = isArabic,
+                    onPrompt = { viewModel.sendMessage(it, uiConfig) }
+                )
             } else {
-                LazyColumn(state = listState, modifier = Modifier.weight(1f), contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    items(messages, key = { it.id }) { msg -> ChatMessageBubble(message = msg, isArabic = isArabic) }
-                    if (isTyping) { item(key = "typing") { TypingIndicatorRow() } }
+                LazyColumn(
+                    state = listState,
+                    modifier = Modifier.weight(1f),
+                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(13.dp)
+                ) {
+                    items(messages, key = { it.id }) { message ->
+                        ChatMessageBubble(message = message, isArabic = isArabic)
+                    }
+                    if (isTyping) item(key = "typing") { TypingIndicatorRow() }
                 }
             }
 
-            ChatInputBar(value = inputText, onChange = { inputText = it },
-                onSend = { val text = inputText.trim(); if (text.isNotBlank()) { viewModel.sendMessage(text, uiConfig); inputText = "" } },
-                isEnabled = !isTyping, isArabic = isArabic, accentColor = borderColor)
+            ChatInputBar(
+                value = inputText,
+                onChange = { inputText = it },
+                onSend = {
+                    val text = inputText.trim()
+                    if (text.isNotBlank()) {
+                        viewModel.sendMessage(text, uiConfig)
+                        inputText = ""
+                    }
+                },
+                isEnabled = !isTyping,
+                isArabic = isArabic,
+                accentColor = ChatIce
+            )
         }
     }
 }
 
 @Composable
-private fun ChatTopBar(onClear: () -> Unit, borderColor: Color, glowAlpha: Float) {
-    Box(modifier = Modifier.fillMaxWidth().background(Brush.verticalGradient(listOf(Color(0xFF060D18), DeepNavy))).border(BorderStroke(0.5.dp, borderColor.copy(alpha = glowAlpha * 0.3f))).padding(horizontal = 16.dp, vertical = 14.dp)) {
-        // Status dot
-        Row(modifier = Modifier.align(Alignment.CenterStart), verticalAlignment = Alignment.CenterVertically) {
-            val pulse = rememberInfiniteTransition(label = "status")
-            val dotAlpha by pulse.animateFloat(initialValue = 0.4f, targetValue = 1f, animationSpec = infiniteRepeatable(tween(1000), RepeatMode.Reverse), label = "dot")
-            Box(modifier = Modifier.size(7.dp).background(Color(0xFF00FF88).copy(alpha = dotAlpha), CircleShape))
-            Spacer(Modifier.width(6.dp))
-            Text("ONLINE", color = Color(0xFF00FF88).copy(alpha = 0.6f), fontSize = 8.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold)
+private fun ChatTopBar(
+    onClear: () -> Unit,
+    borderColor: Color,
+    glowAlpha: Float,
+    isArabic: Boolean
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(Color.White.copy(alpha = 0.025f))
+            .padding(horizontal = 16.dp, vertical = 13.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        Box(
+            modifier = Modifier
+                .size(38.dp)
+                .background(Color(0x268CC9E1), CircleShape)
+                .border(0.8.dp, borderColor.copy(alpha = 0.28f), CircleShape),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(Icons.Rounded.SmartToy, null, tint = Color(0xFFD8F3FB), modifier = Modifier.size(20.dp))
         }
-        Column(modifier = Modifier.align(Alignment.Center), horizontalAlignment = Alignment.CenterHorizontally) {
-            Text("المساعد الذكي", color = borderColor, fontSize = 13.sp, fontWeight = FontWeight.Black, fontFamily = FontFamily.Monospace, letterSpacing = 2.5.sp)
-            Text("Gemini 3.6 Flash", color = borderColor.copy(alpha = 0.45f), fontSize = 10.sp, fontFamily = FontFamily.Monospace)
-        }
-        Box(modifier = Modifier.align(Alignment.CenterEnd).size(34.dp).background(Color.White.copy(alpha = 0.04f), CircleShape).border(1.dp, borderColor.copy(alpha = 0.2f), CircleShape), contentAlignment = Alignment.Center) {
-            IconButton(onClick = onClear, modifier = Modifier.size(34.dp)) {
-                Icon(Icons.Rounded.DeleteSweep, null, tint = Color.White.copy(alpha = 0.35f), modifier = Modifier.size(16.dp))
+        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+            Text(
+                if (isArabic) "المساعد الذكي" else "GEMINI ASSISTANT",
+                color = Color(0xFFE3F5FB),
+                fontSize = 12.sp,
+                fontWeight = FontWeight.SemiBold,
+                fontFamily = if (isArabic) AyriaArabicFont else FontFamily.Monospace
+            )
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                Box(
+                    Modifier
+                        .size(6.dp)
+                        .background(Color(0xFF9BD9C8).copy(alpha = glowAlpha + 0.25f), CircleShape)
+                )
+                Text(
+                    "Gemini 3.6 Flash",
+                    color = Color(0xFFB4D0DC).copy(alpha = 0.62f),
+                    fontSize = 9.sp,
+                    fontFamily = FontFamily.Monospace
+                )
             }
+        }
+        IconButton(
+            onClick = onClear,
+            modifier = Modifier
+                .size(38.dp)
+                .background(Color.White.copy(alpha = 0.035f), CircleShape)
+                .border(0.8.dp, Color.White.copy(alpha = 0.10f), CircleShape)
+        ) {
+            Icon(Icons.Rounded.DeleteSweep, null, tint = Color(0xFFC3DDE7).copy(alpha = 0.75f), modifier = Modifier.size(18.dp))
         }
     }
 }
@@ -246,7 +326,7 @@ private fun AssistantBubble(message: ChatMessage) {
         }
         Spacer(Modifier.width(8.dp))
         Column(modifier = Modifier.widthIn(max = 270.dp)) {
-            Box(modifier = Modifier.background(SurfaceDark, RoundedCornerShape(topStart = 4.dp, topEnd = 18.dp, bottomStart = 18.dp, bottomEnd = 18.dp)).border(1.dp, Color.White.copy(alpha = 0.05f), RoundedCornerShape(topStart = 4.dp, topEnd = 18.dp, bottomStart = 18.dp, bottomEnd = 18.dp)).padding(horizontal = 14.dp, vertical = 10.dp)) {
+            Box(modifier = Modifier.background(Color(0xCC1D3B50), RoundedCornerShape(topStart = 4.dp, topEnd = 18.dp, bottomStart = 18.dp, bottomEnd = 18.dp)).border(1.dp, Color.White.copy(alpha = 0.05f), RoundedCornerShape(topStart = 4.dp, topEnd = 18.dp, bottomStart = 18.dp, bottomEnd = 18.dp)).padding(horizontal = 14.dp, vertical = 10.dp)) {
                 Text(message.content, color = Color.White.copy(alpha = 0.88f), fontSize = 14.sp, lineHeight = 21.sp)
             }
             Row(modifier = Modifier.padding(top = 4.dp, start = 2.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -291,11 +371,11 @@ private fun TypingIndicatorRow() {
 @Composable
 private fun ChatInputBar(value: String, onChange: (String) -> Unit, onSend: () -> Unit, isEnabled: Boolean, isArabic: Boolean, accentColor: Color) {
     val focusManager = LocalFocusManager.current
-    Surface(modifier = Modifier.fillMaxWidth(), color = Color(0xFF060D18), tonalElevation = 0.dp) {
+    Surface(modifier = Modifier.fillMaxWidth(), color = Color(0xFF10283A), tonalElevation = 0.dp) {
         Row(modifier = Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = 12.dp, vertical = 10.dp), verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             OutlinedTextField(value = value, onValueChange = onChange, enabled = isEnabled, modifier = Modifier.weight(1f),
                 placeholder = { Text(if (isArabic) "اكتب رسالة..." else "Message Master Brain...", color = Color.White.copy(alpha = 0.25f), fontSize = 13.sp) },
-                colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White, focusedBorderColor = accentColor.copy(alpha = 0.5f), unfocusedBorderColor = Color.White.copy(alpha = 0.08f), cursorColor = accentColor, focusedContainerColor = SurfaceCard, unfocusedContainerColor = SurfaceCard, disabledContainerColor = SurfaceCard, disabledTextColor = Color.White.copy(alpha = 0.4f), disabledBorderColor = Color.White.copy(alpha = 0.04f)),
+                colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White, focusedBorderColor = accentColor.copy(alpha = 0.5f), unfocusedBorderColor = Color.White.copy(alpha = 0.08f), cursorColor = accentColor, focusedContainerColor = Color(0xB91C3B50), unfocusedContainerColor = Color(0xB91C3B50), disabledContainerColor = Color(0xB91C3B50), disabledTextColor = Color.White.copy(alpha = 0.4f), disabledBorderColor = Color.White.copy(alpha = 0.04f)),
                 shape = RoundedCornerShape(24.dp), maxLines = 5,
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
                 keyboardActions = KeyboardActions(onSend = { onSend(); focusManager.clearFocus() }),
