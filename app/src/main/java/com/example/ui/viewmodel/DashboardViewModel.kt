@@ -32,23 +32,34 @@ import kotlin.random.Random
 
 class DashboardViewModel(application: Application) : AndroidViewModel(application) {
 
-    private val deviceTelemetry = DeviceTelemetryMonitor(application, viewModelScope)
+    // Device services are deliberately lazy: first-run onboarding does not need
+    // sensors, network telemetry, or device-specific service initialization.
+    private val deviceTelemetryDelegate = lazy(LazyThreadSafetyMode.SYNCHRONIZED) {
+        DeviceTelemetryMonitor(application, viewModelScope)
+    }
+    private val deviceTelemetry: DeviceTelemetryMonitor
+        get() = deviceTelemetryDelegate.value
 
-    val roll: StateFlow<Float> = deviceTelemetry.roll
-    val pitch: StateFlow<Float> = deviceTelemetry.pitch
-    val azimuth: StateFlow<Float> = deviceTelemetry.azimuth
+    val roll: StateFlow<Float> by lazy { deviceTelemetry.roll }
+    val pitch: StateFlow<Float> by lazy { deviceTelemetry.pitch }
+    val azimuth: StateFlow<Float> by lazy { deviceTelemetry.azimuth }
 
+    fun startTelemetry() = deviceTelemetry.start()
     fun startSensors() = deviceTelemetry.startSensors()
-
-    fun stopSensors() = deviceTelemetry.stopSensors()
+    fun stopSensors() {
+        if (deviceTelemetryDelegate.isInitialized()) deviceTelemetry.stopSensors()
+    }
+    fun stopTelemetry() {
+        if (deviceTelemetryDelegate.isInitialized()) deviceTelemetry.close()
+    }
 
     private val _isAcademyGenerating = MutableStateFlow(false)
     val isAcademyGenerating: StateFlow<Boolean> = _isAcademyGenerating.asStateFlow()
 
-    val connectionType: StateFlow<String> = deviceTelemetry.connectionType
-    val ipAddress: StateFlow<String> = deviceTelemetry.ipAddress
-    val batteryPercentage: StateFlow<Int> = deviceTelemetry.batteryPercentage
-    val chargingStatus: StateFlow<String> = deviceTelemetry.chargingStatus
+    val connectionType: StateFlow<String> by lazy { deviceTelemetry.connectionType }
+    val ipAddress: StateFlow<String> by lazy { deviceTelemetry.ipAddress }
+    val batteryPercentage: StateFlow<Int> by lazy { deviceTelemetry.batteryPercentage }
+    val chargingStatus: StateFlow<String> by lazy { deviceTelemetry.chargingStatus }
 
     private val _isThinking = MutableStateFlow(false)
     val isThinking: StateFlow<Boolean> = _isThinking.asStateFlow()
@@ -68,7 +79,7 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
     private val _isNeuralLinkOffline = MutableStateFlow(false)
     val isNeuralLinkOffline: StateFlow<Boolean> = _isNeuralLinkOffline.asStateFlow()
 
-    val hasInternetConnection: StateFlow<Boolean> = deviceTelemetry.hasInternetConnection
+    val hasInternetConnection: StateFlow<Boolean> by lazy { deviceTelemetry.hasInternetConnection }
 
     private val _isTestingKey = MutableStateFlow(false)
     val isTestingKey: StateFlow<Boolean> = _isTestingKey.asStateFlow()
@@ -79,12 +90,31 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
     private val _isAnalyzingLink = MutableStateFlow(false)
     val isAnalyzingLink: StateFlow<Boolean> = _isAnalyzingLink.asStateFlow()
 
-    private val database = AppDatabase.getDatabase(application)
-    private val repository = InventorIdeaRepository(database.inventorIdeaDao())
-    private val vaultFileRepository = VaultFileRepository(application, database.vaultItemDao())
+    // Room and encrypted-vault repositories are initialized only when a screen
+    // actually requests those features, not while the welcome UI is being composed.
+    private val databaseDelegate = lazy(LazyThreadSafetyMode.SYNCHRONIZED) {
+        AppDatabase.getDatabase(application)
+    }
+    private val database: AppDatabase
+        get() = databaseDelegate.value
+    private val repositoryDelegate = lazy(LazyThreadSafetyMode.SYNCHRONIZED) {
+        InventorIdeaRepository(database.inventorIdeaDao())
+    }
+    private val repository: InventorIdeaRepository
+        get() = repositoryDelegate.value
+    private val vaultFileRepositoryDelegate = lazy(LazyThreadSafetyMode.SYNCHRONIZED) {
+        VaultFileRepository(application, database.vaultItemDao())
+    }
+    private val vaultFileRepository: VaultFileRepository
+        get() = vaultFileRepositoryDelegate.value
 
-    val vaultItems: StateFlow<List<VaultItem>> = vaultFileRepository.items
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+    val vaultItems: StateFlow<List<VaultItem>> by lazy {
+        vaultFileRepository.items.stateIn(
+            viewModelScope,
+            SharingStarted.WhileSubscribed(5_000),
+            emptyList()
+        )
+    }
 
     suspend fun importVaultFile(uri: Uri): VaultItem {
         check(_isVaultAuthenticated.value) { "Vault authentication is required." }
@@ -106,16 +136,27 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
         vaultFileRepository.delete(id)
     }
 
-    val savedIdeas: StateFlow<List<InventorIdea>> = repository.allIdeas
-        .stateIn(scope = viewModelScope, started = SharingStarted.WhileSubscribed(5000), initialValue = emptyList())
+    val savedIdeas: StateFlow<List<InventorIdea>> by lazy {
+        repository.allIdeas.stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5_000),
+            initialValue = emptyList()
+        )
+    }
 
-    val ambientInsight: StateFlow<ContextualVerseEngine.SpiritualInsight> = combine(
-        deviceTelemetry.batteryPercentage,
-        deviceTelemetry.chargingStatus,
-        deviceTelemetry.connectionType
-    ) { battery, charging, connection ->
-        ContextualVerseEngine.getInsight(battery, charging == "CHARGING", connection)
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), ContextualVerseEngine.getInsight(100, false, "Determining..."))
+    val ambientInsight: StateFlow<ContextualVerseEngine.SpiritualInsight> by lazy {
+        combine(
+            deviceTelemetry.batteryPercentage,
+            deviceTelemetry.chargingStatus,
+            deviceTelemetry.connectionType
+        ) { battery, charging, connection ->
+            ContextualVerseEngine.getInsight(battery, charging == "CHARGING", connection)
+        }.stateIn(
+            viewModelScope,
+            SharingStarted.WhileSubscribed(5_000),
+            ContextualVerseEngine.getInsight(100, false, "Determining...")
+        )
+    }
 
     private val _isVaultViewOpen = MutableStateFlow(false)
     val isVaultViewOpen: StateFlow<Boolean> = _isVaultViewOpen.asStateFlow()
@@ -128,9 +169,23 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
 
     fun setVaultAuthenticated(auth: Boolean) { _isVaultAuthenticated.value = auth }
 
+    private var vaultCleanupStarted = false
+
     fun setVaultViewOpen(open: Boolean) {
         if (open && !_isVaultAuthenticated.value) return
         _isVaultViewOpen.value = open
+        if (open && !vaultCleanupStarted) {
+            vaultCleanupStarted = true
+            viewModelScope.launch(Dispatchers.IO) {
+                try {
+                    vaultFileRepository.removeOrphanedFiles()
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (_: Exception) {
+                    // Cleanup is best-effort and never blocks startup or vault access.
+                }
+            }
+        }
         if (!open) _isVaultAuthenticated.value = false
     }
     fun setSettingsAuthenticated(auth: Boolean) { _isSettingsAuthenticated.value = auth }
@@ -457,18 +512,9 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
     }
 
     init {
-        viewModelScope.launch(Dispatchers.IO) {
-            try {
-                vaultFileRepository.removeOrphanedFiles()
-            } catch (cancelled: CancellationException) {
-                throw cancelled
-            } catch (_: Exception) {
-                // Keep the app usable when storage cleanup is temporarily unavailable.
-            }
-        }
         viewModelScope.launch { dataStore.clearLegacyAiSettings() }
         viewModelScope.launch(Dispatchers.IO) { dataStore.migrateLegacyGeminiApiKey() }
-        deviceTelemetry.start()
+        // Telemetry starts only when the dashboard is actually opened.
         viewModelScope.launch { dataStore.isArabic.collect { _isArabic.value = it } }
         viewModelScope.launch { dataStore.stealthMode.collect { _isStealthMode.value = it } }
         viewModelScope.launch { dataStore.lockAppOnLaunch.collect { _lockAppOnLaunch.value = false } }
@@ -743,7 +789,9 @@ Every scenario you produce MUST be on a COMPLETELY DIFFERENT situation, attack v
     }
 
     override fun onCleared() {
-        deviceTelemetry.close()
+        if (deviceTelemetryDelegate.isInitialized()) {
+            deviceTelemetry.close()
+        }
         super.onCleared()
     }
 }
