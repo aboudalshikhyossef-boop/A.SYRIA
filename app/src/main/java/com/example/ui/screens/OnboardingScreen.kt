@@ -57,6 +57,7 @@ import com.example.ui.brand.AyriaBrandMark
 import com.example.ui.brand.AyriaColors
 import com.example.ui.brand.AyriaEyebrow
 import com.example.ui.brand.AyriaGlassPanel
+import com.example.ui.brand.AyriaVerseCard
 import kotlinx.coroutines.launch
 
 data class UserProfileData(val gender: String, val birthYear: Int)
@@ -288,6 +289,13 @@ private fun WelcomeHeroPage(isArabic: Boolean) {
             textAlign = TextAlign.Center,
             lineHeight = 21.sp,
             modifier = Modifier.padding(horizontal = 14.dp)
+        )
+        Spacer(Modifier.height(18.dp))
+        AyriaVerseCard(
+            isArabic = isArabic,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp)
         )
     }
 }
