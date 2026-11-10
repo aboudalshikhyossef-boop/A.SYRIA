@@ -329,6 +329,11 @@ fun AppPinLockScreen(
                         listOf(Color(0xFF020713), Color(0xFF061525), Color(0xFF02040B))
                     )
                 )
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null,
+                    onClick = {}
+                )
         ) {
             Box(
                 Modifier
