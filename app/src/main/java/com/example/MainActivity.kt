@@ -66,6 +66,7 @@ class MainActivity : FragmentActivity() {
 
     private var hasCompletedStartupGate = false
     private var isAuthInProgress       = false
+    private var hasRequestedStartupAuthentication = false
     private var hasRequestedPermissions = false
     private var pendingCredentialSuccess: (() -> Unit)? = null
     private var pendingCredentialCloseOnCancel = false
@@ -159,99 +160,207 @@ class MainActivity : FragmentActivity() {
                     val navController = rememberNavController()
 
                     fun triggerBiometricAuth(title: String, subtitle: String, onSuccess: () -> Unit, closeOnCancel: Boolean = false) {
-                        if (isAuthInProgress) return
+                        if (isAuthInProgress || isFinishing || isDestroyed) return
 
-                        val supportsCombinedAuthenticators = Build.VERSION.SDK_INT >= Build.VERSION_CODES.R
-                        val authenticators = BiometricCompatibility.allowedAuthenticators(Build.VERSION.SDK_INT)
+                        val apiLevel = Build.VERSION.SDK_INT
+                        val supportsDeviceCredentialInPrompt = apiLevel >= Build.VERSION_CODES.R
+                        val biometricAuthenticators = BiometricCompatibility.allowedAuthenticators(apiLevel)
+                        val deviceCredentialAuthenticator = BiometricManager.Authenticators.DEVICE_CREDENTIAL
                         val manager = BiometricManager.from(this@MainActivity)
-                        val availability = manager.canAuthenticate(authenticators)
 
-                        if (availability != BiometricManager.BIOMETRIC_SUCCESS) {
-                            // Android 10 and older use a separate system credential screen.
-                            if (launchLegacyDeviceCredential(title, subtitle, onSuccess, closeOnCancel)) {
+                        fun isAuthenticatorAvailable(authenticators: Int, label: String): Boolean {
+                            return try {
+                                manager.canAuthenticate(authenticators) == BiometricManager.BIOMETRIC_SUCCESS
+                            } catch (error: RuntimeException) {
+                                android.util.Log.e(
+                                    "A.SYRIA.Auth",
+                                    "canAuthenticate($label) failed on API $apiLevel",
+                                    error
+                                )
+                                false
+                            }
+                        }
+
+                        var promptAuthenticators = biometricAuthenticators
+                        if (!isAuthenticatorAvailable(biometricAuthenticators, "biometric+credential")) {
+                            when {
+                                supportsDeviceCredentialInPrompt &&
+                                    isAuthenticatorAvailable(deviceCredentialAuthenticator, "device-credential-only") -> {
+                                    // Some device implementations reject the combined authenticator mask.
+                                    // Fall back to the Android system credential UI without weakening the gate.
+                                    promptAuthenticators = deviceCredentialAuthenticator
+                                }
+
+                                !supportsDeviceCredentialInPrompt &&
+                                    launchLegacyDeviceCredential(title, subtitle, onSuccess, closeOnCancel) -> {
+                                    return
+                                }
+
+                                else -> {
+                                    Toast.makeText(
+                                        this@MainActivity,
+                                        if (isAr) {
+                                            "للوصول إلى هذه المنطقة، فعّل قفل شاشة آمن (PIN أو نمط أو كلمة مرور) أو بصمة قوية."
+                                        } else {
+                                            "Set up a secure screen lock (PIN, pattern, or password) or strong biometrics to unlock this area."
+                                        },
+                                        Toast.LENGTH_LONG
+                                    ).show()
+                                    if (closeOnCancel) {
+                                        hasCompletedStartupGate = true
+                                        requestEssentialPermissionsOnce()
+                                    }
+                                    return
+                                }
+                            }
+                        }
+
+                        fun launchPrompt(allowedAuthenticators: Int) {
+                            val executor = ContextCompat.getMainExecutor(this@MainActivity)
+                            val prompt = BiometricPrompt(
+                                this@MainActivity,
+                                executor,
+                                object : BiometricPrompt.AuthenticationCallback() {
+                                    override fun onAuthenticationError(code: Int, msg: CharSequence) {
+                                        isAuthInProgress = false
+                                        android.util.Log.e(
+                                            "A.SYRIA.Auth",
+                                            "Biometric prompt ended with code=$code on API $apiLevel: $msg"
+                                        )
+
+                                        if (
+                                            code == BiometricPrompt.ERROR_NEGATIVE_BUTTON &&
+                                            !supportsDeviceCredentialInPrompt
+                                        ) {
+                                            if (!launchLegacyDeviceCredential(title, subtitle, onSuccess, closeOnCancel) && closeOnCancel) {
+                                                finish()
+                                            }
+                                        } else if (code == BiometricPrompt.ERROR_USER_CANCELED && closeOnCancel) {
+                                            finish()
+                                        } else if (closeOnCancel) {
+                                            Toast.makeText(
+                                                this@MainActivity,
+                                                if (isAr) "لم تكتمل المصادقة. أغلق التطبيق وافتحه مجددًا للمحاولة." else "Authentication did not complete. Reopen the app to try again.",
+                                                Toast.LENGTH_LONG
+                                            ).show()
+                                        }
+                                    }
+
+                                    override fun onAuthenticationFailed() {
+                                        android.util.Log.w("A.SYRIA.Auth", "Biometric sample was not recognized")
+                                    }
+
+                                    override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
+                                        isAuthInProgress = false
+                                        hasCompletedStartupGate = true
+                                        if (closeOnCancel) requestEssentialPermissionsOnce()
+                                        onSuccess()
+                                    }
+                                }
+                            )
+
+                            val promptInfoBuilder = BiometricPrompt.PromptInfo.Builder()
+                                .setTitle(title)
+                                .setSubtitle(subtitle)
+                                .setAllowedAuthenticators(allowedAuthenticators)
+
+                            if (
+                                !supportsDeviceCredentialInPrompt &&
+                                allowedAuthenticators == BiometricManager.Authenticators.BIOMETRIC_STRONG
+                            ) {
+                                promptInfoBuilder.setNegativeButtonText(
+                                    if (isAr) "استخدام رمز قفل الجهاز" else "Use device PIN"
+                                )
+                            }
+
+                            prompt.authenticate(promptInfoBuilder.build())
+                        }
+
+                        isAuthInProgress = true
+                        try {
+                            launchPrompt(promptAuthenticators)
+                        } catch (error: Exception) {
+                            isAuthInProgress = false
+                            android.util.Log.e(
+                                "A.SYRIA.Auth",
+                                "Failed to create or launch biometric prompt on API $apiLevel",
+                                error
+                            )
+
+                            // Retry once with the system credential authenticator if the combined
+                            // biometric/credential prompt is what this device rejected.
+                            if (
+                                supportsDeviceCredentialInPrompt &&
+                                promptAuthenticators != deviceCredentialAuthenticator &&
+                                isAuthenticatorAvailable(deviceCredentialAuthenticator, "device-credential-retry")
+                            ) {
+                                isAuthInProgress = true
+                                try {
+                                    launchPrompt(deviceCredentialAuthenticator)
+                                    return
+                                } catch (fallbackError: Exception) {
+                                    isAuthInProgress = false
+                                    android.util.Log.e(
+                                        "A.SYRIA.Auth",
+                                        "Device-credential fallback could not be launched",
+                                        fallbackError
+                                    )
+                                }
+                            }
+
+                            if (
+                                !supportsDeviceCredentialInPrompt &&
+                                launchLegacyDeviceCredential(title, subtitle, onSuccess, closeOnCancel)
+                            ) {
                                 return
                             }
 
                             Toast.makeText(
                                 this@MainActivity,
-                                if (isAr) {
-                                    "للوصول إلى هذه المنطقة، فعّل قفل شاشة آمن (PIN أو نمط أو كلمة مرور) أو بصمة قوية."
-                                } else {
-                                    "Set up a secure screen lock (PIN, pattern, or password) or strong biometrics to unlock this area."
-                                },
+                                if (isAr) "تعذّر فتح نافذة المصادقة. تحقق من قفل الشاشة ثم أعد فتح التطبيق." else "The authentication prompt could not be opened. Check your screen lock and reopen the app.",
                                 Toast.LENGTH_LONG
                             ).show()
-                            if (closeOnCancel) {
-                                hasCompletedStartupGate = true
-                                requestEssentialPermissionsOnce()
-                            }
-                            return
-                        }
-
-                        isAuthInProgress = true
-                        val executor = ContextCompat.getMainExecutor(this@MainActivity)
-                        val prompt = BiometricPrompt(this@MainActivity, executor, object : BiometricPrompt.AuthenticationCallback() {
-                            override fun onAuthenticationError(code: Int, msg: CharSequence) {
-                                isAuthInProgress = false
-
-                                if (
-                                    code == BiometricPrompt.ERROR_NEGATIVE_BUTTON &&
-                                    !supportsCombinedAuthenticators
-                                ) {
-                                    if (!launchLegacyDeviceCredential(title, subtitle, onSuccess, closeOnCancel) && closeOnCancel) {
-                                        finish()
-                                    }
-                                } else if (code == BiometricPrompt.ERROR_USER_CANCELED && closeOnCancel) {
-                                    finish()
-                                }
-                            }
-
-                            override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
-                                isAuthInProgress = false
-                                hasCompletedStartupGate = true
-                                if (closeOnCancel) requestEssentialPermissionsOnce()
-                                onSuccess()
-                            }
-                        })
-
-                        val promptInfoBuilder = BiometricPrompt.PromptInfo.Builder()
-                            .setTitle(title)
-                            .setSubtitle(subtitle)
-                            .setAllowedAuthenticators(authenticators)
-
-                        if (!supportsCombinedAuthenticators) {
-                            promptInfoBuilder.setNegativeButtonText(
-                                if (isAr) "استخدام رمز قفل الجهاز" else "Use device PIN"
-                            )
-                        }
-
-                        try {
-                            prompt.authenticate(promptInfoBuilder.build())
-                        } catch (error: IllegalArgumentException) {
-                            isAuthInProgress = false
-                            android.util.Log.e(
-                                "A.SYRIA.Auth",
-                                "Unsupported biometric prompt configuration for API ${Build.VERSION.SDK_INT}",
-                                error
-                            )
-
-                            if (!launchLegacyDeviceCredential(title, subtitle, onSuccess, closeOnCancel)) {
-                                Toast.makeText(
-                                    this@MainActivity,
-                                    if (isAr) "تعذرت المصادقة على هذا الجهاز. تحقق من إعدادات قفل الشاشة." else "Authentication is unavailable on this device. Check your screen-lock settings.",
-                                    Toast.LENGTH_LONG
-                                ).show()
-                                if (closeOnCancel) finish()
-                            }
+                            if (closeOnCancel) finish()
                         }
                     }
 
                     DisposableEffect(Unit) {
                         val observer = LifecycleEventObserver { _, event ->
                             when (event) {
-                                Lifecycle.Event.ON_START -> { if (!hasCompletedStartupGate && !isAuthInProgress) triggerBiometricAuth(if (isAr) "تأكيد الهوية" else "Identity Verified", if (isAr) "مطلوب بصمة الدخول" else "Biometric uplink required", { }, true) }
-                                Lifecycle.Event.ON_RESUME -> vm.startSensors()
-                                Lifecycle.Event.ON_PAUSE  -> vm.stopSensors()
+                                Lifecycle.Event.ON_RESUME -> {
+                                    vm.startSensors()
+
+                                    // Request the startup gate once, only after the Activity is fully
+                                    // resumed and its first frame can receive the system prompt.
+                                    if (!hasCompletedStartupGate &&
+                                        !hasRequestedStartupAuthentication &&
+                                        !isAuthInProgress
+                                    ) {
+                                        hasRequestedStartupAuthentication = true
+                                        window.decorView.post {
+                                            val activityReady =
+                                                !isFinishing &&
+                                                !isDestroyed &&
+                                                lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)
+
+                                            if (activityReady &&
+                                                !hasCompletedStartupGate &&
+                                                !isAuthInProgress
+                                            ) {
+                                                triggerBiometricAuth(
+                                                    if (isAr) "تأكيد الهوية" else "Identity Verified",
+                                                    if (isAr) "مطلوب بصمة الدخول" else "Biometric authentication required",
+                                                    { },
+                                                    true
+                                                )
+                                            } else if (!hasCompletedStartupGate && !isFinishing && !isDestroyed) {
+                                                hasRequestedStartupAuthentication = false
+                                            }
+                                        }
+                                    }
+                                }
+
+                                Lifecycle.Event.ON_PAUSE -> vm.stopSensors()
                                 else -> {}
                             }
                         }
