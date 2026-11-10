@@ -143,6 +143,138 @@ class MainActivity : FragmentActivity() {
         if (needed.isNotEmpty()) permissionLauncher.launch(needed.toTypedArray())
     }
 
+    /**
+     * Device authentication is used only after the user explicitly selects
+     * "Forgot app PIN". It never gates an ordinary app launch.
+     */
+    private fun authenticateForPinRecovery(
+        isArabic: Boolean,
+        onAuthenticated: () -> Unit,
+        onFailure: (String) -> Unit
+    ) {
+        if (isAuthInProgress || isFinishing || isDestroyed) return
+
+        val keyguard = getSystemService(KEYGUARD_SERVICE) as KeyguardManager
+        val hasSecureDeviceCredential = runCatching { keyguard.isDeviceSecure }.getOrDefault(false)
+        if (!hasSecureDeviceCredential) {
+            onFailure(
+                if (isArabic) "لا يوجد قفل شاشة آمن على الهاتف. أضف PIN أو نمطاً أو كلمة مرور إلى الهاتف ثم أعد الاسترداد."
+                else "No secure phone screen lock is configured. Set a phone PIN, pattern, or password before recovering the app PIN."
+            )
+            return
+        }
+
+        val biometricManager = BiometricManager.from(this)
+        val hasStrongBiometric = runCatching {
+            biometricManager.canAuthenticate(BiometricManager.Authenticators.BIOMETRIC_STRONG) ==
+                BiometricManager.BIOMETRIC_SUCCESS
+        }.getOrDefault(false)
+
+        val title = if (isArabic) "استرداد قفل A.SYRIA" else "Recover A.SYRIA app lock"
+        val subtitle = if (isArabic) "أكد هويتك باستخدام وسيلة حماية الهاتف" else "Verify with your phone's secure authentication"
+
+        fun launchLegacyCredential(): Boolean {
+            return launchLegacyDeviceCredential(
+                title = title,
+                subtitle = subtitle,
+                onSuccess = onAuthenticated,
+                closeOnCancel = false,
+                onCancel = {
+                    onFailure(
+                        if (isArabic) "تم إلغاء استرداد الرمز. ما زال التطبيق مقفلاً."
+                        else "Recovery was cancelled. The app remains locked."
+                    )
+                }
+            )
+        }
+
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R && !hasStrongBiometric) {
+            if (!launchLegacyCredential()) {
+                onFailure(
+                    if (isArabic) "تعذّر فتح شاشة قفل الهاتف. تحقق من إعداد PIN أو النمط أو كلمة المرور."
+                    else "Could not open the phone credential screen. Check its PIN, pattern, or password settings."
+                )
+            }
+            return
+        }
+
+        val allowedAuthenticators = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            BiometricManager.Authenticators.DEVICE_CREDENTIAL or
+                if (hasStrongBiometric) BiometricManager.Authenticators.BIOMETRIC_STRONG else 0
+        } else {
+            BiometricManager.Authenticators.BIOMETRIC_STRONG
+        }
+
+        try {
+            val prompt = BiometricPrompt(
+                this,
+                ContextCompat.getMainExecutor(this),
+                object : BiometricPrompt.AuthenticationCallback() {
+                    override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
+                        isAuthInProgress = false
+                        if (
+                            Build.VERSION.SDK_INT < Build.VERSION_CODES.R &&
+                            errorCode == BiometricPrompt.ERROR_NEGATIVE_BUTTON
+                        ) {
+                            if (!launchLegacyCredential()) {
+                                onFailure(
+                                    if (isArabic) "تعذّر فتح مصادقة الهاتف الاحتياطية."
+                                    else "The phone-credential fallback could not be opened."
+                                )
+                            }
+                        } else {
+                            onFailure(
+                                if (isArabic) "لم تكتمل المصادقة. أعد المحاولة أو استخدم رمز الهاتف."
+                                else "Authentication did not complete. Retry or use your phone credential."
+                            )
+                        }
+                    }
+
+                    override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
+                        isAuthInProgress = false
+                        onAuthenticated()
+                    }
+
+                    override fun onAuthenticationFailed() {
+                        android.util.Log.w("A.SYRIA.Auth", "Recovery biometric sample was not recognized")
+                    }
+                }
+            )
+
+            val infoBuilder = BiometricPrompt.PromptInfo.Builder()
+                .setTitle(title)
+                .setSubtitle(subtitle)
+                .setAllowedAuthenticators(allowedAuthenticators)
+
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
+                infoBuilder.setNegativeButtonText(
+                    if (isArabic) "استخدام رمز الهاتف" else "Use phone PIN"
+                )
+            }
+
+            isAuthInProgress = true
+            prompt.authenticate(infoBuilder.build())
+        } catch (error: Exception) {
+            isAuthInProgress = false
+            android.util.Log.e("A.SYRIA.Auth", "Could not launch device authentication for app PIN recovery", error)
+            if (
+                Build.VERSION.SDK_INT < Build.VERSION_CODES.R &&
+                !launchLegacyCredential()
+            ) {
+                onFailure(
+                    if (isArabic) "تعذّر تشغيل مصادقة الهاتف. أعد المحاولة."
+                    else "Phone authentication could not start. Please retry."
+                )
+            } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                onFailure(
+                    if (isArabic) "تعذّر تشغيل مصادقة الهاتف. أعد المحاولة."
+                    else "Phone authentication could not start. Please retry."
+                )
+            }
+        }
+    }
+
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
@@ -162,9 +294,13 @@ class MainActivity : FragmentActivity() {
             val calibrationCompleted by vm.calibrationCompleted.collectAsState()
             val onboardingCompleted  by vm.onboardingCompleted.collectAsState()
             val isDataLoaded         by vm.isDataLoaded.collectAsState()
-            val lockAppOnLaunch      by vm.lockAppOnLaunch.collectAsState()
+            val appPinSettingsLoaded by vm.isAppPinSettingsLoaded.collectAsState()
+            val appPinEnabled        by vm.isAppPinEnabled.collectAsState()
+            val appPinUnlocked       by vm.isAppPinUnlocked.collectAsState()
+            val appPinFailedAttempts by vm.appPinFailedAttempts.collectAsState()
+            val appPinLockoutUntil   by vm.appPinLockoutUntilMillis.collectAsState()
+            var appPinRecoveryMode by remember { mutableStateOf(false) }
             val customApiKey         by vm.customApiKey.collectAsState()
-            var startupGateUnlocked by remember { mutableStateOf(false) }
             var startupGateMessage by remember { mutableStateOf<String?>(null) }
 
             MyApplicationTheme(darkTheme = true, dynamicColor = false, uiConfig = uiConfig) {
@@ -372,60 +508,27 @@ class MainActivity : FragmentActivity() {
                         }
                     }
 
-                    fun requestStartupAuthentication() {
-                        if (!lockAppOnLaunch || hasCompletedStartupGate || isAuthInProgress || isFinishing || isDestroyed) return
-                        hasRequestedStartupAuthentication = true
-                        triggerBiometricAuth(
-                            if (isAr) "تأكيد الهوية" else "Verify your identity",
-                            if (isAr) "استخدم البصمة أو رمز قفل الجهاز للمتابعة" else "Use biometrics or your device screen lock to continue",
-                            onSuccess = { startupGateUnlocked = true },
-                            closeOnCancel = true
-                        )
-                    }
 
-                    DisposableEffect(isDataLoaded, lockAppOnLaunch, isAr) {
+                    DisposableEffect(appPinEnabled) {
                         val observer = LifecycleEventObserver { _, event ->
                             when (event) {
-                                Lifecycle.Event.ON_RESUME -> {
-                                    vm.startSensors()
-
-                                    if (isDataLoaded && !lockAppOnLaunch && !hasCompletedStartupGate) {
-                                        hasCompletedStartupGate = true
-                                        startupGateUnlocked = true
-                                        requestEssentialPermissionsOnce()
-                                    }
-
-                                    if (
-                                        isDataLoaded &&
-                                        lockAppOnLaunch &&
-                                        !hasCompletedStartupGate &&
-                                        !hasRequestedStartupAuthentication &&
-                                        !isAuthInProgress
-                                    ) {
-                                        window.decorView.post {
-                                            val activityReady =
-                                                !isFinishing &&
-                                                !isDestroyed &&
-                                                lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)
-
-                                            if (
-                                                activityReady &&
-                                                lockAppOnLaunch &&
-                                                !hasCompletedStartupGate &&
-                                                !isAuthInProgress
-                                            ) {
-                                                requestStartupAuthentication()
-                                            }
-                                        }
-                                    }
-                                }
-
+                                Lifecycle.Event.ON_RESUME -> vm.startSensors()
                                 Lifecycle.Event.ON_PAUSE -> vm.stopSensors()
+                                Lifecycle.Event.ON_STOP -> {
+                                    vm.stopSensors()
+                                    vm.lockAppSession()
+                                }
                                 else -> Unit
                             }
                         }
                         lifecycle.addObserver(observer)
                         onDispose { lifecycle.removeObserver(observer) }
+                    }
+
+                    LaunchedEffect(isDataLoaded, appPinSettingsLoaded, appPinEnabled, appPinUnlocked) {
+                        if (isDataLoaded && appPinSettingsLoaded && (!appPinEnabled || appPinUnlocked)) {
+                            requestEssentialPermissionsOnce()
+                        }
                     }
 
                     // Wait for DataStore to load before computing startDestination
@@ -546,7 +649,13 @@ class MainActivity : FragmentActivity() {
                                                         "resources" -> ResourcesScreen(vm) { activeTab = "home" }
                                                         "library"   -> LibraryScreen(vm) { activeTab = "home" }
                                                         "chat"      -> GeminiChatScreen(chatVm, uiConfig, isArLocal)
-                                                        "settings"  -> SettingsScreen(vm, { activeTab = "home" }, { navController.navigate("about") }, { navController.navigate("adaptive_feedback") }) { t, s, ok -> triggerBiometricAuth(t, s, ok) }
+                                                        "settings"  -> SettingsScreen(
+                                                            viewModel = vm,
+                                                            onClose = { activeTab = "home" },
+                                                            onOpenAbout = { navController.navigate("about") },
+                                                            onOpenCustomize = { navController.navigate("adaptive_feedback") },
+                                                            onOpenAppLock = { navController.navigate("app_lock") }
+                                                        )
                                                     }
                                                 }
                                             }
@@ -580,50 +689,46 @@ class MainActivity : FragmentActivity() {
                                     FeedbackScreen(vm, isArLocal) { navController.popBackStack() }
                                 }
                             }
+                            composable("app_lock") {
+                                AdaptiveContentFrame {
+                                    AppPinSettingsScreen(viewModel = vm) { navController.popBackStack() }
+                                }
+                            }
                         }
 
-                        if (isDataLoaded && lockAppOnLaunch && !startupGateUnlocked) {
-                            AlertDialog(
-                                onDismissRequest = {},
-                                title = { Text(if (isAr) "A.SYRIA مقفل" else "A.SYRIA is locked") },
-                                text = {
-                                    Text(
-                                        startupGateMessage ?: if (isAr) {
-                                            "أكد هويتك بالبصمة أو PIN أو النمط أو كلمة المرور. يمكنك إعادة المحاولة أو اختيار المتابعة دون قفل."
-                                        } else {
-                                            "Verify with biometrics, PIN, pattern, or password. You can retry or explicitly continue without the app lock."
+
+                        if (
+                            isDataLoaded &&
+                            appPinSettingsLoaded &&
+                            appPinEnabled &&
+                            !appPinUnlocked
+                        ) {
+                            AppPinLockScreen(
+                                isArabic = isAr,
+                                failedAttempts = appPinFailedAttempts,
+                                lockoutUntilMillis = appPinLockoutUntil,
+                                recoveryMode = appPinRecoveryMode,
+                                onVerify = { pin, result ->
+                                    vm.verifyAppPin(pin, result)
+                                },
+                                onForgotPin = {
+                                    authenticateForPinRecovery(
+                                        isArabic = isAr,
+                                        onAuthenticated = { appPinRecoveryMode = true },
+                                        onFailure = { message ->
+                                            Toast.makeText(this@MainActivity, message, Toast.LENGTH_LONG).show()
                                         }
                                     )
                                 },
-                                confirmButton = {
-                                    TextButton(
-                                        onClick = {
-                                            startupGateMessage = null
-                                            hasRequestedStartupAuthentication = false
-                                            requestStartupAuthentication()
-                                        }
-                                    ) {
-                                        Text(if (isAr) "إعادة المحاولة" else "Retry")
-                                    }
-                                },
-                                dismissButton = {
-                                    TextButton(
-                                        onClick = {
-                                            vm.setLockAppOnLaunch(false)
-                                            hasCompletedStartupGate = true
-                                            startupGateUnlocked = true
-                                            requestEssentialPermissionsOnce()
-                                            Toast.makeText(
-                                                this@MainActivity,
-                                                if (isAr) "تم إيقاف قفل التطبيق عند الفتح." else "App launch lock disabled.",
-                                                Toast.LENGTH_SHORT
-                                            ).show()
-                                        }
-                                    ) {
-                                        Text(if (isAr) "المتابعة دون قفل" else "Continue without lock")
+                                onResetPin = { pin, result ->
+                                    vm.enableAppPin(pin) { saved ->
+                                        if (saved) appPinRecoveryMode = false
+                                        result(saved)
                                     }
                                 }
                             )
+                        }
+
                         }
                         }
                     }
