@@ -274,23 +274,23 @@ private fun ChatEmptyState(modifier: Modifier = Modifier, isArabic: Boolean, onP
                 for (i in 0..2) {
                     val angle = (rotation + i * 120f) * PI.toFloat() / 180f
                     val cx = center.x + r * cos(angle); val cy = center.y + r * sin(angle)
-                    drawCircle(CyberCyan.copy(alpha = 0.6f - i * 0.15f), radius = 3.dp.toPx(), center = Offset(cx, cy))
+                    drawCircle(ChatIce.copy(alpha = 0.6f - i * 0.15f), radius = 3.dp.toPx(), center = Offset(cx, cy))
                 }
-                drawCircle(CyberCyan.copy(alpha = 0.12f), radius = r, style = Stroke(1.dp.toPx()))
+                drawCircle(ChatIce.copy(alpha = 0.12f), radius = r, style = Stroke(1.dp.toPx()))
             })
-            Box(modifier = Modifier.size(70.dp).background(CyberCyan.copy(alpha = 0.06f), CircleShape).border(1.dp, CyberCyan.copy(alpha = 0.15f), CircleShape), contentAlignment = Alignment.Center) {
-                Icon(Icons.Rounded.SmartToy, null, tint = CyberCyan.copy(alpha = 0.6f), modifier = Modifier.size(36.dp))
+            Box(modifier = Modifier.size(70.dp).background(ChatIce.copy(alpha = 0.06f), CircleShape).border(1.dp, ChatIce.copy(alpha = 0.15f), CircleShape), contentAlignment = Alignment.Center) {
+                Icon(Icons.Rounded.SmartToy, null, tint = ChatIce.copy(alpha = 0.6f), modifier = Modifier.size(36.dp))
             }
         }
         Spacer(Modifier.height(20.dp))
-        Text(if (isArabic) "المخ الرئيسي جاهز" else "Master Brain Online", color = CyberCyan.copy(alpha = 0.9f), fontSize = 17.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
+        Text(if (isArabic) "المخ الرئيسي جاهز" else "Master Brain Online", color = ChatIce.copy(alpha = 0.9f), fontSize = 17.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
         Spacer(Modifier.height(6.dp))
         Text(if (isArabic) "اسألني عن أي شيء — أمان، ذكاء اصطناعي، إسلام، أو خصّص الواجهة" else "Ask anything — security, AI, Islam, or customize the UI.", color = TextMuted, fontSize = 12.sp, textAlign = TextAlign.Center, lineHeight = 18.sp)
         Spacer(Modifier.height(24.dp))
         suggestions.forEach { prompt ->
             OutlinedButton(onClick = { onPrompt(prompt) }, modifier = Modifier.fillMaxWidth().padding(vertical = 3.dp),
-                colors = ButtonDefaults.outlinedButtonColors(contentColor = CyberCyan),
-                border = BorderStroke(1.dp, CyberCyan.copy(alpha = 0.22f)),
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = ChatIce),
+                border = BorderStroke(1.dp, ChatIce.copy(alpha = 0.22f)),
                 shape = RoundedCornerShape(20.dp)) {
                 Text(prompt, fontSize = 12.sp, fontFamily = FontFamily.Monospace, modifier = Modifier.padding(vertical = 2.dp))
             }
@@ -310,7 +310,7 @@ private fun ChatMessageBubble(message: ChatMessage, isArabic: Boolean) {
 @Composable
 private fun UserBubble(message: ChatMessage) {
     Column(modifier = Modifier.fillMaxWidth(), horizontalAlignment = Alignment.End) {
-        Box(modifier = Modifier.widthIn(max = 270.dp).background(CyberCyan.copy(alpha = 0.12f), RoundedCornerShape(topStart = 18.dp, topEnd = 4.dp, bottomStart = 18.dp, bottomEnd = 18.dp)).border(1.dp, CyberCyan.copy(alpha = 0.28f), RoundedCornerShape(topStart = 18.dp, topEnd = 4.dp, bottomStart = 18.dp, bottomEnd = 18.dp)).padding(horizontal = 14.dp, vertical = 10.dp)) {
+        Box(modifier = Modifier.widthIn(max = 270.dp).background(ChatIce.copy(alpha = 0.12f), RoundedCornerShape(topStart = 18.dp, topEnd = 4.dp, bottomStart = 18.dp, bottomEnd = 18.dp)).border(1.dp, ChatIce.copy(alpha = 0.28f), RoundedCornerShape(topStart = 18.dp, topEnd = 4.dp, bottomStart = 18.dp, bottomEnd = 18.dp)).padding(horizontal = 14.dp, vertical = 10.dp)) {
             Text(message.content, color = Color.White.copy(alpha = 0.95f), fontSize = 14.sp, lineHeight = 21.sp)
         }
         Text(formatTime(message.timestamp), color = Color.White.copy(alpha = 0.22f), fontSize = 9.sp, fontFamily = FontFamily.Monospace, modifier = Modifier.padding(top = 3.dp, end = 2.dp))
@@ -321,8 +321,8 @@ private fun UserBubble(message: ChatMessage) {
 private fun AssistantBubble(message: ChatMessage) {
     val clipboard = LocalClipboardManager.current; val context = LocalContext.current
     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Start, verticalAlignment = Alignment.Top) {
-        Box(modifier = Modifier.size(30.dp).background(CyberCyan.copy(alpha = 0.08f), CircleShape).border(1.dp, CyberCyan.copy(alpha = 0.2f), CircleShape), contentAlignment = Alignment.Center) {
-            Icon(Icons.Rounded.SmartToy, null, tint = CyberCyan.copy(alpha = 0.8f), modifier = Modifier.size(14.dp))
+        Box(modifier = Modifier.size(30.dp).background(ChatIce.copy(alpha = 0.08f), CircleShape).border(1.dp, ChatIce.copy(alpha = 0.2f), CircleShape), contentAlignment = Alignment.Center) {
+            Icon(Icons.Rounded.SmartToy, null, tint = ChatIce.copy(alpha = 0.8f), modifier = Modifier.size(14.dp))
         }
         Spacer(Modifier.width(8.dp))
         Column(modifier = Modifier.widthIn(max = 270.dp)) {
@@ -331,7 +331,7 @@ private fun AssistantBubble(message: ChatMessage) {
             }
             Row(modifier = Modifier.padding(top = 4.dp, start = 2.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(formatTime(message.timestamp), color = Color.White.copy(alpha = 0.22f), fontSize = 9.sp, fontFamily = FontFamily.Monospace)
-                Icon(Icons.Rounded.ContentCopy, "Copy", tint = CyberCyan.copy(alpha = 0.38f), modifier = Modifier.size(13.dp).clickable { clipboard.setText(AnnotatedString(message.content)); Toast.makeText(context, "Copied", Toast.LENGTH_SHORT).show() })
+                Icon(Icons.Rounded.ContentCopy, "Copy", tint = ChatIce.copy(alpha = 0.38f), modifier = Modifier.size(13.dp).clickable { clipboard.setText(AnnotatedString(message.content)); Toast.makeText(context, "Copied", Toast.LENGTH_SHORT).show() })
             }
         }
     }
@@ -357,13 +357,13 @@ private fun SuggestionBubble(message: ChatMessage) {
 private fun TypingIndicatorRow() {
     val transition = rememberInfiniteTransition(label = "typing")
     Row(modifier = Modifier.padding(start = 14.dp, top = 2.dp, bottom = 4.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-        Box(modifier = Modifier.size(26.dp).background(CyberCyan.copy(alpha = 0.08f), CircleShape).border(1.dp, CyberCyan.copy(alpha = 0.15f), CircleShape), contentAlignment = Alignment.Center) {
-            Icon(Icons.Rounded.SmartToy, null, tint = CyberCyan.copy(alpha = 0.6f), modifier = Modifier.size(12.dp))
+        Box(modifier = Modifier.size(26.dp).background(ChatIce.copy(alpha = 0.08f), CircleShape).border(1.dp, ChatIce.copy(alpha = 0.15f), CircleShape), contentAlignment = Alignment.Center) {
+            Icon(Icons.Rounded.SmartToy, null, tint = ChatIce.copy(alpha = 0.6f), modifier = Modifier.size(12.dp))
         }
         Spacer(Modifier.width(4.dp))
         repeat(3) { i ->
             val offset by transition.animateFloat(initialValue = 0f, targetValue = -5f, animationSpec = infiniteRepeatable(tween(380, easing = FastOutSlowInEasing), RepeatMode.Reverse, initialStartOffset = StartOffset(i * 110)), label = "dot$i")
-            Box(modifier = Modifier.size(7.dp).graphicsLayer { translationY = offset }.background(CyberCyan.copy(alpha = 0.65f), CircleShape))
+            Box(modifier = Modifier.size(7.dp).graphicsLayer { translationY = offset }.background(ChatIce.copy(alpha = 0.65f), CircleShape))
         }
     }
 }
