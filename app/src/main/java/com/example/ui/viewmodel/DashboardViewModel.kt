@@ -249,6 +249,8 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
 
     private val _isStealthMode = MutableStateFlow(false)
     val isStealthMode: StateFlow<Boolean> = _isStealthMode.asStateFlow()
+    private val _lockAppOnLaunch = MutableStateFlow(true)
+    val lockAppOnLaunch: StateFlow<Boolean> = _lockAppOnLaunch.asStateFlow()
 
     private val _customApiKey = MutableStateFlow("")
     val customApiKey: StateFlow<String> = _customApiKey.asStateFlow()
@@ -313,6 +315,13 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
 
     fun setStealthMode(enabled: Boolean) {
         viewModelScope.launch { dataStore.saveStealthMode(enabled).also { _isStealthMode.value = enabled } }
+    }
+
+    fun setLockAppOnLaunch(enabled: Boolean) {
+        viewModelScope.launch {
+            dataStore.saveLockAppOnLaunch(enabled)
+            _lockAppOnLaunch.value = enabled
+        }
     }
 
     fun updateCustomApiKey(key: String) {
@@ -392,6 +401,7 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
         deviceTelemetry.start()
         viewModelScope.launch { dataStore.isArabic.collect { _isArabic.value = it } }
         viewModelScope.launch { dataStore.stealthMode.collect { _isStealthMode.value = it } }
+        viewModelScope.launch { dataStore.lockAppOnLaunch.collect { _lockAppOnLaunch.value = it } }
         viewModelScope.launch { dataStore.cyberScore.collect { _cyberScore.value = it } }
         viewModelScope.launch { dataStore.geminiApiKey.collect { _customApiKey.value = it } }
         viewModelScope.launch { dataStore.projectName.collect { _projectName.value = it } }
@@ -414,6 +424,7 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
         viewModelScope.launch { dataStore.userProfileAnalysis.collect { _userProfileAnalysis.value = it } }
         // Mark data as loaded after critical fields are available
         viewModelScope.launch {
+            _lockAppOnLaunch.value = dataStore.lockAppOnLaunch.first()
             dataStore.onboardingCompleted.first()
             _isDataLoaded.value = true
         }
