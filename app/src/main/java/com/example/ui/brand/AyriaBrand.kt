@@ -1,5 +1,14 @@
 package com.example.ui.brand
 
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.absoluteOffset
+import androidx.compose.foundation.layout.BoxWithConstraints
+import android.util.Base64
+import android.graphics.BitmapFactory
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.FastOutSlowInEasing
@@ -380,140 +389,76 @@ internal fun AyriaActionButton(
     ) {
         Text(
             text = text,
-            color = if (secondary) AyriaColors.pearl else Color(0xFF06212A),
-            fontFamily = AyriaArabicFont,
-            fontWeight = FontWeight.Bold,
-            fontSize = 14.sp
-        )
-    }
-}
-
-/**
- * Continuous five-panel glacier/water panorama shared by the five primary tabs.
- * Switching tabs reveals the next crop of the same scene instead of restarting
- * an unrelated background. Gyroscope input adds a restrained parallax response.
- */
-@Composable
-internal fun AyriaPanoramaBackdrop(
+            color = if (secondary) AyriaColors.internal fun AyriaPanoramaBackdrop(
     pageIndex: Int,
     roll: Float = 0f,
     pitch: Float = 0f,
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
+    val panoramaBitmap = remember(context) {
+        val resourceParts = intArrayOf(
+            R.raw.asyria_panorama_part0,
+            R.raw.asyria_panorama_part1,
+            R.raw.asyria_panorama_part2,
+            R.raw.asyria_panorama_part3,
+            R.raw.asyria_panorama_part4,
+            R.raw.asyria_panorama_part5,
+            R.raw.asyria_panorama_part6,
+            R.raw.asyria_panorama_part7
+        )
+        val encodedImage = buildString {
+            resourceParts.forEach { resourceId ->
+                context.resources.openRawResource(resourceId).bufferedReader(Charsets.US_ASCII).use { reader ->
+                    append(reader.readText().trim())
+                }
+            }
+        }
+        val imageBytes = Base64.decode(encodedImage, Base64.DEFAULT)
+        val decoded = BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.size)
+            ?: error("A.SYRIA panorama image could not be decoded")
+        decoded.asImageBitmap()
+    }
+
     val pageProgress by animateFloatAsState(
         targetValue = pageIndex.coerceIn(0, 4).toFloat(),
-        animationSpec = tween(durationMillis = 820, easing = FastOutSlowInEasing),
+        animationSpec = tween(durationMillis = 860, easing = FastOutSlowInEasing),
         label = "ayria_panorama_page"
     )
-    val atmosphere = rememberInfiniteTransition(label = "ayria_panorama_atmosphere")
-    val shimmer by atmosphere.animateFloat(
-        initialValue = 0f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(tween(durationMillis = 12000), RepeatMode.Reverse),
-        label = "ayria_panorama_shimmer"
-    )
+    val horizontalParallax = roll.coerceIn(-20f, 20f) * 0.0035f
+    val verticalParallax = pitch.coerceIn(-20f, 20f) * 0.0025f
 
-    Canvas(modifier = modifier.fillMaxSize()) {
-        val viewportWidth = size.width
-        val worldWidth = viewportWidth * 5f
-        val cameraX = viewportWidth * pageProgress + roll.coerceIn(-20f, 20f) * viewportWidth * 0.012f
-        val cameraY = pitch.coerceIn(-20f, 20f) * size.height * 0.009f
-        val height = size.height
-
-        drawRect(
-            brush = Brush.linearGradient(
-                colors = listOf(
-                    Color(0xFF07182F), Color(0xFF061426), Color(0xFF0A2942),
-                    Color(0xFF06152B), Color(0xFF040D1D)
-                ),
-                start = Offset(-cameraX, 0f),
-                end = Offset(worldWidth - cameraX, height)
-            )
+    BoxWithConstraints(
+        modifier = modifier
+            .fillMaxSize()
+            .clipToBounds()
+            .background(AyriaColors.abyss),
+        contentAlignment = Alignment.TopLeft
+    ) {
+        Image(
+            bitmap = panoramaBitmap,
+            contentDescription = null,
+            contentScale = ContentScale.FillBounds,
+            modifier = Modifier
+                .width(maxWidth * 5f)
+                .height(maxHeight)
+                .absoluteOffset(
+                    x = -(maxWidth * pageProgress) + (maxWidth * horizontalParallax),
+                    y = maxHeight * verticalParallax
+                )
         )
-
-        for (panel in 0..4) {
-            val center = Offset(
-                x = viewportWidth * (panel + 0.48f) - cameraX,
-                y = height * (0.22f + (panel % 2) * 0.21f) + cameraY
-            )
-            val glowRadius = viewportWidth * 0.78f
-            drawCircle(
-                brush = Brush.radialGradient(
-                    colors = listOf(Color(0x553EBFE8), Color(0x1D267CB9), Color.Transparent),
-                    center = center,
-                    radius = glowRadius
-                ),
-                radius = glowRadius,
-                center = center
-            )
-        }
-
-        val ridgeHeights = listOf(0.31f, 0.25f, 0.36f, 0.27f, 0.33f)
-        for (panel in 0..4) {
-            val centerX = viewportWidth * (panel + 0.5f) - cameraX
-            val peak = Offset(centerX + viewportWidth * 0.02f, height * ridgeHeights[panel] + cameraY)
-            val left = Offset(centerX - viewportWidth * 0.52f, height * 0.79f + cameraY)
-            val right = Offset(centerX + viewportWidth * 0.56f, height * 0.81f + cameraY)
-            val facet = androidx.compose.ui.graphics.Path().apply {
-                moveTo(left.x, left.y)
-                lineTo(peak.x, peak.y)
-                lineTo(right.x, right.y)
-                lineTo(centerX + viewportWidth * 0.1f, height * 0.91f + cameraY)
-                close()
-            }
-            drawPath(
-                path = facet,
-                brush = Brush.linearGradient(
-                    colors = listOf(Color(0x2737A9D5), Color(0x102A6798), Color(0x248DE4F4)),
-                    start = peak,
-                    end = right
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.verticalGradient(
+                        colors = listOf(
+                            Color(0x1A020918),
+                            Color.Transparent,
+                            Color(0x44020818)
+                        )
+                    )
                 )
-            )
-            drawPath(
-                path = facet,
-                color = Color(0x5CA8E8F7).copy(alpha = 0.11f + shimmer * 0.035f),
-                style = Stroke(width = 1.dp.toPx())
-            )
-        }
-
-        for (ribbon in 0..3) {
-            val path = androidx.compose.ui.graphics.Path()
-            val baseY = height * (0.61f + ribbon * 0.075f) + cameraY
-            path.moveTo(-cameraX, baseY)
-            for (segment in 0..4) {
-                val startX = viewportWidth * segment - cameraX
-                val endX = startX + viewportWidth
-                val wave = sin((segment * 0.86f + ribbon * 1.21f + shimmer * 0.12f).toDouble()).toFloat()
-                path.cubicTo(
-                    startX + viewportWidth * 0.27f, baseY + wave * height * 0.035f,
-                    startX + viewportWidth * 0.73f, baseY - wave * height * 0.045f,
-                    endX, baseY + wave * height * 0.018f
-                )
-            }
-            drawPath(
-                path = path,
-                color = if (ribbon % 2 == 0) Color(0xFF8ADCF5).copy(alpha = 0.055f + shimmer * 0.025f)
-                else Color.White.copy(alpha = 0.025f + shimmer * 0.012f),
-                style = Stroke(width = if (ribbon == 0) 2.dp.toPx() else 1.dp.toPx(), cap = StrokeCap.Round)
-            )
-        }
-
-        for (point in 0..26) {
-            val worldX = worldWidth * (point / 26f)
-            val localX = worldX - cameraX
-            val y = height * (0.13f + ((point * 37) % 71) / 100f) + cameraY * 0.5f
-            val alpha = 0.10f + 0.10f * (0.5f + 0.5f * sin((shimmer * 6.283f + point).toDouble()).toFloat())
-            drawCircle(
-                color = Color(0xFFD9F7FF).copy(alpha = alpha),
-                radius = if (point % 3 == 0) 1.4.dp.toPx() else 0.8.dp.toPx(),
-                center = Offset(localX, y)
-            )
-        }
-
-        drawRect(
-            brush = Brush.verticalGradient(
-                colors = listOf(Color.Black.copy(alpha = 0.20f), Color.Transparent, Color.Black.copy(alpha = 0.36f))
-            )
         )
     }
 }
