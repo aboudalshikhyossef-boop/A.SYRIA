@@ -63,6 +63,7 @@ fun AppPinSettingsScreen(
         mutableStateOf(if (isEnabled && hasPin) "overview" else "disabled")
     }
     var pendingPin by remember { mutableStateOf("") }
+    var firstPinForConfirmation by remember { mutableStateOf("") }
     var error by remember { mutableStateOf<String?>(null) }
     var isSaving by remember { mutableStateOf(false) }
 
@@ -209,6 +210,7 @@ fun AppPinSettingsScreen(
                                                 else error = if (isArabic) "تعذّر تحديث إعداد القفل. حاول مجدداً." else "Could not update lock settings. Please retry."
                                             }
                                         } else {
+                                            firstPinForConfirmation = ""
                                             mode = "create"
                                             error = null
                                         }
@@ -244,6 +246,7 @@ fun AppPinSettingsScreen(
                             actionEnabled = pendingPin.length == 6 && !isSaving,
                             onAction = {
                                 if (!confirming) {
+                                    firstPinForConfirmation = pendingPin
                                     pendingPin = ""
                                     error = null
                                     mode = "confirm"
@@ -274,7 +277,7 @@ fun AppPinSettingsScreen(
                             onSecondary = {
                                 pendingPin = ""
                                 error = null
-                                if (confirming) mode = "create" else mode = if (isEnabled) "overview" else "disabled"
+                                if (confirming) { firstPinForConfirmation = ""; mode = "create" } else mode = if (isEnabled) "overview" else "disabled"
                             }
                         )
                     }
