@@ -740,7 +740,6 @@ class MainActivity : FragmentActivity() {
             }
         }
     }
-}
 
 private data class NavTab(val key: String, val labelEn: String, val labelAr: String)
 
