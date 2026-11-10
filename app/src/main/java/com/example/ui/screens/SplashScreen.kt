@@ -175,7 +175,7 @@ fun SplashScreen(
                 Spacer(Modifier.height(18.dp))
                 AyriaVerseCard(
                     isArabic = isArabic,
-                    modifier = Modifier.width(318.dp)
+                    modifier = Modifier.width(318.dp).height(116.dp)
                 )
                 Spacer(Modifier.height(22.dp))
                 androidx.compose.material3.Text(
