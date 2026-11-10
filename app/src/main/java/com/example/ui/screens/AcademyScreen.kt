@@ -156,11 +156,7 @@ fun AcademyScreen(
         Column(
             modifier = modifier
                 .fillMaxSize()
-                .background(
-                    Brush.verticalGradient(
-                        colors = listOf(VoidBlack, Color(0xFF04070D))
-                    )
-                )
+                .background(Color.Transparent)
                 .statusBarsPadding()
                 .navigationBarsPadding()
                 .padding(16.dp)

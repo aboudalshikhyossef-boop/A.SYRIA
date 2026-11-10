@@ -137,7 +137,7 @@ fun GeminiChatScreen(
         }
         drawCircle(brush = Brush.radialGradient(listOf(borderColor.copy(alpha = 0.9f), borderColor.copy(alpha = 0.3f), Color.Transparent), center = Offset(spotX, spotY), radius = 40.dp.toPx()), radius = 40.dp.toPx(), center = Offset(spotX, spotY))
     }) {
-        Column(modifier = Modifier.fillMaxSize().background(DeepNavy)) {
+        Column(modifier = Modifier.fillMaxSize().background(Color.Transparent)) {
             ChatTopBar(onClear = { showClearDialog = true }, borderColor = borderColor, glowAlpha = borderGlow)
 
             if (messages.isEmpty() && !isTyping) {

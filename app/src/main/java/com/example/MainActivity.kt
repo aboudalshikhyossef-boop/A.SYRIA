@@ -23,6 +23,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.MenuBook
@@ -49,6 +50,7 @@ import com.example.adaptive.LocalWindowAdaptiveInfo
 import com.example.adaptive.ProvideWindowAdaptiveLayout
 import com.example.ui.screens.*
 import com.example.ui.brand.AyriaArabicFont
+import com.example.ui.brand.AyriaPanoramaBackdrop
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.LayoutDirection
@@ -720,10 +722,26 @@ class MainActivity : FragmentActivity() {
                                 }
 
                                 val windowInfo = LocalWindowAdaptiveInfo.current
+                                val panoramaRoll by vm.roll.collectAsState()
+                                val panoramaPitch by vm.pitch.collectAsState()
+                                val panoramaPage = when (activeTab) {
+                                    "academy" -> 1
+                                    "chat" -> 2
+                                    "library" -> 3
+                                    "settings" -> 4
+                                    else -> 0
+                                }
                                 CompositionLocalProvider(LocalLayoutDirection provides if (isArLocal) LayoutDirection.Rtl else LayoutDirection.Ltr) {
+                                    Box(Modifier.fillMaxSize()) {
+                                        AyriaPanoramaBackdrop(
+                                            pageIndex = panoramaPage,
+                                            roll = panoramaRoll,
+                                            pitch = panoramaPitch,
+                                            modifier = Modifier.fillMaxSize()
+                                        )
                                     Scaffold(
                                         modifier = Modifier.fillMaxSize().nestedScroll(nestedScrollConnection),
-                                        containerColor = VoidBlack,
+                                        containerColor = Color.Transparent,
                                         contentWindowInsets = WindowInsets(0, 0, 0, 0),
                                         bottomBar = {
                                             if (!windowInfo.usesNavigationRail) {
@@ -783,6 +801,7 @@ class MainActivity : FragmentActivity() {
                                                 }
                                             }
                                         }
+                                    }
                                     }
                                 }
                             }
@@ -919,16 +938,8 @@ private fun AppNavigationRail(
                         modifier = Modifier.size(22.dp)
                     )
                 },
-                label = {
-                    Text(
-                        text = tab.label(isArabic),
-                        color = if (selected) color else Color.White.copy(alpha = 0.45f),
-                        fontSize = 9.sp,
-                        fontWeight = FontWeight.Bold,
-                        fontFamily = FontFamily.Monospace
-                    )
-                },
-                alwaysShowLabel = true,
+                label = null,
+                alwaysShowLabel = false,
                 colors = NavigationRailItemDefaults.colors(
                     selectedIconColor = color,
                     selectedTextColor = color,
@@ -944,67 +955,45 @@ private fun AppNavigationRail(
 @Composable
 private fun AppBottomNavBar(isArabic: Boolean, activeTab: String, onTabSelected: (String) -> Unit) {
     val haptic = LocalHapticFeedback.current
-    val outerShape = RoundedCornerShape(26.dp)
-    val itemShape = RoundedCornerShape(20.dp)
 
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 10.dp)
-            .clip(outerShape)
-            .background(
-                Brush.linearGradient(listOf(Color(0xD9153550), Color(0xC9091B31), Color(0xD9102943))),
-                outerShape
-            )
-            .border(
-                0.75.dp,
-                Brush.linearGradient(listOf(Color.White.copy(alpha = 0.22f), Color(0x668CE5FF), Color.White.copy(alpha = 0.08f))),
-                outerShape
-            )
-            .padding(horizontal = 5.dp, vertical = 6.dp),
-        horizontalArrangement = Arrangement.spacedBy(3.dp),
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 8.dp),
+        horizontalArrangement = Arrangement.SpaceEvenly,
         verticalAlignment = Alignment.CenterVertically
     ) {
         appNavigationTabs.forEach { tab ->
             val selected = activeTab == tab.key
-            val color = tab.accentColor()
-            Column(
-                modifier = Modifier
-                    .weight(1f)
-                    .clip(itemShape)
+            val accent = tab.accentColor()
+            Box(
+                modifier = Modifier.size(50.dp).clip(CircleShape)
                     .background(
-                        if (selected) Brush.linearGradient(listOf(color.copy(alpha = 0.23f), color.copy(alpha = 0.08f)))
-                        else Brush.linearGradient(listOf(Color.Transparent, Color.Transparent)),
-                        itemShape
+                        brush = if (selected) Brush.linearGradient(
+                            listOf(Color(0x8865C8E8), Color(0x555D9FC4), Color(0x33234D70))
+                        ) else Brush.linearGradient(listOf(Color(0x442B5876), Color(0x22213B56))),
+                        shape = CircleShape
                     )
                     .border(
-                        if (selected) 0.7.dp else 0.dp,
-                        if (selected) color.copy(alpha = 0.32f) else Color.Transparent,
-                        itemShape
+                        width = if (selected) 1.15.dp else 0.7.dp,
+                        brush = Brush.linearGradient(
+                            listOf(
+                                Color.White.copy(alpha = if (selected) 0.52f else 0.22f),
+                                accent.copy(alpha = if (selected) 0.66f else 0.18f),
+                                Color.White.copy(alpha = 0.08f)
+                            )
+                        ),
+                        shape = CircleShape
                     )
                     .clickable {
                         haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove)
                         onTabSelected(tab.key)
-                    }
-                    .padding(vertical = 7.dp, horizontal = 2.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center
+                    },
+                contentAlignment = Alignment.Center
             ) {
                 Icon(
                     imageVector = tab.icon(),
                     contentDescription = tab.label(isArabic),
-                    tint = if (selected) Color(0xFFD9F7FF) else Color(0xFFB6C9D9).copy(alpha = 0.72f),
-                    modifier = Modifier.size(if (selected) 22.dp else 20.dp)
-                )
-                Spacer(Modifier.height(3.dp))
-                Text(
-                    text = tab.label(isArabic),
-                    color = if (selected) Color(0xFFEAFBFF) else Color(0xFFB6C9D9).copy(alpha = 0.72f),
-                    fontSize = 9.5.sp,
-                    fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
-                    fontFamily = AyriaArabicFont,
-                    letterSpacing = if (isArabic) 0.sp else 0.35.sp,
-                    maxLines = 1
+                    tint = if (selected) Color(0xFFE8FBFF) else Color(0xFFB6D0E2).copy(alpha = 0.76f),
+                    modifier = Modifier.size(if (selected) 23.dp else 21.dp)
                 )
             }
         }

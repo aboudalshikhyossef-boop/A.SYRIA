@@ -62,7 +62,7 @@ fun SettingsScreen(
     val borderGlow by infiniteTransition.animateFloat(initialValue = 0.3f, targetValue = 0.8f, animationSpec = infiniteRepeatable(tween(2500), RepeatMode.Reverse), label = "glow")
 
     CompositionLocalProvider(LocalLayoutDirection provides layoutDirection) {
-        Box(modifier = Modifier.fillMaxSize().background(VoidBlack)) {
+        Box(modifier = Modifier.fillMaxSize().background(Color.Transparent)) {
             // Subtle top gradient
             Box(modifier = Modifier.fillMaxWidth().height(200.dp).background(Brush.verticalGradient(listOf(AmberZen.copy(alpha = 0.06f), Color.Transparent))))
 

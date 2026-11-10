@@ -38,6 +38,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -51,6 +52,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.rounded.MenuBook
 import androidx.compose.material.icons.rounded.Explore
+import androidx.compose.material.icons.rounded.DesktopWindows
 import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.School
 import androidx.compose.material.icons.rounded.Tune
@@ -153,799 +155,215 @@ fun DashboardScreen(
     onNavigateToScanner: () -> Unit,
     onVaultLockRequest: (String, String, () -> Unit) -> Unit
 ) {
-    val context = LocalContext.current
     val haptic = androidx.compose.ui.platform.LocalHapticFeedback.current
-    val windowInfo = LocalWindowAdaptiveInfo.current
+    val clipboard = androidx.compose.ui.platform.LocalClipboardManager.current
 
-    val roll by viewModel.roll.collectAsState()
-    val pitch by viewModel.pitch.collectAsState()
-
-    // Phase 7 Settings & Stealth Mode state tracking
+    val isAr by viewModel.isArabic.collectAsState()
     val isStealthMode by viewModel.isStealthMode.collectAsState()
-    val customApiKey by viewModel.customApiKey.collectAsState()
-    val isSettingsOpen by viewModel.isSettingsOpen.collectAsState()
-    val stealthAlphaMultiplier = if (isStealthMode) 0.45f else 1f
-
-    // Phase 6 Ambient Wisdom state tracking
-    val ambientInsight by viewModel.ambientInsight.collectAsState()
-    val stateType = ambientInsight.stateType
-
-    // Telemetry and analytical data
-    val connectionType by viewModel.connectionType.collectAsState()
     val ipAddress by viewModel.ipAddress.collectAsState()
-    
-    // Accurate Prayer Data from PrayerViewModel
-    val nextPrayerName by prayerViewModel.nextPrayerName.collectAsState()
-    val nextPrayerCountdown by prayerViewModel.nextPrayerCountdown.collectAsState()
-    val nextPrayerProgress by prayerViewModel.nextPrayerProgress.collectAsState()
-    val nextPrayerTime by prayerViewModel.nextPrayerTime.collectAsState()
-    val allPrayerTimes by prayerViewModel.allPrayerTimes.collectAsState()
-    val qiblaDirection by prayerViewModel.qiblaDirection.collectAsState()
-
-    val azimuth by viewModel.azimuth.collectAsState()
-
-    // Pulse animation for HUD components
-    val infiniteTransition = rememberInfiniteTransition(label = "hudPulse")
-    val hudPulseAlpha by infiniteTransition.animateFloat(
-        initialValue = 0.6f,
-        targetValue = 1.0f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(1500, easing = LinearEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "hudPulseAlpha"
-    )
-
-    fun openIntelligenceLink(url: String, title: String) {
-        haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
-        viewModel.analyzeResourceLink(url)
-    }
-
-    // Gemini states
-    val isThinking by viewModel.isThinking.collectAsState()
-    val intelligenceBrief by viewModel.intelligenceBrief.collectAsState()
-    val terminalInput by viewModel.terminalInput.collectAsState()
-    val terminalResponse by viewModel.terminalResponse.collectAsState()
-    val isTerminalExpanded by viewModel.isTerminalExpanded.collectAsState()
-
-    // Secure vault state
+    val isNeuralLinkOffline by viewModel.isNeuralLinkOffline.collectAsState()
     val isVaultViewOpen by viewModel.isVaultViewOpen.collectAsState()
 
-    // Phase 11 states
-    val isAr by viewModel.isArabic.collectAsState()
-    val cyberScore by viewModel.cyberScore.collectAsState()
-    val cyberRank by viewModel.cyberRank.collectAsState()
-    val cyberProgress by viewModel.cyberProgress.collectAsState()
-    val isAcademyOpen by viewModel.isAcademyOpen.collectAsState()
-    val isResourcesOpen by viewModel.isResourcesOpen.collectAsState()
+    val nextPrayerName by prayerViewModel.nextPrayerName.collectAsState()
+    val nextPrayerCountdown by prayerViewModel.nextPrayerCountdown.collectAsState()
+    val nextPrayerTime by prayerViewModel.nextPrayerTime.collectAsState()
+    val allPrayerTimes by prayerViewModel.allPrayerTimes.collectAsState()
 
-    val operatorName by viewModel.operatorName.collectAsState()
-    val neuralRole by viewModel.neuralRole.collectAsState()
-
-    val isNeuralLinkOffline by viewModel.isNeuralLinkOffline.collectAsState()
-    val linkAnalysisResult by viewModel.linkAnalysisResult.collectAsState()
-    val isAnalyzingLink by viewModel.isAnalyzingLink.collectAsState()
-
-    // Phase 20: Tactical Document Details
-
-    // Desktop Mode state
     var isDesktopModeOpen by remember { mutableStateOf(false) }
-
-    // Navigation BackHandler logic for sovereign stability
-    BackHandler(enabled = isDesktopModeOpen || isTerminalExpanded || isVaultViewOpen) {
-        when {
-            isDesktopModeOpen -> isDesktopModeOpen = false
-            isTerminalExpanded -> viewModel.setTerminalExpanded(false)
-            isVaultViewOpen -> viewModel.setVaultViewOpen(false)
-        }
-    }
-
-    // Cubic bezier easing for organic visual pulse cycle
-    val cubicBezierEasing = remember { CubicBezierEasing(0.445f, 0.05f, 0.55f, 0.95f) }
-
-    val smoothRoll by androidx.compose.animation.core.animateFloatAsState(
-        targetValue = roll,
-        animationSpec = androidx.compose.animation.core.spring(
-            dampingRatio = androidx.compose.animation.core.Spring.DampingRatioLowBouncy,
-            stiffness = androidx.compose.animation.core.Spring.StiffnessVeryLow
-        ),
-        label = "smoothRoll"
-    )
-
-    val smoothPitch by androidx.compose.animation.core.animateFloatAsState(
-        targetValue = pitch,
-        animationSpec = androidx.compose.animation.core.spring(
-            dampingRatio = androidx.compose.animation.core.Spring.DampingRatioLowBouncy,
-            stiffness = androidx.compose.animation.core.Spring.StiffnessVeryLow
-        ),
-        label = "smoothPitch"
-    )
-
-    // Multi-layered Parallax dimensions derived from smooth accelerometer roll and pitch
-    val bgRollShift by remember { derivedStateOf { smoothRoll * 2.8f } }
-    val bgPitchShift by remember { derivedStateOf { smoothPitch * 2.8f } }
-
-    val coreRollShift by remember { derivedStateOf { smoothRoll * 1.5f } }
-    val corePitchShift by remember { derivedStateOf { smoothPitch * 1.5f } }
-
-    val cardRollShift by remember { derivedStateOf { smoothRoll * 0.8f } }
-    val cardPitchShift by remember { derivedStateOf { smoothPitch * 0.8f } }
-
-        val spiritualVerses = remember(isAr) {
-        if (isAr) {
-            listOf(
-                "أَلَا بِذِكْرِ اللَّهِ تَطْمَئِنُّ الْقُلُوبُ",
-                "إِنَّ مَعَ الْعُسْرِ يُسْرًا",
-                "وَمَنْ يَتَوَكَّلْ عَلَى اللَّهِ فَهُوَ حَسْبُهُ",
-                "يَهْدِي اللَّهُ لِنُورِهِ مَنْ يَشَاءُ",
-                "وَكَانَ حقًّا عَلَيْنَا نَصْرُ الْمُؤْمِنِينَ"
-            )
-        } else {
-            listOf(
-                "Verily, in the remembrance of Allah do hearts find rest",
-                "Indeed, with hardship comes ease",
-                "And whoever relies upon Allah - then He is sufficient for him",
-                "Allah guides to His light whom He wills",
-                "And it was due from Us to aid the believers"
-            )
-        }
-    }
     var currentVerseIndex by remember { mutableStateOf(0) }
+    val easing = remember { CubicBezierEasing(0.445f, 0.05f, 0.55f, 0.95f) }
+    val accent = if (isStealthMode) Color(0xFF9DB8CC) else AyriaColors.teal
 
-    val bgColors = when {
-        isStealthMode -> listOf(Color(0xFF020711), Color(0xFF030A14))
-        isNeuralLinkOffline -> listOf(Color(0xFF101624), Color(0xFF030A14))
-        else -> listOf(Color(0xFF0A263C), Color(0xFF020915), Color(0xFF061426))
+    val spiritualVerses = remember(isAr) {
+        if (isAr) listOf(
+            "أَلَا بِذِكْرِ اللَّهِ تَطْمَئِنُّ الْقُلُوبُ",
+            "إِنَّ مَعَ الْعُسْرِ يُسْرًا",
+            "وَمَنْ يَتَوَكَّلْ عَلَى اللَّهِ فَهُوَ حَسْبُهُ",
+            "يَهْدِي اللَّهُ لِنُورِهِ مَنْ يَشَاءُ",
+            "وَكَانَ حَقًّا عَلَيْنَا نَصْرُ الْمُؤْمِنِينَ"
+        ) else listOf(
+            "Verily, in the remembrance of Allah do hearts find rest",
+            "Indeed, with hardship comes ease",
+            "And whoever relies upon Allah - then He is sufficient for him",
+            "Allah guides to His light whom He wills",
+            "And it was due from Us to aid the believers"
+        )
     }
 
-    // ── AI-driven theme accent — reads live from LocalAdaptiveConfig so every color
-    //    change issued by the AI Brain instantly re-triggers Compose recomposition
-    //    across the entire DashboardScreen without any app restart.
-    val adaptiveConfig = LocalAdaptiveConfig.current
-    val themeAccent = resolveAccentFromConfig(adaptiveConfig)
+    BackHandler(enabled = isDesktopModeOpen || isVaultViewOpen) {
+        if (isDesktopModeOpen) isDesktopModeOpen = false else viewModel.setVaultViewOpen(false)
+    }
 
-    // Connection-aware dynamic accent: AI-theme when ONLINE, Orange when OFFLINE
-    val dynamicAccent by animateColorAsState(
-        targetValue = if (isNeuralLinkOffline) AmberZen else themeAccent,
-        animationSpec = tween(800),
-        label = "dynamicAccent"
-    )
-
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(
-                Brush.radialGradient(
-                    colors = bgColors,
-                    radius = 2200f
-                )
-            ),
-        contentAlignment = Alignment.Center
-    ) {
-        // Deep Parallax with Stealth mode speed deceleration support
-        IceTriangleBackdrop(
-            rollOffset = bgRollShift,
-            pitchOffset = bgPitchShift,
-            isStealthMode = isStealthMode
-        )
-
-        BackgroundParticles(
-            rollOffset = bgRollShift,
-            pitchOffset = bgPitchShift,
-            stateType = stateType,
-            isStealthMode = isStealthMode
-        )
-
-        // Subtle gradient vignette overlay
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(
-                    Brush.verticalGradient(
-                        colors = listOf(
-                            Color.Black.copy(alpha = 0.6f),
-                            Color.Transparent,
-                            Color.Black.copy(alpha = 0.7f)
-                        )
-                    )
-                )
-        )
-
-        // Conditional Rendering: Main Dashboard or Strategic Terminal Mode
-        val currentLayoutDirection = if (isAr) LayoutDirection.Rtl else LayoutDirection.Ltr
-        CompositionLocalProvider(LocalLayoutDirection provides currentLayoutDirection) {
-            if (!isTerminalExpanded) {
-                // STANDARD MODE: Unified Operations Grid with LazyColumn fix for scrolling
-                LazyColumn(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .statusBarsPadding()
-                        
-                        .padding(horizontal = windowInfo.horizontalContentPadding, vertical = 8.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
+    CompositionLocalProvider(LocalLayoutDirection provides if (isAr) LayoutDirection.Rtl else LayoutDirection.Ltr) {
+        Box(modifier = Modifier.fillMaxSize()) {
+            Column(
+                modifier = Modifier.fillMaxSize().statusBarsPadding().padding(horizontal = 20.dp, vertical = 14.dp),
+                verticalArrangement = Arrangement.spacedBy(13.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    item {
-                        StatusHeaderCell(
-                            roll = cardRollShift,
-                            pitch = cardPitchShift,
-                            operatorName = operatorName,
-                            neuralRole = neuralRole,
-                            isStealth = isStealthMode
-                        )
-                    }
-
-                    // Connection-aware status pill (blue when online, orange when offline)
-                    item {
-                        ConnectionStatusPill(
-                            isOnline = !isNeuralLinkOffline,
-                            accent = dynamicAccent,
-                            isAr = isAr
-                        )
-                    }
-                    
-                    item {
-                        SovereignContextHub(
-                            roll = cardRollShift,
-                            pitch = cardPitchShift,
-                            connectionType = connectionType,
-                            ipAddress = ipAddress
-                        )
-                    }
-
-                    // Phase 6 Contextual Wisdom floating card
-                    item {
-                        AmbientInsightCard(
-                            insight = ambientInsight,
-                            modifier = Modifier.padding(horizontal = 4.dp)
-                        )
-                    }
-
-                    // Phase 11: Glowing Cyber-Rank tracker bar
-                    item {
-                        CyberRankMetricBar(
-                            score = cyberScore,
-                            rank = cyberRank,
-                            progress = cyberProgress,
-                            roll = cardRollShift,
-                            pitch = cardPitchShift
-                        )
-                    }
-
-                    item {
-                        Text(
-                            text = if (isAr) "اضغط مطولاً على درع النقاط لتنشغيل العصف الاستراتيجي" else "HOLD SHIELD CORE TO ACTIVATE STRATEGIC BRAIN",
-                            color = CyberCyan.copy(alpha = 0.5f),
-                            fontSize = 8.5.sp,
-                            fontWeight = FontWeight.Bold,
-                            letterSpacing = 1.5.sp,
-                            textAlign = TextAlign.Center,
-                            modifier = Modifier.padding(bottom = 2.dp)
-                        )
-                    }
-
-                    // Core responsive node that transitions visually during thinking operations
-                    item {
-                        Box(
-                            modifier = Modifier
-                                .pointerInput(Unit) {
-                                    detectTapGestures(
-                                        onLongPress = {
-                                            haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
-                                            viewModel.setTerminalExpanded(true)
-                                        }
-                                    )
-                                }
-                        ) {
-                            NeuralCore(
-                                roll = coreRollShift,
-                                pitch = corePitchShift,
-                                isThinking = isThinking,
-                                easing = cubicBezierEasing,
-                                sizeDimension = 190,
-                                stateType = stateType
-                            )
+                    DashboardGlassAction(
+                        icon = Icons.Rounded.Lock,
+                        title = if (isAr) "الخزينة" else "Vault",
+                        subtitle = if (isAr) "حفظ مشفّر" else "Encrypted storage",
+                        accent = accent,
+                        modifier = Modifier.weight(1f).height(126.dp),
+                        onClick = {
+                            haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
+                            if (viewModel.isVaultAuthenticated.value) {
+                                viewModel.setVaultViewOpen(true)
+                            } else {
+                                onVaultLockRequest(
+                                    if (isAr) "تأكيد الهوية" else "VERIFY IDENTITY",
+                                    if (isAr) "يلزم التحقق للوصول إلى الخزينة الآمنة" else "Verification is required to open the secure vault",
+                                    {
+                                        viewModel.setVaultAuthenticated(true)
+                                        viewModel.setVaultViewOpen(true)
+                                    }
+                                )
+                            }
                         }
-                    }
+                    )
+                    DashboardGlassAction(
+                        icon = Icons.Rounded.Wifi,
+                        title = if (isAr) "عنوان IP" else "Network IP",
+                        subtitle = ipAddress.ifBlank { if (isAr) "بانتظار الشبكة" else "Waiting for network" },
+                        accent = accent,
+                        modifier = Modifier.weight(1f).height(126.dp),
+                        onClick = {
+                            if (ipAddress.isNotBlank()) {
+                                clipboard.setText(androidx.compose.ui.text.AnnotatedString(ipAddress))
+                                haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove)
+                            }
+                        }
+                    )
+                }
 
-                    // Tactical Holy Verse Selection Bridge
-                    item {
+                DashboardGlassAction(
+                    icon = Icons.Rounded.Explore,
+                    title = if (isAr) "المصادر والفحص" else "Sources & Scan",
+                    subtitle = if (isAr) "فحص الروابط والملفات" else "Inspect links and files",
+                    accent = accent,
+                    modifier = Modifier.fillMaxWidth().height(94.dp),
+                    horizontal = true,
+                    onClick = {
+                        haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
+                        onNavigateToScanner()
+                    }
+                )
+
+                AyriaGlassPanel(
+                    modifier = Modifier.fillMaxWidth().weight(1f).heightIn(min = 132.dp),
+                    highlighted = true,
+                    shape = RoundedCornerShape(26.dp)
+                ) {
+                    Box(
+                        modifier = Modifier.fillMaxSize().padding(horizontal = 8.dp, vertical = 4.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
                         NeuralVerseModule(
                             verse = spiritualVerses[currentVerseIndex],
-                            easing = cubicBezierEasing,
+                            easing = easing,
                             onTap = {
                                 haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove)
                                 currentVerseIndex = (currentVerseIndex + 1) % spiritualVerses.size
                             }
                         )
                     }
-
-                    // Secure vault entry
-                    item {
-                        TacticalGridButton(
-                            text = if (isAr) "الخزينة الآمنة" else "SECURE VAULT",
-                            subtitle = if (isAr) "حفظ الصور والملفات بتشفير محلي" else "Encrypted photos, files and notes",
-                            color = dynamicAccent,
-                            icon = Icons.Rounded.Lock,
-                            onClick = {
-                                haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
-                                if (viewModel.isVaultAuthenticated.value) {
-                                    viewModel.setVaultViewOpen(true)
-                                } else {
-                                    onVaultLockRequest(
-                                        if (isAr) "تأكيد الهوية السيادية" else "SOVEREIGN IDENTITY VERIFIED",
-                                        if (isAr) "مطلوب التحقق بالبصمة أو قفل الجهاز للوصول إلى الخزينة" else "Biometric or secure device authentication is required",
-                                        {
-                                            viewModel.setVaultAuthenticated(true)
-                                            viewModel.setVaultViewOpen(true)
-                                        }
-                                    )
-                                }
-                            },
-                            modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp)
-                        )
-                    }
-
-                    // Academy and resource controllers
-                    item {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 14.dp)
-                                .graphicsLayer {
-                                    rotationX = -cardPitchShift * 0.7f
-                                    rotationY = cardRollShift * 0.7f
-                                },
-                            horizontalArrangement = Arrangement.spacedBy(12.dp)
-                        ) {
-                            TacticalGridButton(
-                                text = if (isAr) "الأكاديمية" else "ACADEMY",
-                                subtitle = if (isAr) "تعلم واختبارات تفاعلية" else "Interactive learning",
-                                color = dynamicAccent,
-                                icon = Icons.Rounded.School,
-                                onClick = {
-                                    haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
-                                    viewModel.setAcademyOpen(true)
-                                },
-                                modifier = Modifier.weight(1f)
-                            )
-                            TacticalGridButton(
-                                text = if (isAr) "المصادر" else "RESOURCES",
-                                subtitle = if (isAr) "أدوات ومعرفة مختارة" else "Curated tools and knowledge",
-                                color = dynamicAccent,
-                                icon = Icons.AutoMirrored.Rounded.MenuBook,
-                                onClick = {
-                                    haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
-                                    viewModel.setResourcesOpen(true)
-                                },
-                                modifier = Modifier.weight(1f)
-                            )
-                        }
-                    }
-
-                    item {
-                        IntelligenceTicker(
-                            text = intelligenceBrief,
-                            isOffline = isNeuralLinkOffline,
-                            roll = cardRollShift,
-                            pitch = cardPitchShift
-                        )
-                    }
-
-                    item {
-                        // Desktop Mode Button
-                        Button(
-                            onClick = { isDesktopModeOpen = true },
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = CyberCyan.copy(alpha = 0.08f)
-                            ),
-                            border = BorderStroke(0.75.dp, CyberCyan.copy(alpha = 0.4f)),
-                            shape = RoundedCornerShape(10.dp),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Text(
-                                text = if (isAr) "وضع المكتب" else "DESKTOP MODE",
-                                color = CyberCyan,
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Bold,
-                                fontFamily = FontFamily.Monospace,
-                                letterSpacing = 2.sp
-                            )
-                        }
-                    }
-
-                    item {
-                        Spacer(modifier = Modifier.height(12.dp))
-                        RadiantDigitalClock(
-                            prayerName = nextPrayerName,
-                            prayerTime = nextPrayerTime,
-                            prayerCountdown = nextPrayerCountdown,
-                            isAr = isAr,
-                            allPrayerTimes = allPrayerTimes
-                        )
-                        Spacer(modifier = Modifier.height(16.dp))
-                    }
-                }
-            } else {
-            // TERMINAL EXTENDED MODE: Redesigned Strategic Station with Scrollable Area and Blinking Cursor
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .statusBarsPadding()
-                    
-                    .imePadding()
-                    .padding(16.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                // Header Area
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    IconButton(onClick = { viewModel.setTerminalExpanded(false) }) {
-                        Icon(imageVector = Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Close", tint = CyberCyan)
-                    }
-                    val statusColor by animateColorAsState(if (isNeuralLinkOffline) Color.Red else CyberCyan, label = "statusColor")
-                    Text(
-                        text = if (isNeuralLinkOffline) "LINK_OFFLINE" else "UPLINK_STABLE",
-                        color = statusColor,
-                        fontSize = 10.sp,
-                        fontFamily = FontFamily.Monospace,
-                        fontWeight = FontWeight.Bold
-                    )
                 }
 
-                Spacer(modifier = Modifier.height(10.dp))
-
-                // Scrollable Output Panel (Neural Console)
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxWidth()
-                        .border(1.dp, CyberCyan.copy(alpha = 0.2f), RoundedCornerShape(12.dp))
-                        .background(Color.Black.copy(alpha = 0.8f), RoundedCornerShape(12.dp))
-                        .padding(16.dp)
-                ) {
-                    val terminalState = rememberScrollState()
-                    LaunchedEffect(terminalResponse) {
-                        terminalState.animateScrollTo(terminalState.maxValue)
+                DashboardGlassAction(
+                    icon = Icons.Rounded.DesktopWindows,
+                    title = if (isAr) "وضع المكتب" else "Desktop Mode",
+                    subtitle = if (isAr) "واجهة موسّعة للأدوات" else "Expanded workspace",
+                    accent = accent,
+                    modifier = Modifier.fillMaxWidth().height(76.dp),
+                    horizontal = true,
+                    onClick = {
+                        haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
+                        isDesktopModeOpen = true
                     }
-
-                    Column(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .verticalScroll(terminalState)
-                    ) {
-                        Text(
-                            text = if (isAr) "--- بداية التقرير الاستراتيجي ---" else "--- BEGIN STRATEGIC REPORT ---",
-                            color = CyberCyan.copy(alpha = 0.4f),
-                            fontSize = 9.sp,
-                            fontFamily = FontFamily.Monospace
-                        )
-                        Spacer(modifier = Modifier.height(12.dp))
-                        
-                        SelectionContainer {
-                            CompositionLocalProvider(LocalLayoutDirection provides (if (isAr) LayoutDirection.Rtl else LayoutDirection.Ltr)) {
-                                val cursorColor by animateColorAsState(if (isThinking) AmberZen else CyberCyan, label = "cursor")
-                                val infiniteCursor = rememberInfiniteTransition(label = "cursor")
-                                val cursorAlpha by infiniteCursor.animateFloat(
-                                    initialValue = 1f,
-                                    targetValue = 0f,
-                                    animationSpec = infiniteRepeatable(tween(500), RepeatMode.Reverse),
-                                    label = "cursorAlpha"
-                                )
-
-                                Text(
-                                    text = if (terminalResponse.isEmpty() && !isThinking) {
-                                        if (isAr) "محطة التشفير جاهزة.\nبناء وتطوير: ABOUDA.AL.SHEKH.YOSSEF\nبانتظار استعلام الهوية..." else "TERMINAL READY.\nEngineered by: ABOUDA.AL.SHEKH.YOSSEF\nAWAITING CORE QUERY..."
-                                    } else {
-                                        terminalResponse + (if (isThinking || terminalResponse.isNotEmpty()) " " else "")
-                                    },
-                                    color = if (isThinking) AmberZen else CyberCyan,
-                                    fontSize = 14.sp,
-                                    fontFamily = FontFamily.Monospace,
-                                    lineHeight = 22.sp
-                                )
-
-                                if (isThinking || terminalResponse.isNotEmpty()) {
-                                    Text(
-                                        text = "_",
-                                        color = cursorColor.copy(alpha = cursorAlpha),
-                                        fontSize = 14.sp,
-                                        fontFamily = FontFamily.Monospace,
-                                        modifier = Modifier.offset(x = if (isAr) (-2).dp else 2.dp)
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(8.dp))
-                // Read-only report mode — AI status dashboard only
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(bottom = 8.dp)
-                        .border(0.5.dp, CyberCyan.copy(alpha = 0.15f), RoundedCornerShape(8.dp))
-                        .background(CyberCyan.copy(alpha = 0.03f), RoundedCornerShape(8.dp))
-                        .padding(10.dp)
-                ) {
-                    Text(
-                        text = if (isAr)
-                            "[ تقرير الحالة ] — واجهة للقراءة فقط. استخدم الأكاديمية لاستعلامات الذكاء الاصطناعي."
-                        else
-                            "[ STATUS REPORT ] — Read-only view. Use Academy for AI interactions.",
-                        color = CyberCyan.copy(alpha = 0.5f),
-                        fontSize = 9.sp,
-                        fontFamily = FontFamily.Monospace,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                }
-            }
-        }
-
-        // ==========================================
-        // PHASE 19: NEURAL LINK ANALYSIS OVERLAY
-        // ==========================================
-        AnimatedVisibility(
-            visible = isAnalyzingLink || linkAnalysisResult != null,
-            enter = fadeIn() + slideInVertically { it / 2 },
-            exit = fadeOut() + slideOutVertically { it / 2 }
-        ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(Color.Black.copy(alpha = 0.85f))
-                    .clickable { viewModel.clearLinkAnalysis() },
-                contentAlignment = Alignment.Center
-            ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth(0.9f)
-                        .background(VoidBlack, RoundedCornerShape(16.dp))
-                        .border(1.dp, CyberCyan.copy(alpha = 0.5f), RoundedCornerShape(16.dp))
-                        .padding(24.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Text(
-                        text = "NEURAL LINK ANALYSIS",
-                        color = CyberCyan,
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Black,
-                        letterSpacing = 2.sp,
-                        fontFamily = FontFamily.Monospace
-                    )
-                    
-                    Spacer(modifier = Modifier.height(20.dp))
-                    
-                    if (isAnalyzingLink) {
-                        NeuralCore(
-                            roll = 0f, pitch = 0f, 
-                            isThinking = true, easing = LinearEasing,
-                            sizeDimension = 80, stateType = ContextualVerseEngine.AmbientStateType.HIGH_PERFORMANCE
-                        )
-                        Spacer(modifier = Modifier.height(16.dp))
-                        Text(
-                            text = if (isAr) "تحليل الرابط رقمياً..." else "DECODING BRAIN LINK...",
-                            color = Color.White.copy(alpha = 0.7f),
-                            fontSize = 11.sp,
-                            fontFamily = FontFamily.Monospace
-                        )
-                    } else if (linkAnalysisResult != null) {
-                        Text(
-                            text = linkAnalysisResult!!,
-                            color = Color.White,
-                            fontSize = 13.sp,
-                            lineHeight = 20.sp,
-                            fontFamily = FontFamily.Monospace,
-                            textAlign = TextAlign.Start
-                        )
-                        Spacer(modifier = Modifier.height(24.dp))
-                        Button(
-                            onClick = { viewModel.clearLinkAnalysis() },
-                            modifier = Modifier.fillMaxWidth(),
-                            colors = ButtonDefaults.buttonColors(containerColor = CyberCyan),
-                            shape = RoundedCornerShape(8.dp)
-                        ) {
-                            Text("CLOSE", fontWeight = FontWeight.Bold, color = VoidBlack)
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-        if (isVaultViewOpen) {
-            SecureVaultScreen(
-                viewModel = viewModel,
-                isArabic = isAr,
-                onClose = { viewModel.setVaultViewOpen(false) }
-            )
-        }
-
-        // Floating settings control in matching glass material.
-        Box(
-            modifier = Modifier
-                .align(Alignment.TopEnd)
-                .statusBarsPadding()
-                .padding(top = 12.dp, end = 18.dp)
-                .size(44.dp)
-                .background(
-                    Brush.linearGradient(listOf(Color(0x553C8CAB), Color(0x33132D48))),
-                    RoundedCornerShape(16.dp)
                 )
-                .border(0.7.dp, Color.White.copy(alpha = 0.19f), RoundedCornerShape(16.dp))
-                .clickable {
-                    haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
-                    viewModel.setSettingsOpen(true)
-                },
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                imageVector = Icons.Rounded.Tune,
-                contentDescription = if (isAr) "الإعدادات" else "Settings",
-                tint = AyriaColors.glacier,
-                modifier = Modifier.size(21.dp)
-            )
-        }
-
-        // Overlay Screen when isSettingsOpen is true
-        if (isSettingsOpen) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(Color.Black.copy(alpha = 0.82f))
-                    .pointerInput(Unit) {}, // Consume taps
-                contentAlignment = Alignment.Center
-            ) {
-                var keyInput by remember { mutableStateOf(customApiKey) }
-
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth(0.9f)
-                        .border(1.dp, CyberCyan.copy(alpha = 0.35f), RoundedCornerShape(14.dp))
-                        .background(VoidBlack.copy(alpha = 0.92f), RoundedCornerShape(14.dp))
-                        .padding(20.dp)
-                ) {
-                    Text(
-                        text = if (isAr) "وحدة الإعدادات" else "SOVEREIGN CONFIGURATION UNIT",
-                        color = Color.White,
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Bold,
-                        fontFamily = FontFamily.Monospace,
-                        letterSpacing = 2.sp
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = if (isAr) "تحكم متقدم في إعدادات التطبيق" else "A.SYRIA V4 ADVANCED USER CONTROLS",
-                        color = CyberCyan.copy(alpha = 0.6f),
-                        fontSize = 8.sp,
-                        fontFamily = FontFamily.Monospace,
-                        fontWeight = FontWeight.Bold
-                    )
-
-                    Spacer(modifier = Modifier.height(20.dp))
-
-                    // Gemini API Key input field
-                    OutlinedTextField(
-                        value = keyInput,
-                        onValueChange = { keyInput = it },
-                        modifier = Modifier.fillMaxWidth(),
-                        textStyle = TextStyle(color = Color.White, fontSize = 11.sp, fontFamily = FontFamily.Monospace),
-                        label = { Text("GEMINI API KEY OVERRIDE", color = CyberCyan.copy(alpha = 0.7f), fontSize = 9.sp, fontFamily = FontFamily.Monospace) },
-                        placeholder = { Text("Enter custom key...", color = Color.White.copy(alpha = 0.3f), fontSize = 11.sp) },
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = CyberCyan,
-                            unfocusedBorderColor = CyberCyan.copy(alpha = 0.3f),
-                            cursorColor = CyberCyan
-                        ),
-                        singleLine = true
-                    )
-
-                    Spacer(modifier = Modifier.height(14.dp))
-
-                    // Stealth Mode Switch Row
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .border(0.5.dp, CyberCyan.copy(alpha = 0.15f), RoundedCornerShape(8.dp))
-                            .background(GlassWhite, RoundedCornerShape(8.dp))
-                            .padding(12.dp)
-                            .clickable {
-                                haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove)
-                                viewModel.setStealthMode(!isStealthMode)
-                            },
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Column {
-                            Text(
-                                text = if (isAr) "وضع التخفي" else "STEALTH MODE",
-                                color = Color.White,
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold,
-                                fontFamily = FontFamily.Monospace
-                            )
-                            Text(
-                                text = if (isAr) "يخفف الإضاءة ويبطئ الحركات" else "Dims global UI & slows celestial drift",
-                                color = Color.White.copy(alpha = 0.5f),
-                                fontSize = 8.5.sp,
-                                fontFamily = FontFamily.Monospace
-                            )
-                        }
-                        Box(
-                            modifier = Modifier
-                                .width(40.dp)
-                                .height(22.dp)
-                                .border(1.dp, if (isStealthMode) CyberCyan else Color.White.copy(alpha = 0.3f), RoundedCornerShape(11.dp))
-                                .background(if (isStealthMode) CyberCyan.copy(alpha = 0.2f) else Color.Transparent, RoundedCornerShape(11.dp))
-                                .padding(2.dp),
-                            contentAlignment = if (isStealthMode) Alignment.CenterEnd else Alignment.CenterStart
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(16.dp)
-                                    .background(if (isStealthMode) CyberCyan else Color.White.copy(alpha = 0.5f), RoundedCornerShape(50))
-                            )
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(14.dp))
-
-                    // Dialog Actions (Save & Close)
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        Button(
-                            onClick = {
-                                haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove)
-                                viewModel.setSettingsOpen(false)
-                            },
-                            colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent),
-                            border = BorderStroke(0.5.dp, Color.White.copy(alpha = 0.3f)),
-                            shape = RoundedCornerShape(8.dp),
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Text("CLOSE", color = Color.White, fontSize = 11.sp, fontFamily = FontFamily.Monospace)
-                        }
-
-                        Button(
-                            onClick = {
-                                haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
-                                viewModel.updateCustomApiKey(keyInput)
-                                viewModel.setSettingsOpen(false)
-                            },
-                            colors = ButtonDefaults.buttonColors(containerColor = CyberCyan.copy(alpha = 0.2f)),
-                            border = BorderStroke(0.75.dp, CyberCyan),
-                            shape = RoundedCornerShape(8.dp),
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Text("SAVE CONFIG", color = CyberCyan, fontSize = 11.sp, fontFamily = FontFamily.Monospace)
-                        }
-                    }
-                }
-
             }
-        }
 
-        // Desktop Mode Overlay
-        if (isDesktopModeOpen) {
-            DesktopModeScreen(
-                prayerName = nextPrayerName,
-                prayerTime = nextPrayerTime,
-                prayerCountdown = nextPrayerCountdown,
-                allPrayerTimes = allPrayerTimes,
-                isAr = isAr,
-                isOnline = !isNeuralLinkOffline,
-                onClose = { isDesktopModeOpen = false }
-            )
+            if (isVaultViewOpen) {
+                SecureVaultScreen(viewModel = viewModel, isArabic = isAr, onClose = { viewModel.setVaultViewOpen(false) })
+            }
+
+            if (isDesktopModeOpen) {
+                DesktopModeScreen(
+                    prayerName = nextPrayerName,
+                    prayerTime = nextPrayerTime,
+                    prayerCountdown = nextPrayerCountdown,
+                    allPrayerTimes = allPrayerTimes,
+                    isAr = isAr,
+                    isOnline = !isNeuralLinkOffline,
+                    onClose = { isDesktopModeOpen = false }
+                )
+            }
         }
     }
 }
+
+@Composable
+private fun DashboardGlassAction(
+    icon: ImageVector,
+    title: String,
+    subtitle: String,
+    accent: Color,
+    modifier: Modifier = Modifier,
+    horizontal: Boolean = false,
+    onClick: () -> Unit
+) {
+    AyriaGlassPanel(
+        modifier = modifier.clickable(onClick = onClick),
+        highlighted = true,
+        shape = RoundedCornerShape(24.dp)
+    ) {
+        if (horizontal) {
+            Row(
+                modifier = Modifier.fillMaxSize().padding(horizontal = 18.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
+                Box(
+                    modifier = Modifier.size(46.dp)
+                        .background(Brush.linearGradient(listOf(accent.copy(alpha = 0.25f), Color(0x1EFFFFFF))), CircleShape)
+                        .border(0.8.dp, accent.copy(alpha = 0.35f), CircleShape),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(icon, contentDescription = title, tint = AyriaColors.glacier, modifier = Modifier.size(23.dp))
+                }
+                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(title, color = AyriaColors.pearl, fontSize = 14.sp, fontWeight = FontWeight.Bold, fontFamily = AyriaArabicFont)
+                    Text(subtitle, color = AyriaColors.muted, fontSize = 10.sp, fontFamily = AyriaArabicFont, maxLines = 1)
+                }
+                Icon(Icons.Rounded.ChevronLeft, null, tint = accent.copy(alpha = 0.8f), modifier = Modifier.size(18.dp))
+            }
+        } else {
+            Column(
+                modifier = Modifier.fillMaxSize().padding(horizontal = 10.dp, vertical = 12.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
+                Box(
+                    modifier = Modifier.size(42.dp)
+                        .background(Brush.linearGradient(listOf(accent.copy(alpha = 0.25f), Color(0x1EFFFFFF))), CircleShape)
+                        .border(0.8.dp, accent.copy(alpha = 0.35f), CircleShape),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(icon, contentDescription = title, tint = AyriaColors.glacier, modifier = Modifier.size(22.dp))
+                }
+                Spacer(Modifier.height(7.dp))
+                Text(title, color = AyriaColors.pearl, fontSize = 12.sp, fontWeight = FontWeight.Bold, fontFamily = AyriaArabicFont, maxLines = 1)
+                Text(subtitle, color = AyriaColors.muted, fontSize = 9.sp, fontFamily = AyriaArabicFont, maxLines = 1)
+            }
+        }
+    }
+}
+
 
 // ==========================================
 // COMPOSE SUB-COMPONENTS & LAYOUTS

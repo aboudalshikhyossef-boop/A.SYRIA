@@ -80,9 +80,7 @@ fun LibraryScreen(viewModel: DashboardViewModel, onBack: () -> Unit) {
     )
 
     CompositionLocalProvider(LocalLayoutDirection provides layoutDirection) {
-        Box(modifier = Modifier.fillMaxSize().background(
-            Brush.radialGradient(listOf(Color(0xFF001020), Color(0xFF030810), VoidBlack), radius = 2000f)
-        )) {
+        Box(modifier = Modifier.fillMaxSize().background(Color.Transparent)) {
             // Ambient background orbs
             Canvas(modifier = Modifier.fillMaxSize()) {
                 drawCircle(brush = Brush.radialGradient(listOf(CyberCyan.copy(alpha = 0.04f), Color.Transparent), radius = size.width * 0.5f, center = Offset(size.width * 0.2f, size.height * 0.15f)), radius = size.width * 0.5f, center = Offset(size.width * 0.2f, size.height * 0.15f))
@@ -98,7 +96,7 @@ fun LibraryScreen(viewModel: DashboardViewModel, onBack: () -> Unit) {
                     val phase = borderPhase
                     val lineY = size.height - strokeW / 2
                     drawLine(brush = Brush.horizontalGradient(listOf(Color.Transparent, CyberCyan.copy(alpha = glowPulse), AmberGold.copy(alpha = glowPulse * 0.6f), Color.Transparent)), start = Offset(0f, lineY), end = Offset(size.width, lineY), strokeWidth = strokeW * 2)
-                }.background(Brush.verticalGradient(listOf(Color(0xFF060D18), Color(0xFF030810)))).padding(horizontal = 16.dp, vertical = 14.dp)) {
+                }.background(Brush.verticalGradient(listOf(Color(0xAA102B43), Color(0x6620344A)))).padding(horizontal = 16.dp, vertical = 14.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Box(modifier = Modifier.size(36.dp).background(CyberCyan.copy(alpha = 0.08f), CircleShape).border(1.dp, CyberCyan.copy(alpha = 0.25f * glowPulse + 0.15f), CircleShape).clickable { onBack() }, contentAlignment = Alignment.Center) {
                             Icon(Icons.AutoMirrored.Filled.ArrowBack, null, tint = CyberCyan, modifier = Modifier.size(18.dp))
