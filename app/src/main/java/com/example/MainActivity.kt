@@ -70,6 +70,7 @@ class MainActivity : FragmentActivity() {
     private var hasRequestedPermissions = false
     private var pendingCredentialSuccess: (() -> Unit)? = null
     private var pendingCredentialOnCancel: (() -> Unit)? = null
+    private var pendingCredentialIsStartupGate = false
 
     private val permissionLauncher = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { }
 
@@ -77,13 +78,17 @@ class MainActivity : FragmentActivity() {
         registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
             val onSuccess = pendingCredentialSuccess
             val onCancel = pendingCredentialOnCancel
+            val isStartupGate = pendingCredentialIsStartupGate
             pendingCredentialSuccess = null
             pendingCredentialOnCancel = null
+            pendingCredentialIsStartupGate = false
             isAuthInProgress = false
 
             if (result.resultCode == Activity.RESULT_OK) {
-                hasCompletedStartupGate = true
-                requestEssentialPermissionsOnce()
+                if (isStartupGate) {
+                    hasCompletedStartupGate = true
+                    requestEssentialPermissionsOnce()
+                }
                 onSuccess?.invoke()
             } else {
                 android.util.Log.i("A.SYRIA.Auth", "Device credential flow cancelled by the user")
@@ -110,12 +115,14 @@ class MainActivity : FragmentActivity() {
         return runCatching {
             pendingCredentialSuccess = onSuccess
             pendingCredentialOnCancel = onCancel
+            pendingCredentialIsStartupGate = closeOnCancel
             isAuthInProgress = true
             deviceCredentialLauncher.launch(credentialIntent)
             true
         }.getOrElse {
             pendingCredentialSuccess = null
             pendingCredentialOnCancel = null
+            pendingCredentialIsStartupGate = false
             isAuthInProgress = false
             false
         }
@@ -348,7 +355,11 @@ class MainActivity : FragmentActivity() {
                             } else {
                                 "The authentication prompt could not be opened. Retry or continue without the app lock."
                             }
-                            Toast.makeText(this@MainActivity, startupGateMessage, Toast.LENGTH_LONG).show()
+                            Toast.makeText(
+                                this@MainActivity,
+                                startupGateMessage ?: if (isAr) "تعذّر فتح نافذة المصادقة." else "Unable to open the authentication prompt.",
+                                Toast.LENGTH_LONG
+                            ).show()
                         }
                     }
 
@@ -364,93 +375,6 @@ class MainActivity : FragmentActivity() {
                     }
 
                     DisposableEffect(isDataLoaded, lockAppOnLaunch, isAr) {
-                        val observer = LifecycleEventObserver { _, event ->
-                            when (event) {
-                                Lifecycle.Event.ON_RESUME -> {
-                                    vm.startSensors()
-
-                                    if (isDataLoaded && !lockAppOnLaunch && !hasCompletedStartupGate) {
-                                        hasCompletedStartupGate = true
-                                        startupGateUnlocked = true
-                                    }
-
-                                    if (
-                                        isDataLoaded &&
-                                        lockAppOnLaunch &&
-                                        !hasCompletedStartupGate &&
-                                        !hasRequestedStartupAuthentication &&
-                                        !isAuthInProgress
-                                    ) {
-                                        window.decorView.post {
-                                            val activityReady =
-                                                !isFinishing &&
-                                                !isDestroyed &&
-                                                lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)
-
-                                            if (
-                                                activityReady &&
-                                                lockAppOnLaunch &&
-                                                !hasCompletedStartupGate &&
-                                                !isAuthInProgress
-                                            ) {
-                                                requestStartupAuthentication()
-                                            }
-                                        }
-                                    }
-                                }
-
-                                Lifecycle.Event.ON_PAUSE -> vm.stopSensors()
-                                else -> Unit
-                            }
-                        }
-                        lifecycle.addObserver(observer)
-                        onDispose { lifecycle.removeObserver(observer) }
-                    }
-
-
-                        val observer = LifecycleEventObserver { _, event ->
-                            when (event) {
-                                Lifecycle.Event.ON_RESUME -> {
-                                    vm.startSensors()
-
-                                    // Request the startup gate once, only after the Activity is fully
-                                    // resumed and its first frame can receive the system prompt.
-                                    if (!hasCompletedStartupGate &&
-                                        !hasRequestedStartupAuthentication &&
-                                        !isAuthInProgress
-                                    ) {
-                                        hasRequestedStartupAuthentication = true
-                                        window.decorView.post {
-                                            val activityReady =
-                                                !isFinishing &&
-                                                !isDestroyed &&
-                                                lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)
-
-                                            if (activityReady &&
-                                                !hasCompletedStartupGate &&
-                                                !isAuthInProgress
-                                            ) {
-                                                triggerBiometricAuth(
-                                                    if (isAr) "تأكيد الهوية" else "Identity Verified",
-                                                    if (isAr) "مطلوب بصمة الدخول" else "Biometric authentication required",
-                                                    { },
-                                                    true
-                                                )
-                                            } else if (!hasCompletedStartupGate && !isFinishing && !isDestroyed) {
-                                                hasRequestedStartupAuthentication = false
-                                            }
-                                        }
-                                    }
-                                }
-
-                                Lifecycle.Event.ON_PAUSE -> vm.stopSensors()
-                                else -> {}
-                            }
-                        }
-                        lifecycle.addObserver(observer)
-                        onDispose { lifecycle.removeObserver(observer) }
-                    }
-
                     // Wait for DataStore to load before computing startDestination
                     // This prevents the onboarding from showing every time
                     val startDestination = remember(isDataLoaded, onboardingCompleted, calibrationCompleted) {
