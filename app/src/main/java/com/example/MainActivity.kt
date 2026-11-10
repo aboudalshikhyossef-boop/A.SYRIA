@@ -7,6 +7,7 @@ import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
 import android.widget.Toast
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
@@ -29,6 +30,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.MenuBook
 import androidx.compose.material.icons.rounded.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -57,6 +59,7 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
@@ -646,7 +649,13 @@ class MainActivity : FragmentActivity() {
                             }
                             composable("dashboard") {
                                 val isArLocal by vm.isArabic.collectAsState()
-                                var activeTab by remember { mutableStateOf("home") }
+                                var activeTab by rememberSaveable { mutableStateOf("home") }
+                                val currentEntry by navController.currentBackStackEntryAsState()
+                                val isDashboardRoute = currentEntry?.destination?.route == "dashboard"
+                                BackHandler(enabled = isDashboardRoute && activeTab != "home") {
+                                    activeTab = "home"
+                                    vm.setSettingsOpen(false)
+                                }
 
                                 DisposableEffect(vm, appPinEnabled, appPinUnlocked) {
                                     fun startDashboardServices() {
@@ -785,14 +794,20 @@ class MainActivity : FragmentActivity() {
                                                         }
                                                         "academy"   -> AcademyScreen(vm, onNavigateToGlossary = { navController.navigate("glossary") }, onNavigateToChecklist = { navController.navigate("checklist") })
                                                         "resources" -> ResourcesScreen(vm) { activeTab = "home" }
-                                                        "library"   -> LibraryScreen(vm) { activeTab = "home" }
+                                                        "library"   -> {
+                                                            val prayerVm: com.example.ui.viewmodel.PrayerViewModel = viewModel()
+                                                            LibraryScreen(vm, prayerVm) {
+                                                                activeTab = "home"
+                                                                vm.setSettingsOpen(false)
+                                                            }
+                                                        }
                                                         "chat"      -> {
                                                             val chatVm: GeminiChatViewModel = viewModel()
                                                             GeminiChatScreen(chatVm, uiConfig, isArLocal)
                                                         }
                                                         "settings"  -> SettingsScreen(
                                                             viewModel = vm,
-                                                            onClose = { activeTab = "home" },
+                                                            onClose = { activeTab = "home"; vm.setSettingsOpen(false) },
                                                             onOpenAbout = { navController.navigate("about") },
                                                             onOpenCustomize = { navController.navigate("adaptive_feedback") },
                                                             onOpenAppLock = { navController.navigate("app_lock") }

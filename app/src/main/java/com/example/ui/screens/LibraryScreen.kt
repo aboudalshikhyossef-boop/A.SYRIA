@@ -1,6 +1,7 @@
 package com.example.ui.screens
 
 import android.content.Context
+import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
@@ -13,6 +14,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -22,6 +24,7 @@ import androidx.compose.ui.graphics.*
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -30,6 +33,7 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.ui.theme.*
+import com.example.ui.brand.AyriaArabicFont
 import com.example.ui.viewmodel.DashboardViewModel
 import org.json.JSONObject
 import org.json.JSONArray
@@ -39,156 +43,243 @@ data class LibraryItem(
     val title: String,
     val subtitle: String,
     val body: String,
-    val tag: String
+    val tag: String,
+    val source: String = "",
+    val reference: String = "",
+    val sourceUrl: String = ""
 )
 
 @Composable
-fun LibraryScreen(viewModel: DashboardViewModel, onBack: () -> Unit) {
+fun LibraryScreen(
+    viewModel: DashboardViewModel,
+    prayerViewModel: com.example.ui.viewmodel.PrayerViewModel,
+    onBack: () -> Unit
+) {
     val isAr by viewModel.isArabic.collectAsState()
+    val nextPrayerName by prayerViewModel.nextPrayerName.collectAsState()
+    val nextPrayerTime by prayerViewModel.nextPrayerTime.collectAsState()
+    val nextPrayerCountdown by prayerViewModel.nextPrayerCountdown.collectAsState()
+    val nextPrayerProgress by prayerViewModel.nextPrayerProgress.collectAsState()
+    val prayerTimes by prayerViewModel.allPrayerTimes.collectAsState()
     val context = LocalContext.current
     val layoutDirection = if (isAr) LayoutDirection.Rtl else LayoutDirection.Ltr
-
-    // Load data once
     val allData = remember(context) { loadLibraryData(context) }
-
-    val tabs = if (isAr)
-        listOf("الأدعية" to "duas", "الأحاديث" to "hadiths")
-    else
-        listOf("Duas" to "duas", "Hadiths" to "hadiths")
-
-    var selectedTab by remember { mutableStateOf("duas") }
-    var searchQuery by remember { mutableStateOf("") }
+    val tabs = if (isAr) listOf("الأدعية" to "duas", "الأحاديث" to "hadiths")
+        else listOf("Duas" to "duas", "Hadiths" to "hadiths")
+    var selectedTab by rememberSaveable { mutableStateOf("duas") }
+    var searchQuery by rememberSaveable { mutableStateOf("") }
 
     val displayedItems = remember(selectedTab, searchQuery, allData) {
-        val items = allData[selectedTab] ?: emptyList()
-        if (searchQuery.isBlank()) items
-        else items.filter {
-            it.title.contains(searchQuery, ignoreCase = true) ||
-            it.body.contains(searchQuery, ignoreCase = true) ||
-            it.tag.contains(searchQuery, ignoreCase = true)
+        val source = allData[selectedTab].orEmpty()
+        if (searchQuery.isBlank()) source
+        else source.filter { item ->
+            item.title.contains(searchQuery, ignoreCase = true) ||
+                item.body.contains(searchQuery, ignoreCase = true) ||
+                item.tag.contains(searchQuery, ignoreCase = true)
         }
     }
 
-    val infiniteTransition = rememberInfiniteTransition(label = "lib_glow")
-    val borderPhase by infiniteTransition.animateFloat(
-        initialValue = 0f, targetValue = 1f,
-        animationSpec = infiniteRepeatable(tween(5000, easing = LinearEasing)), label = "phase"
-    )
-    val glowPulse by infiniteTransition.animateFloat(
-        initialValue = 0.3f, targetValue = 0.7f,
-        animationSpec = infiniteRepeatable(tween(2500), RepeatMode.Reverse), label = "pulse"
-    )
-
     CompositionLocalProvider(LocalLayoutDirection provides layoutDirection) {
-        Box(modifier = Modifier.fillMaxSize().background(Color.Transparent)) {
-            // Ambient background orbs
-            Canvas(modifier = Modifier.fillMaxSize()) {
-                drawCircle(brush = Brush.radialGradient(listOf(CyberCyan.copy(alpha = 0.04f), Color.Transparent), radius = size.width * 0.5f, center = Offset(size.width * 0.2f, size.height * 0.15f)), radius = size.width * 0.5f, center = Offset(size.width * 0.2f, size.height * 0.15f))
-                drawCircle(brush = Brush.radialGradient(listOf(AmberGold.copy(alpha = 0.03f), Color.Transparent), radius = size.width * 0.4f, center = Offset(size.width * 0.8f, size.height * 0.7f)), radius = size.width * 0.4f, center = Offset(size.width * 0.8f, size.height * 0.7f))
-                drawCircle(brush = Brush.radialGradient(listOf(PurpleVibe.copy(alpha = 0.03f), Color.Transparent), radius = size.width * 0.35f, center = Offset(size.width * 0.5f, size.height * 0.5f)), radius = size.width * 0.35f, center = Offset(size.width * 0.5f, size.height * 0.5f))
-            }
-
-            Column(modifier = Modifier.fillMaxSize().statusBarsPadding()) {
-                // ── Header ────────────────────────────────────────────
-                Box(modifier = Modifier.fillMaxWidth().drawBehind {
-                    val strokeW = 1.dp.toPx()
-                    // Animated glow line at bottom of header
-                    val phase = borderPhase
-                    val lineY = size.height - strokeW / 2
-                    drawLine(brush = Brush.horizontalGradient(listOf(Color.Transparent, CyberCyan.copy(alpha = glowPulse), AmberGold.copy(alpha = glowPulse * 0.6f), Color.Transparent)), start = Offset(0f, lineY), end = Offset(size.width, lineY), strokeWidth = strokeW * 2)
-                }.background(Brush.verticalGradient(listOf(Color(0xAA102B43), Color(0x6620344A)))).padding(horizontal = 16.dp, vertical = 14.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Box(modifier = Modifier.size(36.dp).background(CyberCyan.copy(alpha = 0.08f), CircleShape).border(1.dp, CyberCyan.copy(alpha = 0.25f * glowPulse + 0.15f), CircleShape).clickable { onBack() }, contentAlignment = Alignment.Center) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, null, tint = CyberCyan, modifier = Modifier.size(18.dp))
-                        }
-                        Spacer(Modifier.width(12.dp))
-                        Column {
-                            Text(
-                                text = if (isAr) "المكتبة الرقمية" else "Digital Library",
-                                color = Color.White,
-                                fontSize = 20.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                            Text(
-                                text = if (isAr) "أدعية · أحاديث" else "Duas · Hadiths",
-                                color = CyberCyan.copy(alpha = 0.6f),
-                                fontSize = 10.sp,
-                                fontFamily = FontFamily.Monospace,
-                                letterSpacing = 1.sp
-                            )
-                        }
-                        Spacer(Modifier.weight(1f))
-                        // Item count badge
-                        Box(modifier = Modifier.background(CyberCyan.copy(alpha = 0.1f), RoundedCornerShape(20.dp)).border(1.dp, CyberCyan.copy(alpha = 0.3f), RoundedCornerShape(20.dp)).padding(horizontal = 10.dp, vertical = 4.dp)) {
-                            Text("${displayedItems.size}", color = CyberCyan, fontSize = 12.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
-                        }
-                    }
-                }
-
-                // ── Search Bar ─────────────────────────────────────────
-                Box(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp)) {
-                    OutlinedTextField(
-                        value = searchQuery,
-                        onValueChange = { searchQuery = it },
-                        modifier = Modifier.fillMaxWidth(),
-                        placeholder = { Text(if (isAr) "بحث..." else "Search...", color = Color.White.copy(alpha = 0.3f), fontSize = 13.sp) },
-                        leadingIcon = { Icon(Icons.Default.Search, null, tint = CyberCyan.copy(alpha = 0.6f), modifier = Modifier.size(18.dp)) },
-                        trailingIcon = if (searchQuery.isNotEmpty()) { { IconButton(onClick = { searchQuery = "" }) { Icon(Icons.Default.Close, null, tint = Color.White.copy(alpha = 0.4f), modifier = Modifier.size(16.dp)) } } } else null,
-                        singleLine = true,
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = CyberCyan.copy(alpha = 0.6f),
-                            unfocusedBorderColor = Color.White.copy(alpha = 0.1f),
-                            focusedContainerColor = Color(0xFF050D18),
-                            unfocusedContainerColor = Color(0xFF030810),
-                            cursorColor = CyberCyan,
-                            focusedTextColor = Color.White,
-                            unfocusedTextColor = Color.White
-                        ),
-                        shape = RoundedCornerShape(12.dp)
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .statusBarsPadding()
+                .padding(horizontal = 14.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 2.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(11.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(40.dp)
+                        .background(Color(0x268FC8DE), CircleShape)
+                        .border(0.8.dp, Color(0x558DC9DE), CircleShape)
+                        .clickable { onBack() },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        Icons.AutoMirrored.Filled.ArrowBack,
+                        contentDescription = if (isAr) "رجوع" else "Back",
+                        tint = Color(0xFFD7EEF6),
+                        modifier = Modifier.size(19.dp)
                     )
                 }
+                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                    Text(
+                        if (isAr) "مكتبة السكينة" else "QUIET LIBRARY",
+                        color = Color(0xFFE0F3F8),
+                        fontSize = 17.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        fontFamily = if (isAr) AyriaArabicFont else FontFamily.Monospace,
+                        letterSpacing = if (isAr) 0.sp else 1.1.sp
+                    )
+                    Text(
+                        if (isAr) "أدعية وأحاديث ومواقيت الصلاة" else "DUAS · HADITHS · PRAYER TIMES",
+                        color = Color(0xFFA7C8D5).copy(alpha = 0.66f),
+                        fontSize = 8.sp,
+                        fontFamily = FontFamily.Monospace,
+                        letterSpacing = 0.4.sp
+                    )
+                }
+                Text(
+                    displayedItems.size.toString(),
+                    color = Color(0xFFC5E7F0),
+                    fontSize = 11.sp,
+                    fontFamily = FontFamily.Monospace,
+                    modifier = Modifier
+                        .background(Color(0x247BAFC5), CircleShape)
+                        .border(0.7.dp, Color(0x447BAFC5), CircleShape)
+                        .padding(horizontal = 11.dp, vertical = 6.dp)
+                )
+            }
 
-                // ── Tab Row ────────────────────────────────────────────
-                Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(bottom = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    tabs.forEach { (label, key) ->
-                        val isSelected = selectedTab == key
-                        val tabColor = when (key) {
-                            "duas" -> AmberGold
-                            else -> NeonGreen
-                        }
-                        val tabGlow by infiniteTransition.animateFloat(
-                            initialValue = if (isSelected) 0.3f else 0f, targetValue = if (isSelected) 0.6f else 0f,
-                            animationSpec = infiniteRepeatable(tween(1800), RepeatMode.Reverse), label = "tabGlow_$key"
+            // Prayer information remains visible in both Duas and Hadiths tabs.
+            DeskFrostPanel(Modifier.fillMaxWidth()) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text(
+                            if (isAr) "مواقيت الصلاة" else "PRAYER TIMES",
+                            color = Color(0xFFD6EEF5),
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            letterSpacing = 1.sp,
+                            fontFamily = if (isAr) AyriaArabicFont else FontFamily.Monospace
                         )
-                        Box(
-                            modifier = Modifier.weight(1f).clip(RoundedCornerShape(10.dp))
-                                .background(if (isSelected) tabColor.copy(alpha = 0.12f) else Color.White.copy(alpha = 0.03f))
-                                .border(if (isSelected) 1.dp else 0.5.dp, if (isSelected) tabColor.copy(alpha = 0.6f + tabGlow) else Color.White.copy(alpha = 0.1f), RoundedCornerShape(10.dp))
-                                .clickable { selectedTab = key; searchQuery = "" }
-                                .padding(vertical = 10.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(label, color = if (isSelected) tabColor else Color.White.copy(alpha = 0.5f), fontSize = 11.sp, fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal)
+                        Text(
+                            if (isAr) "الصلاة القادمة · $nextPrayerName" else "NEXT · $nextPrayerName",
+                            color = Color(0xFFB2D2DF).copy(alpha = 0.76f),
+                            fontSize = 9.sp,
+                            fontFamily = AyriaArabicFont
+                        )
+                        Text(
+                            nextPrayerTime,
+                            color = Color(0xFFE4F5F9),
+                            fontSize = 20.sp,
+                            fontWeight = FontWeight.Light,
+                            fontFamily = FontFamily.Monospace
+                        )
+                        Text(
+                            nextPrayerCountdown,
+                            color = Color(0xFFC3E0EA),
+                            fontSize = 11.sp,
+                            fontFamily = FontFamily.Monospace,
+                            letterSpacing = 0.3.sp
+                        )
+                    }
+                    PrayerCountdownWheel(
+                        prayerName = nextPrayerName,
+                        prayerTime = nextPrayerTime,
+                        countdown = nextPrayerCountdown,
+                        progress = nextPrayerProgress,
+                        isArabic = isAr,
+                        diameter = 116.dp
+                    )
+                }
+                Spacer(Modifier.height(9.dp))
+                DeskPrayerSchedule(
+                    prayerTimes = prayerTimes,
+                    nextPrayer = nextPrayerName,
+                    isArabic = isAr,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+
+            OutlinedTextField(
+                value = searchQuery,
+                onValueChange = { searchQuery = it },
+                modifier = Modifier.fillMaxWidth(),
+                placeholder = {
+                    Text(
+                        if (isAr) "ابحث في الأدعية والأحاديث..." else "Search duas and hadiths...",
+                        color = Color(0xFFA8C3D0).copy(alpha = 0.55f),
+                        fontSize = 12.sp,
+                        fontFamily = if (isAr) AyriaArabicFont else FontFamily.Default
+                    )
+                },
+                leadingIcon = {
+                    Icon(Icons.Default.Search, null, tint = Color(0xFFB9DDE8), modifier = Modifier.size(18.dp))
+                },
+                trailingIcon = if (searchQuery.isNotEmpty()) {
+                    {
+                        IconButton(onClick = { searchQuery = "" }) {
+                            Icon(Icons.Default.Close, null, tint = Color(0xFFB9DDE8).copy(alpha = 0.7f), modifier = Modifier.size(17.dp))
                         }
                     }
-                }
+                } else null,
+                singleLine = true,
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = Color(0xFF9DCDDE).copy(alpha = 0.68f),
+                    unfocusedBorderColor = Color.White.copy(alpha = 0.12f),
+                    focusedContainerColor = Color(0x66162F43),
+                    unfocusedContainerColor = Color(0x55162F43),
+                    cursorColor = Color(0xFFC9EAF4),
+                    focusedTextColor = Color(0xFFE8F5F9),
+                    unfocusedTextColor = Color(0xFFE8F5F9)
+                ),
+                shape = RoundedCornerShape(17.dp)
+            )
 
-                // ── Items List ─────────────────────────────────────────
-                LazyColumn(modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(10.dp), contentPadding = PaddingValues(bottom = 24.dp)) {
-                    if (displayedItems.isEmpty()) {
-                        item {
-                            Box(modifier = Modifier.fillMaxWidth().padding(top = 60.dp), contentAlignment = Alignment.Center) {
-                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                    Icon(Icons.Default.SearchOff, null, tint = Color.White.copy(alpha = 0.2f), modifier = Modifier.size(48.dp))
-                                    Spacer(Modifier.height(12.dp))
-                                    Text(if (isAr) "لا توجد نتائج" else "No results found", color = Color.White.copy(alpha = 0.3f), fontSize = 14.sp)
-                                }
-                            }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                tabs.forEach { (label, key) ->
+                    val selected = selectedTab == key
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(if (selected) Color(0x3A8FC8DE) else Color.White.copy(alpha = 0.035f))
+                            .border(
+                                if (selected) 0.9.dp else 0.6.dp,
+                                if (selected) Color(0x779BD6E6) else Color.White.copy(alpha = 0.10f),
+                                RoundedCornerShape(16.dp)
+                            )
+                            .clickable { selectedTab = key; searchQuery = "" }
+                            .padding(vertical = 11.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            label,
+                            color = if (selected) Color(0xFFE0F4FA) else Color(0xFFABC3CE).copy(alpha = 0.72f),
+                            fontSize = 11.sp,
+                            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+                            fontFamily = if (isAr) AyriaArabicFont else FontFamily.Monospace
+                        )
+                    }
+                }
+            }
+
+            LazyColumn(
+                modifier = Modifier.weight(1f).fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(9.dp),
+                contentPadding = PaddingValues(bottom = 20.dp)
+            ) {
+                if (displayedItems.isEmpty()) {
+                    item {
+                        Column(
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 38.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Icon(Icons.Default.SearchOff, null, tint = Color(0xFFA8C9D5).copy(alpha = 0.42f), modifier = Modifier.size(34.dp))
+                            Text(
+                                if (isAr) "لا توجد نتائج مطابقة" else "No matching entries",
+                                color = Color(0xFFB7D1DA).copy(alpha = 0.66f),
+                                fontSize = 12.sp
+                            )
                         }
-                    } else {
-                        items(displayedItems, key = { "${selectedTab}_${it.id}" }) { item ->
-                            LibraryItemCard(item = item, category = selectedTab, isAr = isAr, glowPulse = glowPulse)
-                        }
+                    }
+                } else {
+                    items(displayedItems, key = { "${selectedTab}_${it.id}" }) { item ->
+                        LibraryItemCard(item = item, category = selectedTab, isAr = isAr)
                     }
                 }
             }
@@ -197,69 +288,132 @@ fun LibraryScreen(viewModel: DashboardViewModel, onBack: () -> Unit) {
 }
 
 @Composable
-fun LibraryItemCard(item: LibraryItem, category: String, isAr: Boolean, glowPulse: Float) {
-    val accentColor = when (category) {
-        "duas" -> AmberGold
-        else -> NeonGreen
-    }
-    val icon = when (category) {
-        "duas" -> "🤲"
-        else -> "📖"
-    }
-    var expanded by remember { mutableStateOf(false) }
+fun LibraryItemCard(item: LibraryItem, category: String, isAr: Boolean) {
+    var expanded by rememberSaveable(item.id, category) { mutableStateOf(false) }
+    val uriHandler = LocalUriHandler.current
+    val accentColor = Color(0xFFB8DDE9)
+    val cardShape = RoundedCornerShape(22.dp)
 
-    val infiniteTransition = rememberInfiniteTransition(label = "card_${item.id}")
-    val shimmer by infiniteTransition.animateFloat(
-        initialValue = 0f, targetValue = 1f,
-        animationSpec = infiniteRepeatable(tween(3000 + item.id % 1500, easing = LinearEasing)), label = "shimmer"
-    )
-
-    Column(modifier = Modifier.fillMaxWidth()
-        .drawBehind {
-            // Subtle animated glow border
-            val phase = shimmer
-            val borderW = 0.8.dp.toPx()
-            drawRoundRect(color = accentColor.copy(alpha = glowPulse * 0.25f), style = Stroke(borderW), cornerRadius = androidx.compose.ui.geometry.CornerRadius(12.dp.toPx()))
-            // Moving light spot
-            val perimeter = 2 * (size.width + size.height)
-            val spotPos = (phase * perimeter) % perimeter
-            val (spotX, spotY) = when {
-                spotPos < size.width -> spotPos to 0f
-                spotPos < size.width + size.height -> size.width to (spotPos - size.width)
-                spotPos < 2 * size.width + size.height -> (size.width - (spotPos - size.width - size.height)) to size.height
-                else -> 0f to (size.height - (spotPos - 2 * size.width - size.height))
-            }
-            drawCircle(brush = Brush.radialGradient(listOf(accentColor.copy(alpha = 0.5f), accentColor.copy(alpha = 0.2f), Color.Transparent), center = Offset(spotX, spotY), radius = 30.dp.toPx()), radius = 30.dp.toPx(), center = Offset(spotX, spotY))
-        }
-        .clip(RoundedCornerShape(12.dp))
-        .background(Brush.verticalGradient(listOf(accentColor.copy(alpha = 0.05f), Color(0xFF030810))))
-        .clickable { expanded = !expanded }
-        .padding(14.dp)
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .animateContentSize()
+            .clip(cardShape)
+            .background(
+                Brush.linearGradient(
+                    listOf(Color(0xCA1A394D), Color(0x9D10283B), Color(0x76182F42))
+                ),
+                cardShape
+            )
+            .border(
+                0.8.dp,
+                Brush.linearGradient(
+                    listOf(Color(0x559BCFE0), Color(0x228BC5D8), Color(0x16FFFFFF))
+                ),
+                cardShape
+            )
+            .clickable { expanded = !expanded }
+            .padding(horizontal = 15.dp, vertical = 13.dp)
     ) {
-        Row(verticalAlignment = Alignment.Top) {
-            // Icon circle
-            Box(modifier = Modifier.size(36.dp).background(accentColor.copy(alpha = 0.12f), CircleShape).border(1.dp, accentColor.copy(alpha = 0.3f), CircleShape), contentAlignment = Alignment.Center) {
-                Text(icon, fontSize = 16.sp, textAlign = TextAlign.Center)
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(11.dp)) {
+            Box(
+                modifier = Modifier
+                    .size(39.dp)
+                    .background(Color(0x278FC9DF), CircleShape)
+                    .border(0.8.dp, Color(0x558FC9DF), CircleShape),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(if (category == "duas") "🤲" else "📖", fontSize = 17.sp)
             }
-            Spacer(Modifier.width(12.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(item.title, color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, lineHeight = 20.sp)
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                Text(
+                    item.title,
+                    color = Color(0xFFE4F4F8),
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    lineHeight = 21.sp,
+                    fontFamily = if (isAr) AyriaArabicFont else FontFamily.Default
+                )
                 if (item.subtitle.isNotBlank()) {
-                    Spacer(Modifier.height(2.dp))
-                    Text(item.subtitle, color = accentColor.copy(alpha = 0.7f), fontSize = 10.sp, fontFamily = FontFamily.Monospace)
+                    Text(
+                        item.subtitle,
+                        color = accentColor.copy(alpha = 0.68f),
+                        fontSize = 9.sp,
+                        lineHeight = 14.sp,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
+                    )
                 }
             }
-            Icon(if (expanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown, null, tint = accentColor.copy(alpha = 0.5f), modifier = Modifier.size(18.dp))
+            Icon(
+                if (expanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                contentDescription = if (expanded) "Collapse" else "Expand",
+                tint = accentColor.copy(alpha = 0.68f),
+                modifier = Modifier.size(20.dp)
+            )
         }
         if (expanded) {
-            Spacer(Modifier.height(10.dp))
+            Spacer(Modifier.height(12.dp))
             HorizontalDivider(color = accentColor.copy(alpha = 0.15f))
-            Spacer(Modifier.height(10.dp))
-            Text(item.body, color = Color.White.copy(alpha = 0.85f), fontSize = 13.sp, lineHeight = 22.sp, textAlign = if (isAr) TextAlign.Right else TextAlign.Start)
-            if (item.tag.isNotBlank()) {
+            Spacer(Modifier.height(11.dp))
+            Text(
+                item.body,
+                color = Color(0xFFE8F5F8),
+                fontSize = if (category == "duas") 19.sp else 17.sp,
+                lineHeight = if (category == "duas") 34.sp else 30.sp,
+                textAlign = if (isAr) TextAlign.Right else TextAlign.Start,
+                fontFamily = AyriaArabicFont
+            )
+            Spacer(Modifier.height(12.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(7.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                if (item.tag.isNotBlank()) {
+                    Box(
+                        modifier = Modifier
+                            .background(Color(0x1F9ACDDF), RoundedCornerShape(50))
+                            .border(0.7.dp, Color(0x448FC9DF), RoundedCornerShape(50))
+                            .padding(horizontal = 10.dp, vertical = 5.dp)
+                    ) {
+                        Text(
+                            item.tag,
+                            color = Color(0xFFC8E5EE),
+                            fontSize = 9.sp,
+                            fontFamily = if (isAr) AyriaArabicFont else FontFamily.Monospace
+                        )
+                    }
+                }
+                if (item.reference.isNotBlank()) {
+                    Text(
+                        item.reference,
+                        modifier = Modifier.weight(1f, fill = false),
+                        color = Color(0xFFA9C9D5).copy(alpha = 0.75f),
+                        fontSize = 9.sp,
+                        fontFamily = if (isAr) AyriaArabicFont else FontFamily.Monospace
+                    )
+                }
+            }
+            if (item.sourceUrl.isNotBlank()) {
                 Spacer(Modifier.height(8.dp))
-                Box(modifier = Modifier.background(accentColor.copy(alpha = 0.08f), RoundedCornerShape(6.dp)).border(0.5.dp, accentColor.copy(alpha = 0.25f), RoundedCornerShape(6.dp)).padding(horizontal = 8.dp, vertical = 3.dp)) {
-                    Text(item.tag, color = accentColor.copy(alpha = 0.8f), fontSize = 9.sp, fontFamily = FontFamily.Monospace)
+                TextButton(
+                    onClick = { runCatching { uriHandler.openUri(item.sourceUrl) } },
+                    contentPadding = PaddingValues(horizontal = 4.dp, vertical = 2.dp)
+                ) {
+                    Icon(
+                        Icons.Default.OpenInNew,
+                        contentDescription = null,
+                        tint = Color(0xFFB9DFEA),
+                        modifier = Modifier.size(14.dp)
+                    )
+                    Spacer(Modifier.width(6.dp))
+                    Text(
+                        if (isAr) "فتح المصدر والتحقق" else "Open source & verify",
+                        color = Color(0xFFB9DFEA),
+                        fontSize = 10.sp,
+                        fontFamily = if (isAr) AyriaArabicFont else FontFamily.Monospace
+                    )
                 }
             }
         }
@@ -277,7 +431,8 @@ fun loadLibraryData(context: Context): Map<String, List<LibraryItem>> {
             "duas" to parseDuas(json.optJSONArray("duas")),
             "hadiths" to parseHadiths(json.optJSONArray("hadiths"))
         )
-    } catch (_: Exception) {
+    } catch (error: Exception) {
+        android.util.Log.e("A.SYRIA.Library", "Could not read the verified Islamic library asset", error)
         mapOf("duas" to emptyList(), "hadiths" to emptyList())
     }
 }
@@ -285,38 +440,52 @@ fun loadLibraryData(context: Context): Map<String, List<LibraryItem>> {
 private fun parseDuas(arr: JSONArray?): List<LibraryItem> {
     if (arr == null) return emptyList()
     return (0 until arr.length()).mapNotNull { index ->
-        val obj = arr.optJSONObject(index) ?: return@mapNotNull null
-        val arabic = obj.optString("arabic").trim()
+        val item = arr.optJSONObject(index) ?: return@mapNotNull null
+        val arabic = item.optString("arabic").trim()
         if (arabic.isBlank()) return@mapNotNull null
+        val source = item.optString("source").trim()
+        val reference = item.optString("reference").trim()
+        val occasion = item.optString("occasion", "دعاء").ifBlank { "دعاء" }
 
-        val occasion = obj.optString("occasion", obj.optString("category", "دعاء"))
-            .ifBlank { "دعاء" }
-        val source = obj.optString("source").trim()
         LibraryItem(
-            id = obj.optInt("id", index),
+            id = item.optInt("id", index),
             title = occasion,
-            subtitle = if (source.isNotBlank()) "المصدر: $source" else "",
+            subtitle = listOf(source, reference).filter { it.isNotBlank() }.joinToString(" · "),
             body = arabic,
-            tag = "دعاء مأثور"
+            tag = item.optString("grade").ifBlank {
+                item.optString("kind").ifBlank { "دعاء" }
+            },
+            source = source,
+            reference = reference,
+            sourceUrl = item.optString("source_url").trim()
         )
-    }.distinctBy { listOf(it.body, it.title, it.subtitle) }
+    }.distinctBy { it.body to it.reference }
 }
 
 private fun parseHadiths(arr: JSONArray?): List<LibraryItem> {
     if (arr == null) return emptyList()
     return (0 until arr.length()).mapNotNull { index ->
-        val obj = arr.optJSONObject(index) ?: return@mapNotNull null
-        val arabic = obj.optString("arabic").trim()
+        val item = arr.optJSONObject(index) ?: return@mapNotNull null
+        val arabic = item.optString("arabic").trim()
         if (arabic.isBlank()) return@mapNotNull null
+        val narrator = item.optString("narrator").trim()
+        val source = item.optString("source").trim()
+        val reference = item.optString("reference").trim()
+        val topic = item.optString("topic").ifBlank { arabic.take(48) }
+        val meta = listOf(
+            narrator.takeIf { it.isNotBlank() }?.let { "عن $it" },
+            source.takeIf { it.isNotBlank() }
+        ).filterNotNull().joinToString(" · ")
 
-        val narrator = obj.optString("narrator").trim()
-        val topic = obj.optString("topic").trim()
         LibraryItem(
-            id = obj.optInt("id", index),
-            title = topic.ifBlank { arabic.take(50) },
-            subtitle = if (narrator.isNotBlank()) "رواه $narrator" else "",
+            id = item.optInt("id", index),
+            title = topic,
+            subtitle = meta,
             body = arabic,
-            tag = obj.optString("grade").trim()
+            tag = item.optString("grade").ifBlank { "لم تُسجَّل الدرجة" },
+            source = source,
+            reference = reference,
+            sourceUrl = item.optString("source_url").trim()
         )
-    }.distinctBy { listOf(it.body, it.title, it.subtitle, it.tag) }
+    }.distinctBy { it.body to it.reference }
 }

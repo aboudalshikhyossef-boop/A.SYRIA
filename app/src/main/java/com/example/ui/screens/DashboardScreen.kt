@@ -1726,7 +1726,7 @@ private fun DeskClockPanel(
 }
 
 @Composable
-private fun PrayerCountdownWheel(
+internal fun PrayerCountdownWheel(
     prayerName: String,
     prayerTime: String,
     countdown: String,
@@ -1826,13 +1826,14 @@ private fun PrayerCountdownWheel(
 }
 
 @Composable
-private fun DeskPrayerSchedule(
+internal fun DeskPrayerSchedule(
     prayerTimes: Map<String, String>,
     nextPrayer: String,
-    isArabic: Boolean
+    isArabic: Boolean,
+    modifier: Modifier = Modifier
 ) {
     val prayerNames = listOf("الفجر", "الشروق", "الظهر", "العصر", "المغرب", "العشاء")
-    DeskFrostPanel(Modifier.fillMaxWidth()) {
+    DeskFrostPanel(modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -1987,7 +1988,7 @@ private fun DeskReflectionPanel(
 }
 
 @Composable
-private fun DeskFrostPanel(
+internal fun DeskFrostPanel(
     modifier: Modifier = Modifier,
     content: @Composable ColumnScope.() -> Unit
 ) {
