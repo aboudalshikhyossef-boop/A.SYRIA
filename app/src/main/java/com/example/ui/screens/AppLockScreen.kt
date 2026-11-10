@@ -44,6 +44,9 @@ import androidx.compose.ui.unit.sp
 import com.example.ui.theme.AmberZen
 import com.example.ui.theme.CyberCyan
 import com.example.ui.theme.VoidBlack
+import com.example.ui.brand.AyriaActionButton
+import com.example.ui.brand.AyriaArabicFont
+import com.example.ui.brand.AyriaBrandMark
 import com.example.ui.viewmodel.DashboardViewModel
 import kotlinx.coroutines.delay
 
@@ -332,7 +335,7 @@ fun AppPinLockScreen(
                 .fillMaxSize()
                 .background(
                     Brush.linearGradient(
-                        listOf(Color(0xFF020713), Color(0xFF061525), Color(0xFF02040B))
+                        listOf(Color(0xFF020817), Color(0xFF071A35), Color(0xFF020612))
                     )
                 )
                 .clickable(
@@ -345,7 +348,7 @@ fun AppPinLockScreen(
                 Modifier
                     .fillMaxWidth()
                     .height(320.dp)
-                    .background(Brush.verticalGradient(listOf(PinAccent.copy(alpha = 0.15f), Color.Transparent)))
+                    .background(Brush.verticalGradient(listOf(PinAccent.copy(alpha = 0.22f), Color.Transparent)))
             )
 
             Column(
@@ -578,6 +581,7 @@ private fun PinEntryPanel(
             color = Color.White,
             fontSize = 17.sp,
             fontWeight = FontWeight.Bold,
+            fontFamily = if (isArabic) AyriaArabicFont else FontFamily.Default,
             textAlign = TextAlign.Center
         )
         Spacer(Modifier.height(7.dp))
@@ -585,29 +589,69 @@ private fun PinEntryPanel(
             subtitle,
             color = Color.White.copy(alpha = 0.52f),
             fontSize = 11.sp,
+            fontFamily = if (isArabic) AyriaArabicFont else FontFamily.Default,
             textAlign = TextAlign.Center,
-            lineHeight = 17.sp
+            lineHeight = 19.sp
         )
         Spacer(Modifier.height(22.dp))
 
         Row(
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceEvenly,
             verticalAlignment = Alignment.CenterVertically
         ) {
             repeat(6) { index ->
                 val filled = index < pin.length
+                val ringScale by animateFloatAsState(
+                    targetValue = if (filled) 1.07f else 1f,
+                    animationSpec = tween(180, easing = FastOutSlowInEasing),
+                    label = "pin_indicator_scale_$index"
+                )
                 Box(
                     modifier = Modifier
-                        .size(width = 34.dp, height = 40.dp)
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(if (filled) PinAccent.copy(alpha = 0.18f) else Color.White.copy(alpha = 0.035f))
-                        .border(1.dp, if (filled) PinAccent.copy(alpha = 0.72f) else Color.White.copy(alpha = 0.14f), RoundedCornerShape(12.dp)),
+                        .size(38.dp)
+                        .graphicsLayer { scaleX = ringScale; scaleY = ringScale }
+                        .clip(CircleShape)
+                        .background(
+                            Brush.radialGradient(
+                                listOf(
+                                    if (filled) PinAccent.copy(alpha = 0.28f) else Color(0xFF173354).copy(alpha = 0.42f),
+                                    Color(0xFF07182D).copy(alpha = 0.68f),
+                                    Color.White.copy(alpha = 0.025f)
+                                )
+                            ),
+                            CircleShape
+                        )
+                        .border(
+                            1.2.dp,
+                            Brush.sweepGradient(
+                                listOf(
+                                    Color.White.copy(alpha = 0.82f),
+                                    PinAccent.copy(alpha = if (filled) 0.95f else 0.58f),
+                                    PinAccentSecondary.copy(alpha = 0.72f),
+                                    Color.White.copy(alpha = 0.30f),
+                                    Color.White.copy(alpha = 0.82f)
+                                )
+                            ),
+                            CircleShape
+                        ),
                     contentAlignment = Alignment.Center
                 ) {
                     Box(
                         Modifier
-                            .size(if (filled) 9.dp else 5.dp)
-                            .background(if (filled) PinAccent else Color.White.copy(alpha = 0.25f), CircleShape)
+                            .size(if (filled) 9.dp else 4.dp)
+                            .background(
+                                if (filled) Color(0xFFEAFBFF) else Color.White.copy(alpha = 0.30f),
+                                CircleShape
+                            )
+                    )
+                    Box(
+                        Modifier
+                            .align(Alignment.TopCenter)
+                            .padding(top = 6.dp)
+                            .size(width = 15.dp, height = 2.dp)
+                            .clip(CircleShape)
+                            .background(Color.White.copy(alpha = if (filled) 0.78f else 0.30f))
                     )
                 }
             }
@@ -619,6 +663,7 @@ private fun PinEntryPanel(
                 modifier = Modifier.padding(top = 12.dp),
                 color = PinDanger,
                 fontSize = 10.sp,
+                fontFamily = if (isArabic) AyriaArabicFont else FontFamily.Default,
                 textAlign = TextAlign.Center
             )
         }
@@ -633,34 +678,47 @@ private fun PinEntryPanel(
         keypadRows.forEach { row ->
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                horizontalArrangement = Arrangement.SpaceEvenly,
+                verticalAlignment = Alignment.CenterVertically
             ) {
                 row.forEach { digit ->
                     if (digit.isEmpty()) {
-                        Spacer(Modifier.weight(1f).height(58.dp))
+                        Spacer(Modifier.size(66.dp))
                     } else {
                         val interaction = remember { MutableInteractionSource() }
                         val pressed by interaction.collectIsPressedAsState()
                         val scale by animateFloatAsState(
-                            targetValue = if (pressed) 0.94f else 1f,
-                            animationSpec = tween(110, easing = FastOutSlowInEasing),
-                            label = "pin_key_press"
+                            targetValue = if (pressed) 0.91f else 1f,
+                            animationSpec = tween(125, easing = FastOutSlowInEasing),
+                            label = "pin_key_press_$digit"
                         )
                         Box(
                             modifier = Modifier
-                                .weight(1f)
-                                .height(58.dp)
+                                .size(66.dp)
                                 .graphicsLayer { scaleX = scale; scaleY = scale }
-                                .clip(RoundedCornerShape(17.dp))
+                                .clip(CircleShape)
                                 .background(
-                                    Brush.linearGradient(
-                                        listOf(PinAccent.copy(alpha = 0.18f), Color.White.copy(alpha = 0.045f), PinAccentSecondary.copy(alpha = 0.13f))
-                                    )
+                                    Brush.radialGradient(
+                                        listOf(
+                                            Color(0xFF2B75AD).copy(alpha = 0.34f),
+                                            Color(0xFF10345D).copy(alpha = 0.62f),
+                                            Color(0xFF06152A).copy(alpha = 0.94f)
+                                        )
+                                    ),
+                                    CircleShape
                                 )
                                 .border(
-                                    1.dp,
-                                    Brush.linearGradient(listOf(Color.White.copy(alpha = 0.22f), PinAccent.copy(alpha = 0.28f))),
-                                    RoundedCornerShape(17.dp)
+                                    1.3.dp,
+                                    Brush.sweepGradient(
+                                        listOf(
+                                            Color.White.copy(alpha = 0.88f),
+                                            PinAccent.copy(alpha = 0.78f),
+                                            PinAccentSecondary.copy(alpha = 0.80f),
+                                            Color.White.copy(alpha = 0.20f),
+                                            Color.White.copy(alpha = 0.88f)
+                                        )
+                                    ),
+                                    CircleShape
                                 )
                                 .clickable(
                                     enabled = pin.length < 6 || digit == "back",
@@ -673,8 +731,18 @@ private fun PinEntryPanel(
                                 },
                             contentAlignment = Alignment.Center
                         ) {
+                            Box(
+                                Modifier
+                                    .size(55.dp)
+                                    .border(0.7.dp, Color.White.copy(alpha = 0.12f), CircleShape)
+                            )
                             if (digit == "back") {
-                                Icon(Icons.Default.Backspace, contentDescription = if (isArabic) "حذف" else "Delete", tint = PinAccent, modifier = Modifier.size(21.dp))
+                                Icon(
+                                    Icons.Default.Backspace,
+                                    contentDescription = if (isArabic) "حذف" else "Delete",
+                                    tint = PinAccent,
+                                    modifier = Modifier.size(21.dp)
+                                )
                             } else {
                                 Text(
                                     digit,
@@ -684,28 +752,30 @@ private fun PinEntryPanel(
                                     fontFamily = FontFamily.Monospace
                                 )
                             }
+                            Box(
+                                Modifier
+                                    .align(Alignment.TopCenter)
+                                    .padding(top = 9.dp)
+                                    .size(width = 22.dp, height = 3.dp)
+                                    .clip(CircleShape)
+                                    .background(Color.White.copy(alpha = 0.68f))
+                            )
                         }
                     }
                 }
             }
-            Spacer(Modifier.height(9.dp))
+            Spacer(Modifier.height(10.dp))
         }
 
-        Button(
+        AyriaActionButton(
+            text = actionLabel,
             onClick = onAction,
-            enabled = actionEnabled,
             modifier = Modifier.fillMaxWidth().height(50.dp),
-            shape = RoundedCornerShape(15.dp),
-            colors = ButtonDefaults.buttonColors(
-                containerColor = PinAccent.copy(alpha = 0.23f),
-                disabledContainerColor = Color.White.copy(alpha = 0.05f)
-            )
-        ) {
-            Text(actionLabel, color = if (actionEnabled) Color.White else Color.White.copy(alpha = 0.35f), fontWeight = FontWeight.Bold)
-        }
+            enabled = actionEnabled
+        )
         if (secondaryLabel != null && onSecondary != null) {
             TextButton(onClick = onSecondary, modifier = Modifier.padding(top = 3.dp)) {
-                Text(secondaryLabel, color = Color.White.copy(alpha = 0.55f), fontSize = 11.sp)
+                Text(secondaryLabel, color = Color.White.copy(alpha = 0.55f), fontSize = 11.sp, fontFamily = if (isArabic) AyriaArabicFont else FontFamily.Default)
             }
         }
     }
@@ -715,21 +785,26 @@ private fun PinEntryPanel(
 private fun PinShieldMark() {
     Box(
         modifier = Modifier
-            .size(74.dp)
-            .clip(RoundedCornerShape(24.dp))
+            .size(96.dp)
+            .clip(RoundedCornerShape(30.dp))
             .background(
-                Brush.linearGradient(
-                    listOf(PinAccent.copy(alpha = 0.22f), Color(0xFF10243B).copy(alpha = 0.55f), PinAccentSecondary.copy(alpha = 0.18f))
+                Brush.radialGradient(
+                    listOf(Color(0xFF276DAB).copy(alpha = 0.36f), Color(0xFF0A1D3C).copy(alpha = 0.94f))
                 )
             )
             .border(
-                1.dp,
-                Brush.linearGradient(listOf(PinAccent.copy(alpha = 0.8f), Color.White.copy(alpha = 0.12f), PinAccentSecondary.copy(alpha = 0.6f))),
-                RoundedCornerShape(24.dp)
+                1.2.dp,
+                Brush.sweepGradient(
+                    listOf(Color.White.copy(alpha = 0.78f), PinAccent, PinAccentSecondary, Color.White.copy(alpha = 0.22f))
+                ),
+                RoundedCornerShape(30.dp)
             ),
         contentAlignment = Alignment.Center
     ) {
-        Icon(Icons.Default.Security, contentDescription = null, tint = PinAccent, modifier = Modifier.size(36.dp))
+        AyriaBrandMark(
+            modifier = Modifier.size(84.dp),
+            contentDescription = "A.SYRIA"
+        )
     }
 }
 
