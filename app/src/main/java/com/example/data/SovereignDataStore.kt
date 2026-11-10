@@ -22,6 +22,7 @@ class SovereignDataStore(private val context: Context) {
         val PROJECT_NUMBER      = stringPreferencesKey("project_number")
         val IS_ARABIC           = booleanPreferencesKey("is_arabic")
         val STEALTH_MODE        = booleanPreferencesKey("stealth_mode")
+        val LOCK_APP_ON_LAUNCH  = booleanPreferencesKey("lock_app_on_launch")
         val CYBER_SCORE         = intPreferencesKey("cyber_score")
         val USER_LEVEL          = stringPreferencesKey("user_level")
         val USER_INTERESTS      = stringSetPreferencesKey("user_interests")
@@ -48,6 +49,7 @@ class SovereignDataStore(private val context: Context) {
     val projectNumber: Flow<String> = context.dataStore.data.map { it[PROJECT_NUMBER] ?: "" }
     val isArabic: Flow<Boolean>     = context.dataStore.data.map { it[IS_ARABIC]      ?: true }
     val stealthMode: Flow<Boolean>  = context.dataStore.data.map { it[STEALTH_MODE]   ?: false }
+    val lockAppOnLaunch: Flow<Boolean> = context.dataStore.data.map { it[LOCK_APP_ON_LAUNCH] ?: true }
     val cyberScore: Flow<Int>       = context.dataStore.data.map { it[CYBER_SCORE]    ?: 0 }
     val userLevel: Flow<String>     = context.dataStore.data.map { it[USER_LEVEL]     ?: "Beginner" }
     val userInterests: Flow<Set<String>> = context.dataStore.data.map { it[USER_INTERESTS] ?: emptySet() }
@@ -90,6 +92,7 @@ class SovereignDataStore(private val context: Context) {
     suspend fun saveProjectNumber(n: String)   { context.dataStore.edit { it[PROJECT_NUMBER] = n } }
     suspend fun saveIsArabic(v: Boolean)       { context.dataStore.edit { it[IS_ARABIC]      = v } }
     suspend fun saveStealthMode(v: Boolean)    { context.dataStore.edit { it[STEALTH_MODE]   = v } }
+    suspend fun saveLockAppOnLaunch(v: Boolean) { context.dataStore.edit { it[LOCK_APP_ON_LAUNCH] = v } }
     suspend fun saveCyberScore(score: Int)     { context.dataStore.edit { it[CYBER_SCORE]    = score } }
     
     /** Atomic score increment; avoids lost updates from concurrent feature actions. */
