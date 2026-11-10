@@ -39,7 +39,7 @@ fun LinkScannerScreen(viewModel: DashboardViewModel, onBack: () -> Unit) {
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(VoidBlack)
+            .background(Color.Transparent)
             .statusBarsPadding()
             .navigationBarsPadding()
             .padding(24.dp)

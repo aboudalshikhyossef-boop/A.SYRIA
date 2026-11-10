@@ -151,7 +151,7 @@ fun SecurityChecklistScreen(
                 .fillMaxSize()
                 .statusBarsPadding()
                 .navigationBarsPadding()
-                .background(VoidBlack)
+                .background(Color.Transparent)
         ) {
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),

@@ -169,7 +169,7 @@ fun SecureVaultScreen(viewModel: DashboardViewModel, isArabic: Boolean, onClose:
         exportLauncher.launch(intent)
     }
 
-    Box(Modifier.fillMaxSize().background(VoidBlack)) {
+    Box(Modifier.fillMaxSize().background(Color.Transparent)) {
         Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().padding(18.dp)) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {

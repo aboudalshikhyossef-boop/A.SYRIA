@@ -806,8 +806,11 @@ class MainActivity : FragmentActivity() {
                                 }
                             }
                             composable("link_scanner") {
-                                AdaptiveContentFrame {
-                                    LinkScannerScreen(vm) { navController.popBackStack() }
+                                Box(Modifier.fillMaxSize()) {
+                                    AyriaPanoramaBackdrop(pageIndex = 0)
+                                    AdaptiveContentFrame {
+                                        LinkScannerScreen(vm) { navController.popBackStack() }
+                                    }
                                 }
                             }
                             composable("about") {
@@ -816,13 +819,19 @@ class MainActivity : FragmentActivity() {
                                 }
                             }
                             composable("glossary") {
-                                AdaptiveContentFrame {
-                                    CyberGlossaryScreen(vm) { navController.popBackStack() }
+                                Box(Modifier.fillMaxSize()) {
+                                    AyriaPanoramaBackdrop(pageIndex = 1)
+                                    AdaptiveContentFrame {
+                                        CyberGlossaryScreen(vm) { navController.popBackStack() }
+                                    }
                                 }
                             }
                             composable("checklist") {
-                                AdaptiveContentFrame {
-                                    SecurityChecklistScreen(vm) { navController.popBackStack() }
+                                Box(Modifier.fillMaxSize()) {
+                                    AyriaPanoramaBackdrop(pageIndex = 1)
+                                    AdaptiveContentFrame {
+                                        SecurityChecklistScreen(vm) { navController.popBackStack() }
+                                    }
                                 }
                             }
                             composable("adaptive_feedback") {

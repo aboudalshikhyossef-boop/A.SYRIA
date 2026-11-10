@@ -117,11 +117,7 @@ fun ResourcesScreen(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(
-                    Brush.verticalGradient(
-                        colors = listOf(VoidBlack, Color(0xFF04070D))
-                    )
-                )
+                .background(Color.Transparent)
                 .statusBarsPadding()
                 .navigationBarsPadding()
         ) {
