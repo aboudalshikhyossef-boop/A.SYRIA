@@ -21,7 +21,8 @@ android {
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
     ndk {
-      abiFilters += setOf("arm64-v8a")
+      // Ship both ARM widths: legacy 32-bit Android and modern 64-bit devices.
+      abiFilters += setOf("armeabi-v7a", "arm64-v8a")
     }
   }
 
@@ -52,8 +53,8 @@ android {
       isMinifyEnabled = false
       isShrinkResources = false
       ndk {
-        // Include emulator ABI for Android instrumentation tests; release stays ARM64-only.
-        abiFilters += setOf("arm64-v8a", "x86_64")
+        // Include emulator ABI for instrumentation; ARM 32/64-bit remain available to devices.
+        abiFilters += setOf("armeabi-v7a", "arm64-v8a", "x86_64")
       }
     }
   }
