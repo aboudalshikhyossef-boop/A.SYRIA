@@ -147,6 +147,12 @@ fun AppPinSettingsScreen(
                         )
                         Spacer(Modifier.height(10.dp))
                         ActionPanel(
+                            title = if (isArabic) "قفل التطبيق الآن" else "Lock app now",
+                            subtitle = if (isArabic) "أغلق الجلسة واطلب PIN عند العودة" else "Lock this session and require the app PIN",
+                            onClick = { viewModel.lockAppSession(); onBack() }
+                        )
+                        Spacer(Modifier.height(10.dp))
+                        ActionPanel(
                             title = if (isArabic) "إيقاف قفل التطبيق" else "Disable app lock",
                             subtitle = if (isArabic) "سيُطلب الرمز الحالي قبل الإيقاف" else "Your current PIN is required",
                             danger = true,
