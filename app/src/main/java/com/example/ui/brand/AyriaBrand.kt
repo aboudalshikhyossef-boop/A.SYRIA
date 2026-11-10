@@ -391,7 +391,20 @@ internal fun AyriaActionButton(
     ) {
         Text(
             text = text,
-            color = if (secondary) AyriaColors.internal fun AyriaPanoramaBackdrop(
+            color = if (secondary) AyriaColors.pearl else Color(0xFF06212A),
+            fontFamily = AyriaArabicFont,
+            fontWeight = FontWeight.Bold,
+            fontSize = 14.sp
+        )
+    }
+}
+
+/**
+ * Displays the supplied chrome-glacier image as one continuous five-panel panorama.
+ * Each main tab shows an adjacent crop of the same image; gyro values add subtle parallax.
+ */
+@Composable
+internal fun AyriaPanoramaBackdrop(
     pageIndex: Int,
     roll: Float = 0f,
     pitch: Float = 0f,
