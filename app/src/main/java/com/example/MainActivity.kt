@@ -621,7 +621,7 @@ class MainActivity : FragmentActivity() {
                                     }
                                 }
 
-                                LaunchedEffect(Unit) {
+                                LaunchedEffect(appPinEnabled, appPinUnlocked) {
                                     if (!appPinEnabled || appPinUnlocked) {
                                         requestEssentialPermissionsOnce()
                                     }
