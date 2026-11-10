@@ -62,7 +62,6 @@ import com.example.ui.viewmodel.GeminiChatViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.lifecycleScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
 class MainActivity : FragmentActivity() {
@@ -141,7 +140,7 @@ class MainActivity : FragmentActivity() {
         if (hasScheduledBackgroundWork) return
         hasScheduledBackgroundWork = true
 
-        lifecycleScope.launch(Dispatchers.IO) {
+        lifecycleScope.launch {
             try {
                 // WorkManager auto-initialization is disabled in the manifest.
                 // Initialize it here, only after the user reaches the dashboard.
