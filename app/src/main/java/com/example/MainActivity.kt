@@ -13,11 +13,14 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricPrompt
 import androidx.core.content.ContextCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import androidx.fragment.app.FragmentActivity
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
@@ -28,6 +31,7 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -44,6 +48,7 @@ import com.example.adaptive.AdaptiveContentFrame
 import com.example.adaptive.LocalWindowAdaptiveInfo
 import com.example.adaptive.ProvideWindowAdaptiveLayout
 import com.example.ui.screens.*
+import com.example.ui.brand.AyriaArabicFont
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.LayoutDirection
@@ -76,6 +81,36 @@ class MainActivity : FragmentActivity() {
         @Volatile
         private var workManagerInitialized = false
     }
+
+    /**
+     * Keep the Android status bar visible and transparent while hiding only
+     * the OS navigation bar. The app's own glass navigation remains available.
+     */
+    private fun applyImmersiveNavigationMode() {
+        window.statusBarColor = android.graphics.Color.TRANSPARENT
+        window.navigationBarColor = android.graphics.Color.TRANSPARENT
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            window.isNavigationBarContrastEnforced = false
+            window.isStatusBarContrastEnforced = false
+        }
+        WindowInsetsControllerCompat(window, window.decorView).apply {
+            isAppearanceLightStatusBars = false
+            isAppearanceLightNavigationBars = false
+            systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+            hide(WindowInsetsCompat.Type.navigationBars())
+        }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        applyImmersiveNavigationMode()
+    }
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (hasFocus) window.decorView.post { applyImmersiveNavigationMode() }
+    }
+
     private var pendingCredentialSuccess: (() -> Unit)? = null
     private var pendingCredentialOnCancel: (() -> Unit)? = null
     private var pendingCredentialIsStartupGate = false
@@ -323,6 +358,7 @@ class MainActivity : FragmentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        applyImmersiveNavigationMode()
 
         android.util.Log.i("A.SYRIA.Startup", "MainActivity.onCreate started on API ${Build.VERSION.SDK_INT}")
 
@@ -908,77 +944,67 @@ private fun AppNavigationRail(
 @Composable
 private fun AppBottomNavBar(isArabic: Boolean, activeTab: String, onTabSelected: (String) -> Unit) {
     val haptic = LocalHapticFeedback.current
-    val infiniteTransition = rememberInfiniteTransition(label = "nav_glow")
-    val glowAlpha by infiniteTransition.animateFloat(
-        initialValue = 0.3f,
-        targetValue = 0.9f,
-        animationSpec = infiniteRepeatable(tween(1800), RepeatMode.Reverse),
-        label = "glow"
-    )
+    val outerShape = RoundedCornerShape(26.dp)
+    val itemShape = RoundedCornerShape(20.dp)
 
-    Box(modifier = Modifier.fillMaxWidth()) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(1.dp)
-                .background(
-                    Brush.horizontalGradient(
-                        listOf(
-                            Color.Transparent,
-                            CyberCyan.copy(alpha = glowAlpha * 0.5f),
-                            AmberZen.copy(alpha = glowAlpha * 0.3f),
-                            CyberCyan.copy(alpha = glowAlpha * 0.5f),
-                            Color.Transparent
-                        )
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 10.dp)
+            .clip(outerShape)
+            .background(
+                Brush.linearGradient(listOf(Color(0xD9153550), Color(0xC9091B31), Color(0xD9102943))),
+                outerShape
+            )
+            .border(
+                0.75.dp,
+                Brush.linearGradient(listOf(Color.White.copy(alpha = 0.22f), Color(0x668CE5FF), Color.White.copy(alpha = 0.08f))),
+                outerShape
+            )
+            .padding(horizontal = 5.dp, vertical = 6.dp),
+        horizontalArrangement = Arrangement.spacedBy(3.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        appNavigationTabs.forEach { tab ->
+            val selected = activeTab == tab.key
+            val color = tab.accentColor()
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .clip(itemShape)
+                    .background(
+                        if (selected) Brush.linearGradient(listOf(color.copy(alpha = 0.23f), color.copy(alpha = 0.08f)))
+                        else Brush.linearGradient(listOf(Color.Transparent, Color.Transparent)),
+                        itemShape
                     )
-                )
-                .align(Alignment.TopCenter)
-        )
-
-        NavigationBar(
-            containerColor = Color(0xFF02050D).copy(alpha = 0.98f),
-            tonalElevation = 0.dp,
-            windowInsets = WindowInsets.navigationBars
-        ) {
-            appNavigationTabs.forEach { tab ->
-                val selected = activeTab == tab.key
-                val color = tab.accentColor()
-                NavigationBarItem(
-                    selected = selected,
-                    onClick = {
-                        haptic.performHapticFeedback(
-                            androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove
-                        )
+                    .border(
+                        if (selected) 0.7.dp else 0.dp,
+                        if (selected) color.copy(alpha = 0.32f) else Color.Transparent,
+                        itemShape
+                    )
+                    .clickable {
+                        haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove)
                         onTabSelected(tab.key)
-                    },
-                    icon = {
-                        Box(contentAlignment = Alignment.Center) {
-                            if (selected) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(46.dp)
-                                        .background(color.copy(alpha = glowAlpha * 0.12f), RoundedCornerShape(14.dp))
-                                        .border(1.dp, color.copy(alpha = glowAlpha * 0.5f), RoundedCornerShape(14.dp))
-                                )
-                            }
-                            Icon(
-                                imageVector = tab.icon(),
-                                contentDescription = tab.label(isArabic),
-                                tint = if (selected) color else Color.White.copy(alpha = 0.25f),
-                                modifier = Modifier.size(22.dp)
-                            )
-                        }
-                    },
-                    label = {
-                        Text(
-                            text = tab.label(isArabic),
-                            color = if (selected) color else Color.White.copy(alpha = 0.25f),
-                            fontSize = 9.sp,
-                            fontWeight = FontWeight.Bold,
-                            fontFamily = FontFamily.Monospace
-                        )
-                    },
-                    colors = NavigationBarItemDefaults.colors(indicatorColor = Color.Transparent)
+                    }
+                    .padding(vertical = 7.dp, horizontal = 2.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
+                Icon(
+                    imageVector = tab.icon(),
+                    contentDescription = tab.label(isArabic),
+                    tint = if (selected) Color(0xFFD9F7FF) else Color(0xFFB6C9D9).copy(alpha = 0.72f),
+                    modifier = Modifier.size(if (selected) 22.dp else 20.dp)
+                )
+                Spacer(Modifier.height(3.dp))
+                Text(
+                    text = tab.label(isArabic),
+                    color = if (selected) Color(0xFFEAFBFF) else Color(0xFFB6C9D9).copy(alpha = 0.72f),
+                    fontSize = 9.5.sp,
+                    fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+                    fontFamily = AyriaArabicFont,
+                    letterSpacing = if (isArabic) 0.sp else 0.35.sp,
+                    maxLines = 1
                 )
             }
         }

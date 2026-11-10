@@ -48,6 +48,12 @@ import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.rounded.MenuBook
+import androidx.compose.material.icons.rounded.Explore
+import androidx.compose.material.icons.rounded.Lock
+import androidx.compose.material.icons.rounded.School
+import androidx.compose.material.icons.rounded.Tune
+import androidx.compose.material.icons.rounded.Wifi
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -65,6 +71,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
@@ -79,6 +86,10 @@ import com.example.ui.theme.AmberZen
 import com.example.ui.theme.CyberCyan
 import com.example.ui.theme.GlassWhite
 import com.example.ui.theme.VoidBlack
+import com.example.ui.brand.AyriaArabicFont
+import com.example.ui.brand.AyriaQuranFont
+import com.example.ui.brand.AyriaColors
+import com.example.ui.brand.AyriaGlassPanel
 import com.example.ui.viewmodel.DashboardViewModel
 import com.example.adaptive.LocalAdaptiveConfig
 import com.example.adaptive.LocalWindowAdaptiveInfo
@@ -161,8 +172,6 @@ fun DashboardScreen(
     // Telemetry and analytical data
     val connectionType by viewModel.connectionType.collectAsState()
     val ipAddress by viewModel.ipAddress.collectAsState()
-    val batteryPercentage by viewModel.batteryPercentage.collectAsState()
-    val chargingStatus by viewModel.chargingStatus.collectAsState()
     
     // Accurate Prayer Data from PrayerViewModel
     val nextPrayerName by prayerViewModel.nextPrayerName.collectAsState()
@@ -283,9 +292,9 @@ fun DashboardScreen(
     var currentVerseIndex by remember { mutableStateOf(0) }
 
     val bgColors = when {
-        isStealthMode -> listOf(VoidBlack, Color(0xFF030508))
-        isNeuralLinkOffline -> listOf(Color(0xFF1A0E00), VoidBlack) // Orange/Amber background when offline
-        else -> listOf(Color(0xFF001520), VoidBlack) // Cyber Blue background when online
+        isStealthMode -> listOf(Color(0xFF020711), Color(0xFF030A14))
+        isNeuralLinkOffline -> listOf(Color(0xFF101624), Color(0xFF030A14))
+        else -> listOf(Color(0xFF0A263C), Color(0xFF020915), Color(0xFF061426))
     }
 
     // ── AI-driven theme accent — reads live from LocalAdaptiveConfig so every color
@@ -313,9 +322,15 @@ fun DashboardScreen(
         contentAlignment = Alignment.Center
     ) {
         // Deep Parallax with Stealth mode speed deceleration support
+        IceTriangleBackdrop(
+            rollOffset = bgRollShift,
+            pitchOffset = bgPitchShift,
+            isStealthMode = isStealthMode
+        )
+
         BackgroundParticles(
-            rollOffset = bgRollShift, 
-            pitchOffset = bgPitchShift, 
+            rollOffset = bgRollShift,
+            pitchOffset = bgPitchShift,
             stateType = stateType,
             isStealthMode = isStealthMode
         )
@@ -344,10 +359,10 @@ fun DashboardScreen(
                     modifier = Modifier
                         .fillMaxSize()
                         .statusBarsPadding()
-                        .navigationBarsPadding()
-                        .padding(horizontal = windowInfo.horizontalContentPadding, vertical = 12.dp),
+                        
+                        .padding(horizontal = windowInfo.horizontalContentPadding, vertical = 8.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     item {
                         StatusHeaderCell(
@@ -373,9 +388,7 @@ fun DashboardScreen(
                             roll = cardRollShift,
                             pitch = cardPitchShift,
                             connectionType = connectionType,
-                            ipAddress = ipAddress,
-                            batteryPercentage = batteryPercentage,
-                            chargingStatus = chargingStatus
+                            ipAddress = ipAddress
                         )
                     }
 
@@ -449,9 +462,10 @@ fun DashboardScreen(
                     // Secure vault entry
                     item {
                         TacticalGridButton(
-                            text = if (isAr) "[ دخول الخزينة الآمنة ]" else "[ ENTER SECURE VAULT ]",
-                            subtitle = if (isAr) "حفظ الصور والملفات والنصوص بتشفير محلي" else "Encrypted storage for images, files and text",
+                            text = if (isAr) "الخزينة الآمنة" else "SECURE VAULT",
+                            subtitle = if (isAr) "حفظ الصور والملفات بتشفير محلي" else "Encrypted photos, files and notes",
                             color = dynamicAccent,
+                            icon = Icons.Rounded.Lock,
                             onClick = {
                                 haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
                                 if (viewModel.isVaultAuthenticated.value) {
@@ -484,9 +498,10 @@ fun DashboardScreen(
                             horizontalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
                             TacticalGridButton(
-                                text = if (isAr) "[ منهج الأكاديمية ]" else "[ ACADEMY SYLLABUS ]",
-                                subtitle = if (isAr) "اختبارات أمنية تفاعلية بالذكاء الاصطناعي" else "AI-powered interactive security tests",
+                                text = if (isAr) "الأكاديمية" else "ACADEMY",
+                                subtitle = if (isAr) "تعلم واختبارات تفاعلية" else "Interactive learning",
                                 color = dynamicAccent,
+                                icon = Icons.Rounded.School,
                                 onClick = {
                                     haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
                                     viewModel.setAcademyOpen(true)
@@ -494,9 +509,10 @@ fun DashboardScreen(
                                 modifier = Modifier.weight(1f)
                             )
                             TacticalGridButton(
-                                text = if (isAr) "[ مصادر الذكاء ]" else "[ INTEL DIRECTORY ]",
-                                subtitle = if (isAr) "مقالات وأدوات أمن المعلومات المختارة" else "Curated cybersecurity tools & resources",
+                                text = if (isAr) "المصادر" else "RESOURCES",
+                                subtitle = if (isAr) "أدوات ومعرفة مختارة" else "Curated tools and knowledge",
                                 color = dynamicAccent,
+                                icon = Icons.AutoMirrored.Rounded.MenuBook,
                                 onClick = {
                                     haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
                                     viewModel.setResourcesOpen(true)
@@ -555,7 +571,7 @@ fun DashboardScreen(
                 modifier = Modifier
                     .fillMaxSize()
                     .statusBarsPadding()
-                    .navigationBarsPadding()
+                    
                     .imePadding()
                     .padding(16.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
@@ -749,42 +765,29 @@ fun DashboardScreen(
             )
         }
 
-        // ==========================================
-        // PHASE 7 LAYER: SOVEREIGN SETTINGS UNIT
-        // ==========================================
-        // Floating Gear button on top right of screen
+        // Floating settings control in matching glass material.
         Box(
             modifier = Modifier
                 .align(Alignment.TopEnd)
                 .statusBarsPadding()
-                .padding(top = 16.dp, end = 20.dp)
-                .size(40.dp)
-                .border(
-                    width = 0.5.dp,
-                    color = CyberCyan.copy(alpha = 0.45f),
-                    shape = RoundedCornerShape(10.dp)
-                )
+                .padding(top = 12.dp, end = 18.dp)
+                .size(44.dp)
                 .background(
-                    color = Color.White.copy(alpha = 0.05f),
-                    shape = RoundedCornerShape(10.dp)
+                    Brush.linearGradient(listOf(Color(0x553C8CAB), Color(0x33132D48))),
+                    RoundedCornerShape(16.dp)
                 )
+                .border(0.7.dp, Color.White.copy(alpha = 0.19f), RoundedCornerShape(16.dp))
                 .clickable {
                     haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
                     viewModel.setSettingsOpen(true)
                 },
             contentAlignment = Alignment.Center
         ) {
-            Text(
-                text = "⚙",
-                color = CyberCyan,
-                fontSize = 18.sp,
-                style = TextStyle(
-                    shadow = androidx.compose.ui.graphics.Shadow(
-                        color = CyberCyan.copy(alpha = 0.8f),
-                        offset = Offset(0f, 0f),
-                        blurRadius = 10f
-                    )
-                )
+            Icon(
+                imageVector = Icons.Rounded.Tune,
+                contentDescription = if (isAr) "الإعدادات" else "Settings",
+                tint = AyriaColors.glacier,
+                modifier = Modifier.size(21.dp)
             )
         }
 
@@ -949,144 +952,186 @@ fun DashboardScreen(
 
 // Phase 6 Contextual Wisdom Ambient Insight Typewriter Board
 @Composable
+private fun IceTriangleBackdrop(
+    rollOffset: Float,
+    pitchOffset: Float,
+    isStealthMode: Boolean
+) {
+    val transition = rememberInfiniteTransition(label = "ice_prism_drift")
+    val shimmer by transition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(tween(9000, easing = LinearEasing), RepeatMode.Reverse),
+        label = "ice_prism_shimmer"
+    )
+    Canvas(modifier = Modifier.fillMaxSize()) {
+        val center = Offset(
+            x = size.width * 0.51f + rollOffset * 0.7f,
+            y = size.height * 0.39f + pitchOffset * 0.7f
+        )
+        val radius = size.minDimension * 0.56f
+        val top = Offset(center.x, center.y - radius * 0.98f)
+        val left = Offset(center.x - radius * 0.84f, center.y + radius * 0.52f)
+        val right = Offset(center.x + radius * 0.84f, center.y + radius * 0.52f)
+        val base = Offset(center.x, center.y + radius * 0.52f)
+
+        drawCircle(
+            brush = Brush.radialGradient(
+                colors = listOf(
+                    Color(0x553BC4E8).copy(alpha = if (isStealthMode) 0.18f else 0.42f),
+                    Color(0x1C2C78B7),
+                    Color.Transparent
+                ),
+                center = center,
+                radius = radius * 1.32f
+            ),
+            radius = radius * 1.32f,
+            center = center
+        )
+        val prism = androidx.compose.ui.graphics.Path().apply {
+            moveTo(top.x, top.y)
+            lineTo(left.x, left.y)
+            lineTo(right.x, right.y)
+            close()
+        }
+        drawPath(
+            path = prism,
+            brush = Brush.linearGradient(
+                colors = listOf(Color(0x2B9FEAFF), Color(0x123C91C9), Color(0x228CEBFF)),
+                start = top,
+                end = right
+            ),
+            alpha = if (isStealthMode) 0.32f else 0.72f
+        )
+        drawPath(
+            path = prism,
+            color = Color(0x8ADBF8FF).copy(alpha = if (isStealthMode) 0.035f else 0.085f + shimmer * 0.025f),
+            style = Stroke(width = 1.1.dp.toPx())
+        )
+        drawLine(color = Color.White.copy(alpha = 0.045f + shimmer * 0.025f), start = top, end = base, strokeWidth = 1.dp.toPx())
+        drawLine(color = Color(0xFF8FE6FF).copy(alpha = 0.06f), start = left, end = Offset(center.x, center.y + radius * 0.03f), strokeWidth = 0.8.dp.toPx())
+        drawLine(color = Color(0xFF8FE6FF).copy(alpha = 0.06f), start = right, end = Offset(center.x, center.y + radius * 0.03f), strokeWidth = 0.8.dp.toPx())
+    }
+}
+
+@Composable
 fun AmbientInsightCard(
     insight: ContextualVerseEngine.SpiritualInsight,
     modifier: Modifier = Modifier
 ) {
     val fullText = remember(insight) {
-        "${insight.systemAnalysis}. REMEMBER: \"${insight.verseArabic}\" (${insight.verseReference}) - ${insight.verseTranslation}"
+        "${insight.systemAnalysis}. ${insight.verseArabic} (${insight.verseReference}) — ${insight.verseTranslation}"
     }
-
     var typedText by remember(insight) { mutableStateOf("") }
-    
-    androidx.compose.runtime.LaunchedEffect(fullText) {
+    LaunchedEffect(fullText) {
         typedText = ""
-        for (i in 1..fullText.length) {
-            typedText = fullText.substring(0, i)
-            kotlinx.coroutines.delay(18)
+        for (index in 1..fullText.length) {
+            typedText = fullText.substring(0, index)
+            kotlinx.coroutines.delay(15)
         }
-        typedText = fullText
     }
-
     val stateColor = when (insight.stateType) {
-        ContextualVerseEngine.AmbientStateType.CRITICAL -> AmberZen
-        ContextualVerseEngine.AmbientStateType.HIGH_PERFORMANCE -> CyberCyan
-        ContextualVerseEngine.AmbientStateType.NORMAL -> Color.White.copy(alpha = 0.8f)
+        ContextualVerseEngine.AmbientStateType.CRITICAL -> Color(0xFFFFC68C)
+        ContextualVerseEngine.AmbientStateType.HIGH_PERFORMANCE -> AyriaColors.teal
+        ContextualVerseEngine.AmbientStateType.NORMAL -> AyriaColors.glacier
     }
-
-    Column(
-        modifier = modifier
-            .fillMaxWidth()
-            .border(
-                width = 0.5.dp,
-                brush = Brush.horizontalGradient(
-                    colors = listOf(
-                        stateColor.copy(alpha = 0.45f),
-                        Color.Transparent
-                    )
-                ),
-                shape = RoundedCornerShape(10.dp)
-            )
-            .background(
-                brush = Brush.verticalGradient(
-                    colors = listOf(
-                        Color(0x0FFFFFFF),
-                        Color(0x02FFFFFF)
-                    )
-                ),
-                shape = RoundedCornerShape(10.dp)
-            )
-            .padding(14.dp)
+    AyriaGlassPanel(
+        modifier = modifier.fillMaxWidth(),
+        highlighted = insight.stateType != ContextualVerseEngine.AmbientStateType.NORMAL,
+        shape = RoundedCornerShape(20.dp)
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(
-                    modifier = Modifier
-                        .size(6.dp)
-                        .background(stateColor, RoundedCornerShape(50))
-                )
-                Spacer(modifier = Modifier.width(6.dp))
+        Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
                 Text(
-                    text = if (insight.stateType == ContextualVerseEngine.AmbientStateType.CRITICAL) "تنبيه" else "حكمة اليوم",
+                    text = if (insight.stateType == ContextualVerseEngine.AmbientStateType.CRITICAL) "تنبيه" else "ومضة معرفية",
                     color = stateColor,
-                    fontSize = 8.5.sp,
-                    fontWeight = FontWeight.ExtraBold,
-                    fontFamily = FontFamily.Monospace,
-                    letterSpacing = 1.5.sp
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = AyriaArabicFont
                 )
+                Box(Modifier.size(6.dp).background(stateColor.copy(alpha = 0.88f), RoundedCornerShape(50)))
             }
+            Spacer(Modifier.height(7.dp))
             Text(
-                text = "ONLINE",
-                color = stateColor.copy(alpha = 0.5f),
-                fontSize = 7.5.sp,
-                fontFamily = FontFamily.Monospace,
-                fontWeight = FontWeight.Bold
+                text = typedText,
+                color = AyriaColors.pearl.copy(alpha = 0.94f),
+                fontSize = 11.sp,
+                fontFamily = AyriaArabicFont,
+                lineHeight = 18.sp,
+                textAlign = TextAlign.Start
             )
         }
-        
-        Spacer(modifier = Modifier.height(8.dp))
-        
-        Text(
-            text = typedText,
-            color = Color.White.copy(alpha = 0.9f),
-            fontSize = 11.sp,
-            fontFamily = FontFamily.Monospace,
-            lineHeight = 16.sp
-        )
     }
 }
 
-// Standard cyber outline technical grid button with click ripple specs
+// Responsive liquid-glass action card shared by the vault, academy and resources.
 @Composable
 fun TacticalGridButton(
     text: String,
     color: Color,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
-    subtitle: String = ""
+    subtitle: String = "",
+    icon: ImageVector = Icons.Rounded.Lock
 ) {
-    val infiniteTransition = rememberInfiniteTransition(label = "btnGlow")
-    val borderAlpha by infiniteTransition.animateFloat(
-        initialValue = 0.3f, targetValue = 0.7f,
-        animationSpec = infiniteRepeatable(tween(1800, easing = LinearEasing), RepeatMode.Reverse),
-        label = "borderAlpha"
-    )
+    val shape = RoundedCornerShape(20.dp)
     Box(
         modifier = modifier
-            .border(1.dp, color.copy(alpha = borderAlpha), RoundedCornerShape(10.dp))
+            .heightIn(min = 88.dp)
             .background(
-                Brush.verticalGradient(listOf(color.copy(alpha = 0.08f), Color(0xFF010508))),
-                RoundedCornerShape(10.dp)
+                Brush.linearGradient(listOf(Color(0x293B91B6), Color(0x1B173B59), Color(0x16FFFFFF))),
+                shape
+            )
+            .border(
+                0.7.dp,
+                Brush.linearGradient(listOf(Color.White.copy(alpha = 0.21f), color.copy(alpha = 0.24f), Color.White.copy(alpha = 0.07f))),
+                shape
             )
             .clickable(onClick = onClick)
-            .padding(vertical = 12.dp, horizontal = 12.dp),
+            .padding(horizontal = 13.dp, vertical = 12.dp),
         contentAlignment = Alignment.Center
     ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(
-                text = text,
-                color = color,
-                fontSize = 10.5.sp,
-                fontWeight = FontWeight.Bold,
-                fontFamily = FontFamily.Monospace,
-                letterSpacing = 1.sp,
-                textAlign = TextAlign.Center
-            )
-            if (subtitle.isNotBlank()) {
-                Spacer(modifier = Modifier.height(3.dp))
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier.size(42.dp).background(color.copy(alpha = 0.14f), RoundedCornerShape(14.dp)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(imageVector = icon, contentDescription = null, tint = AyriaColors.glacier, modifier = Modifier.size(21.dp))
+            }
+            Spacer(Modifier.width(11.dp))
+            Column(
+                modifier = Modifier.weight(1f),
+                horizontalAlignment = Alignment.Start,
+                verticalArrangement = Arrangement.Center
+            ) {
                 Text(
-                    text = subtitle,
-                    color = color.copy(alpha = 0.5f),
-                    fontSize = 8.sp,
-                    fontFamily = FontFamily.Monospace,
-                    letterSpacing = 0.5.sp,
-                    textAlign = TextAlign.Center,
-                    lineHeight = 11.sp
+                    text = text,
+                    color = AyriaColors.pearl,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = AyriaArabicFont,
+                    textAlign = TextAlign.Start,
+                    maxLines = 1
                 )
+                if (subtitle.isNotBlank()) {
+                    Spacer(Modifier.height(3.dp))
+                    Text(
+                        text = subtitle,
+                        color = AyriaColors.muted.copy(alpha = 0.9f),
+                        fontSize = 9.sp,
+                        fontFamily = AyriaArabicFont,
+                        textAlign = TextAlign.Start,
+                        lineHeight = 13.sp,
+                        maxLines = 2
+                    )
+                }
             }
         }
     }
@@ -1125,7 +1170,7 @@ fun BackgroundParticles(
     )
 
     val particles = remember {
-        List(85) {
+        List(48) {
             SpaceParticle(
                 x = Random.nextFloat(),
                 y = Random.nextFloat(),
@@ -1192,109 +1237,83 @@ fun SovereignContextHub(
     roll: Float,
     pitch: Float,
     connectionType: String,
-    ipAddress: String,
-    batteryPercentage: Int,
-    chargingStatus: String
+    ipAddress: String
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .graphicsLayer {
-                rotationX = -pitch * 0.5f
-                rotationY = roll * 0.5f
-                translationX = roll * 0.4f
-                translationY = pitch * 0.4f
+                rotationX = -pitch * 0.22f
+                rotationY = roll * 0.22f
+                translationX = roll * 0.35f
+                translationY = pitch * 0.35f
             },
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
+        horizontalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        // Card 1: Network Intelligence
-        Column(
-            modifier = Modifier
-                .weight(1f)
-                .border(0.75.dp, CyberCyan.copy(alpha = 0.2f), RoundedCornerShape(10.dp))
-                .background(GlassWhite, RoundedCornerShape(10.dp))
-                .padding(10.dp)
+        AyriaGlassPanel(
+            modifier = Modifier.weight(1f).heightIn(min = 92.dp),
+            highlighted = true,
+            shape = RoundedCornerShape(20.dp)
         ) {
-            Text(
-                text = "الشبكة",
-                color = CyberCyan,
-                fontSize = 8.sp,
-                fontWeight = FontWeight.Bold,
-                letterSpacing = 1.2.sp
-            )
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text = connectionType,
-                color = Color.White,
-                fontSize = 10.sp,
-                fontWeight = FontWeight.Bold
-            )
-            Text(
-                text = ipAddress,
-                color = Color.White.copy(alpha = 0.6f),
-                fontSize = 8.5.sp,
-                fontFamily = FontFamily.Monospace
-            )
+            Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.Center) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        modifier = Modifier.size(34.dp).background(Color(0x3322C7E8), RoundedCornerShape(12.dp)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(Icons.Rounded.Wifi, contentDescription = null, tint = AyriaColors.glacier, modifier = Modifier.size(19.dp))
+                    }
+                    Spacer(Modifier.width(9.dp))
+                    Column {
+                        Text("اتصال الشبكة", color = AyriaColors.glacier, fontFamily = AyriaArabicFont, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                        Text(connectionType.ifBlank { "غير متاح" }, color = AyriaColors.pearl, fontFamily = AyriaArabicFont, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                    }
+                }
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    text = ipAddress.ifBlank { "—" },
+                    color = AyriaColors.muted.copy(alpha = 0.82f),
+                    fontSize = 9.sp,
+                    fontFamily = FontFamily.Monospace,
+                    maxLines = 1
+                )
+            }
         }
 
-        // Card 2: Mission-Critical Power Status
-        Column(
-            modifier = Modifier
-                .weight(1f)
-                .border(0.75.dp, AmberZen.copy(alpha = 0.2f), RoundedCornerShape(10.dp))
-                .background(GlassWhite, RoundedCornerShape(10.dp))
-                .padding(10.dp)
+        AyriaGlassPanel(
+            modifier = Modifier.weight(1f).heightIn(min = 92.dp),
+            shape = RoundedCornerShape(20.dp)
         ) {
-            Text(
-                text = "البطارية",
-                color = AmberZen,
-                fontSize = 8.sp,
-                fontWeight = FontWeight.Bold,
-                letterSpacing = 1.2.sp
-            )
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text = "$batteryPercentage%",
-                color = Color.White,
-                fontSize = 10.sp,
-                fontWeight = FontWeight.Bold
-            )
-            Text(
-                text = chargingStatus,
-                color = (if (chargingStatus == "CHARGING") CyberCyan else Color.White).copy(alpha = 0.6f),
-                fontSize = 8.5.sp,
-                fontWeight = FontWeight.Medium
-            )
-        }
-
-        // Card 3: Sovereign Version Status
-        Column(
-            modifier = Modifier
-                .weight(1f)
-                .border(0.75.dp, CyberCyan.copy(alpha = 0.2f), RoundedCornerShape(10.dp))
-                .background(GlassWhite, RoundedCornerShape(10.dp))
-                .padding(10.dp)
-        ) {
-            Text(
-                text = "المحرك",
-                color = CyberCyan,
-                fontSize = 8.sp,
-                fontWeight = FontWeight.Bold,
-                letterSpacing = 1.2.sp
-            )
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text = "SOVEREIGN V4",
-                color = Color.White,
-                fontSize = 10.sp,
-                fontWeight = FontWeight.Bold
-            )
-            Text(
-                text = "نشط",
-                color = Color.White.copy(alpha = 0.6f),
-                fontSize = 8.5.sp,
-                fontFamily = FontFamily.Monospace
-            )
+            Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.Center) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        modifier = Modifier.size(34.dp).background(Color(0x332A8FC9), RoundedCornerShape(12.dp)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(Icons.Rounded.Explore, contentDescription = null, tint = AyriaColors.glacier, modifier = Modifier.size(20.dp))
+                    }
+                    Spacer(Modifier.width(9.dp))
+                    Column {
+                        Text("استجابة الجيروسكوب", color = AyriaColors.glacier, fontFamily = AyriaArabicFont, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                        Text("حركة متزامنة", color = AyriaColors.pearl.copy(alpha = 0.9f), fontFamily = AyriaArabicFont, fontSize = 12.sp)
+                    }
+                }
+                Spacer(Modifier.height(8.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text(
+                        text = "X ${String.format(java.util.Locale.US, "%.1f", roll)}",
+                        color = AyriaColors.muted,
+                        fontSize = 9.sp,
+                        fontFamily = FontFamily.Monospace
+                    )
+                    Text(
+                        text = "Y ${String.format(java.util.Locale.US, "%.1f", pitch)}",
+                        color = AyriaColors.muted,
+                        fontSize = 9.sp,
+                        fontFamily = FontFamily.Monospace
+                    )
+                }
+            }
         }
     }
 }
@@ -1364,17 +1383,14 @@ fun NeuralCore(
 
     // Core visual shifts based on state and Gemini calculations
     val primaryCoreColor = when {
-        isThinking -> AmberZen
-        stateType == ContextualVerseEngine.AmbientStateType.CRITICAL -> AmberZen
-        stateType == ContextualVerseEngine.AmbientStateType.HIGH_PERFORMANCE -> CyberCyan
-        else -> CyberCyan
+        stateType == ContextualVerseEngine.AmbientStateType.CRITICAL -> Color(0xFFFFC68C)
+        isThinking -> Color(0xFFB7F4FF)
+        else -> Color(0xFF8EDDF7)
     }
-
     val secondaryCoreColor = when {
-        isThinking -> CyberCyan
-        stateType == ContextualVerseEngine.AmbientStateType.CRITICAL -> Color(0xFFE28413) // Deep Amber Orange
-        stateType == ContextualVerseEngine.AmbientStateType.HIGH_PERFORMANCE -> Color.White
-        else -> AmberZen
+        stateType == ContextualVerseEngine.AmbientStateType.CRITICAL -> Color(0xFFE99A52)
+        isThinking -> Color(0xFF73D9E9)
+        else -> Color(0xFF9ABFFF)
     }
 
     Box(
@@ -1466,17 +1482,18 @@ fun NeuralVerseModule(verse: String, easing: CubicBezierEasing, onTap: () -> Uni
         // Beautiful quranic verse text with AmberZen drop shadow glow
         Text(
             text = verse,
-            color = AmberZen,
+            color = AyriaColors.glacier,
             style = TextStyle(
                 shadow = androidx.compose.ui.graphics.Shadow(
-                    color = AmberZen.copy(alpha = 0.85f),
+                    color = AyriaColors.teal.copy(alpha = 0.48f),
                     offset = Offset(0f, 0f),
                     blurRadius = 15f
                 )
             ),
             fontSize = 21.sp,
             fontWeight = FontWeight.Bold,
-            fontFamily = FontFamily.Serif,
+            fontFamily = AyriaQuranFont,
+            lineHeight = 31.sp,
             textAlign = TextAlign.Center,
             modifier = Modifier
                 .graphicsLayer { alpha = opacityGlow }
@@ -1487,10 +1504,10 @@ fun NeuralVerseModule(verse: String, easing: CubicBezierEasing, onTap: () -> Uni
         
         Text(
             text = "اضغط لتغيير الآية",
-            color = Color.White.copy(alpha = 0.3f),
+            color = AyriaColors.muted.copy(alpha = 0.74f),
             fontSize = 9.sp,
-            fontWeight = FontWeight.Bold,
-            letterSpacing = 1.sp,
+            fontWeight = FontWeight.Medium,
+            fontFamily = AyriaArabicFont,
             textAlign = TextAlign.Center
         )
     }
@@ -2165,7 +2182,7 @@ fun DesktopModeScreen(
                 modifier = Modifier
                     .fillMaxSize()
                     .statusBarsPadding()
-                    .navigationBarsPadding()
+                    
                     .padding(horizontal = 32.dp, vertical = 16.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(40.dp, Alignment.CenterHorizontally)
@@ -2325,7 +2342,7 @@ fun DesktopModeScreen(
                 modifier = Modifier
                     .fillMaxSize()
                     .statusBarsPadding()
-                    .navigationBarsPadding()
+                    
                     .padding(horizontal = 24.dp, vertical = 40.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(30.dp, Alignment.CenterVertically)

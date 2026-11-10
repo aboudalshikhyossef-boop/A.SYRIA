@@ -11,12 +11,15 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.runtime.Composable
@@ -82,109 +85,92 @@ fun SplashScreen(
         currentCallback()
     }
 
-    AyriaAtmosphere(
-        modifier = Modifier
-            .fillMaxSize()
-            .statusBarsPadding()
-            .navigationBarsPadding()
-    ) {
-        Column(
-            modifier = Modifier.fillMaxSize(),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
-        ) {
-            Box(
-                modifier = Modifier.size(286.dp),
-                contentAlignment = Alignment.Center
+    AyriaAtmosphere(modifier = Modifier.fillMaxSize()) {
+        BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+            val compact = maxHeight < 620.dp
+            val emblemFrame = minOf(286.dp, maxWidth * 0.72f, maxHeight * (if (compact) 0.34f else 0.42f))
+
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .statusBarsPadding()
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = 20.dp, vertical = 10.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
             ) {
-                Canvas(modifier = Modifier.fillMaxSize()) {
-                    val center = androidx.compose.ui.geometry.Offset(size.width / 2f, size.height / 2f)
-                    val radius = size.minDimension * 0.43f
-                    drawCircle(
-                        color = AyriaColors.teal.copy(alpha = 0.08f * haloPulse),
-                        radius = radius * 1.26f,
-                        center = center,
-                        style = Stroke(width = 1.dp.toPx())
-                    )
-                    drawCircle(
-                        color = Color.White.copy(alpha = 0.055f),
-                        radius = radius * 1.08f,
-                        center = center,
-                        style = Stroke(width = 0.7.dp.toPx())
-                    )
-                    drawArc(
-                        color = AyriaColors.glacier.copy(alpha = 0.34f),
-                        startAngle = orbitRotation,
-                        sweepAngle = 58f,
-                        useCenter = false,
-                        topLeft = androidx.compose.ui.geometry.Offset(
-                            center.x - radius,
-                            center.y - radius
-                        ),
-                        size = androidx.compose.ui.geometry.Size(radius * 2f, radius * 2f),
-                        style = Stroke(width = 1.35.dp.toPx(), cap = StrokeCap.Round)
-                    )
-                    drawArc(
-                        color = AyriaColors.ion.copy(alpha = 0.24f),
-                        startAngle = 180f - orbitRotation * 0.42f,
-                        sweepAngle = 34f,
-                        useCenter = false,
-                        topLeft = androidx.compose.ui.geometry.Offset(
-                            center.x - radius * 0.83f,
-                            center.y - radius * 0.83f
-                        ),
-                        size = androidx.compose.ui.geometry.Size(radius * 1.66f, radius * 1.66f),
-                        style = Stroke(width = 1.dp.toPx(), cap = StrokeCap.Round)
+                Box(Modifier.size(emblemFrame), contentAlignment = Alignment.Center) {
+                    Canvas(modifier = Modifier.fillMaxSize()) {
+                        val center = androidx.compose.ui.geometry.Offset(size.width / 2f, size.height / 2f)
+                        val radius = size.minDimension * 0.43f
+                        drawCircle(color = AyriaColors.teal.copy(alpha = 0.08f * haloPulse), radius = radius * 1.26f, center = center, style = Stroke(width = 1.dp.toPx()))
+                        drawCircle(color = Color.White.copy(alpha = 0.055f), radius = radius * 1.08f, center = center, style = Stroke(width = 0.7.dp.toPx()))
+                        drawArc(
+                            color = AyriaColors.glacier.copy(alpha = 0.34f),
+                            startAngle = orbitRotation,
+                            sweepAngle = 58f,
+                            useCenter = false,
+                            topLeft = androidx.compose.ui.geometry.Offset(center.x - radius, center.y - radius),
+                            size = androidx.compose.ui.geometry.Size(radius * 2f, radius * 2f),
+                            style = Stroke(width = 1.35.dp.toPx(), cap = StrokeCap.Round)
+                        )
+                        drawArc(
+                            color = AyriaColors.ion.copy(alpha = 0.24f),
+                            startAngle = 180f - orbitRotation * 0.42f,
+                            sweepAngle = 34f,
+                            useCenter = false,
+                            topLeft = androidx.compose.ui.geometry.Offset(center.x - radius * 0.83f, center.y - radius * 0.83f),
+                            size = androidx.compose.ui.geometry.Size(radius * 1.66f, radius * 1.66f),
+                            style = Stroke(width = 1.dp.toPx(), cap = StrokeCap.Round)
+                        )
+                    }
+                    AyriaBrandMark(
+                        modifier = Modifier
+                            .size(emblemFrame * 0.88f)
+                            .graphicsLayer {
+                                alpha = markAlpha.value
+                                scaleX = markScale.value
+                                scaleY = markScale.value
+                            },
+                        contentDescription = if (isArabic) "شعار A.SYRIA" else "A.SYRIA logo"
                     )
                 }
 
-                AyriaBrandMark(
-                    modifier = Modifier
-                        .size(252.dp)
-                        .graphicsLayer {
-                            alpha = markAlpha.value
-                            scaleX = markScale.value
-                            scaleY = markScale.value
-                        },
-                    contentDescription = if (isArabic) "شعار A.SYRIA" else "A.SYRIA logo"
-                )
-            }
-
-            Spacer(Modifier.height(8.dp))
-            Column(
-                modifier = Modifier.alpha(copyAlpha.value),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                androidx.compose.material3.Text(
-                    text = "A.SYRIA",
-                    color = AyriaColors.pearl,
-                    fontSize = 27.sp,
-                    fontWeight = FontWeight.Bold,
-                    letterSpacing = 4.2.sp
-                )
-                Spacer(Modifier.height(8.dp))
-                androidx.compose.material3.Text(
-                    text = if (isArabic) "سيادة رقمية. بثقة ووضوح." else "DIGITAL SOVEREIGNTY",
-                    color = AyriaColors.glacier.copy(alpha = 0.82f),
-                    fontSize = if (isArabic) 14.sp else 10.sp,
-                    fontFamily = AyriaArabicFont,
-                    fontWeight = FontWeight.Medium,
-                    letterSpacing = if (isArabic) 0.sp else 2.4.sp,
-                    textAlign = TextAlign.Center
-                )
-                Spacer(Modifier.height(18.dp))
-                AyriaVerseCard(
-                    isArabic = isArabic,
-                    modifier = Modifier.width(318.dp).height(116.dp)
-                )
-                Spacer(Modifier.height(22.dp))
-                androidx.compose.material3.Text(
-                    text = if (isArabic) "حماية  •  ذكاء  •  معرفة" else "PROTECTION  •  INTELLIGENCE  •  KNOWLEDGE",
-                    color = AyriaColors.muted.copy(alpha = 0.72f),
-                    fontSize = 9.sp,
-                    letterSpacing = 1.2.sp,
-                    textAlign = TextAlign.Center
-                )
+                Spacer(Modifier.height(if (compact) 2.dp else 8.dp))
+                Column(modifier = Modifier.alpha(copyAlpha.value), horizontalAlignment = Alignment.CenterHorizontally) {
+                    androidx.compose.material3.Text(
+                        text = "A.SYRIA",
+                        color = AyriaColors.pearl,
+                        fontSize = if (compact) 24.sp else 27.sp,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 4.2.sp
+                    )
+                    Spacer(Modifier.height(6.dp))
+                    androidx.compose.material3.Text(
+                        text = if (isArabic) "سيادة رقمية. بثقة ووضوح." else "DIGITAL SOVEREIGNTY",
+                        color = AyriaColors.glacier.copy(alpha = 0.82f),
+                        fontSize = if (compact) 12.sp else if (isArabic) 14.sp else 10.sp,
+                        fontFamily = AyriaArabicFont,
+                        fontWeight = FontWeight.Medium,
+                        letterSpacing = if (isArabic) 0.sp else 2.4.sp,
+                        textAlign = TextAlign.Center
+                    )
+                    Spacer(Modifier.height(if (compact) 12.dp else 18.dp))
+                    AyriaVerseCard(
+                        isArabic = isArabic,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(if (compact) 106.dp else 116.dp)
+                    )
+                    Spacer(Modifier.height(if (compact) 14.dp else 22.dp))
+                    androidx.compose.material3.Text(
+                        text = if (isArabic) "حماية  •  ذكاء  •  معرفة" else "PROTECTION  •  INTELLIGENCE  •  KNOWLEDGE",
+                        color = AyriaColors.muted.copy(alpha = 0.72f),
+                        fontSize = 9.sp,
+                        letterSpacing = 1.2.sp,
+                        textAlign = TextAlign.Center
+                    )
+                }
             }
         }
     }

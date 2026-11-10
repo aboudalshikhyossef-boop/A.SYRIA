@@ -236,9 +236,9 @@ internal fun AyriaGlassPanel(
     } else {
         Brush.linearGradient(
             colors = listOf(
-                Color.White.copy(alpha = 0.22f),
-                Color.White.copy(alpha = 0.055f),
-                AyriaColors.teal.copy(alpha = 0.11f)
+                Color.White.copy(alpha = 0.15f),
+                Color.White.copy(alpha = 0.035f),
+                AyriaColors.teal.copy(alpha = 0.075f)
             )
         )
     }
@@ -252,7 +252,7 @@ internal fun AyriaGlassPanel(
             )
             .clip(shape)
             .background(fill, shape)
-            .border(width = 1.dp, brush = edge, shape = shape),
+            .border(width = 0.65.dp, brush = edge, shape = shape),
         content = content
     )
 }

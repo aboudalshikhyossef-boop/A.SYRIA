@@ -76,13 +76,10 @@ fun OnboardingScreen(
         LocalLayoutDirection provides if (isArabic) LayoutDirection.Rtl else LayoutDirection.Ltr
     ) {
         AyriaAtmosphere(
-            modifier = Modifier
-                .fillMaxSize()
-                .statusBarsPadding()
-                .navigationBarsPadding()
+            modifier = Modifier.fillMaxSize()
         ) {
             Column(
-                modifier = Modifier.fillMaxSize(),
+                modifier = Modifier.fillMaxSize().statusBarsPadding(),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Row(

@@ -42,6 +42,8 @@ import androidx.compose.ui.unit.sp
 import com.example.ui.theme.AmberZen
 import com.example.ui.theme.CyberCyan
 import com.example.ui.theme.VoidBlack
+import com.example.ui.brand.AyriaArabicFont
+import com.example.ui.brand.AyriaColors
 
 /** Stateless presentation components shared by the dashboard's status and metrics sections. */
 
@@ -56,70 +58,44 @@ fun StatusHeaderCell(
     Column(
         modifier = Modifier
             .graphicsLayer {
-                rotationX = -pitch * 0.4f
-                rotationY = roll * 0.4f
-                translationX = roll * 0.3f
-                translationY = pitch * 0.3f
+                rotationX = -pitch * 0.18f
+                rotationY = roll * 0.18f
+                translationX = roll * 0.22f
+                translationY = pitch * 0.22f
             }
             .wrapContentSize(),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
-                text = "A.SYRIA V5",
-                color = Color.White,
+                text = "A.SYRIA",
+                color = AyriaColors.pearl,
                 style = TextStyle(
                     shadow = androidx.compose.ui.graphics.Shadow(
-                        color = CyberCyan.copy(alpha = 0.85f),
+                        color = AyriaColors.teal.copy(alpha = 0.55f),
                         offset = Offset(0f, 0f),
-                        blurRadius = 15f
+                        blurRadius = 19f
                     )
                 ),
-                fontSize = 30.sp,
+                fontSize = 29.sp,
                 fontWeight = FontWeight.ExtraBold,
-                fontFamily = FontFamily.Serif,
-                letterSpacing = 6.sp
+                letterSpacing = 3.2.sp
             )
-
             if (isStealth) {
                 Spacer(modifier = Modifier.width(8.dp))
                 Icon(
                     imageVector = Icons.Default.VisibilityOff,
                     contentDescription = "Stealth Active",
-                    tint = Color.Gray.copy(alpha = 0.6f),
-                    modifier = Modifier.size(20.dp)
+                    tint = AyriaColors.muted.copy(alpha = 0.78f),
+                    modifier = Modifier.size(18.dp)
                 )
             }
         }
-
-        Spacer(modifier = Modifier.height(4.dp))
-
-        Text(
-            text = operatorName.uppercase(),
-            color = AmberZen,
-            fontSize = 11.sp,
-            fontWeight = FontWeight.Bold,
-            letterSpacing = 2.sp,
-            fontFamily = FontFamily.Monospace
-        )
-
-        Text(
-            text = neuralRole.uppercase(),
-            color = Color.White.copy(alpha = 0.6f),
-            fontSize = 8.sp,
-            fontWeight = FontWeight.Medium,
-            letterSpacing = 1.sp,
-            fontFamily = FontFamily.Monospace
-        )
-
-        Spacer(modifier = Modifier.height(8.dp))
-        Text(
-            text = "الحالة: آمن",
-            color = CyberCyan,
-            fontSize = 9.sp,
-            fontWeight = FontWeight.Bold,
-            letterSpacing = 3.sp
-        )
+        Spacer(Modifier.height(3.dp))
+        Text(text = operatorName, color = AyriaColors.glacier.copy(alpha = 0.88f), fontSize = 11.sp, fontWeight = FontWeight.Bold, fontFamily = AyriaArabicFont)
+        Text(text = neuralRole, color = AyriaColors.muted.copy(alpha = 0.8f), fontSize = 9.sp, fontWeight = FontWeight.Medium, fontFamily = AyriaArabicFont)
+        Spacer(Modifier.height(6.dp))
+        Text(text = "الحالة الأمنية مستقرة", color = AyriaColors.teal, fontSize = 10.sp, fontWeight = FontWeight.Bold, fontFamily = AyriaArabicFont)
     }
 }
 
