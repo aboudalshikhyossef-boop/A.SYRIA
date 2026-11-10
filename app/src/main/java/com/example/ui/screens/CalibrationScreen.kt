@@ -175,7 +175,7 @@ fun CalibrationScreen(
             }
             Spacer(Modifier.height(16.dp))
             LinearProgressIndicator(
-                progress = { (step + 1f) / totalSteps },
+                progress = (step + 1f) / totalSteps,
                 modifier = Modifier.fillMaxWidth().height(3.dp).clip(CircleShape),
                 color = AyriaColors.teal,
                 trackColor = Color.White.copy(alpha = 0.10f)
