@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.runtime.Composable
@@ -38,6 +39,7 @@ import com.example.ui.brand.AyriaArabicFont
 import com.example.ui.brand.AyriaAtmosphere
 import com.example.ui.brand.AyriaBrandMark
 import com.example.ui.brand.AyriaColors
+import com.example.ui.brand.AyriaVerseCard
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -170,7 +172,12 @@ fun SplashScreen(
                     letterSpacing = if (isArabic) 0.sp else 2.4.sp,
                     textAlign = TextAlign.Center
                 )
-                Spacer(Modifier.height(26.dp))
+                Spacer(Modifier.height(18.dp))
+                AyriaVerseCard(
+                    isArabic = isArabic,
+                    modifier = Modifier.width(318.dp)
+                )
+                Spacer(Modifier.height(22.dp))
                 androidx.compose.material3.Text(
                     text = if (isArabic) "حماية  •  ذكاء  •  معرفة" else "PROTECTION  •  INTELLIGENCE  •  KNOWLEDGE",
                     color = AyriaColors.muted.copy(alpha = 0.72f),
