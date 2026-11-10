@@ -48,7 +48,7 @@ fun AboutScreen(onBack: () -> Unit) {
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(VoidBlack)
+            .background(Color.Transparent)
             .statusBarsPadding()
             .navigationBarsPadding()
     ) {

@@ -814,8 +814,11 @@ class MainActivity : FragmentActivity() {
                                 }
                             }
                             composable("about") {
-                                AdaptiveContentFrame {
-                                    AboutScreen { navController.popBackStack() }
+                                Box(Modifier.fillMaxSize()) {
+                                    AyriaPanoramaBackdrop(pageIndex = 4)
+                                    AdaptiveContentFrame {
+                                        AboutScreen { navController.popBackStack() }
+                                    }
                                 }
                             }
                             composable("glossary") {
@@ -836,13 +839,19 @@ class MainActivity : FragmentActivity() {
                             }
                             composable("adaptive_feedback") {
                                 val isArLocal by vm.isArabic.collectAsState()
-                                AdaptiveContentFrame {
-                                    FeedbackScreen(vm, isArLocal) { navController.popBackStack() }
+                                Box(Modifier.fillMaxSize()) {
+                                    AyriaPanoramaBackdrop(pageIndex = 4)
+                                    AdaptiveContentFrame {
+                                        FeedbackScreen(vm, isArLocal) { navController.popBackStack() }
+                                    }
                                 }
                             }
                             composable("app_lock") {
-                                AdaptiveContentFrame {
-                                    AppPinSettingsScreen(viewModel = vm) { navController.popBackStack() }
+                                Box(Modifier.fillMaxSize()) {
+                                    AyriaPanoramaBackdrop(pageIndex = 4)
+                                    AdaptiveContentFrame {
+                                        AppPinSettingsScreen(viewModel = vm) { navController.popBackStack() }
+                                    }
                                 }
                             }
                         }

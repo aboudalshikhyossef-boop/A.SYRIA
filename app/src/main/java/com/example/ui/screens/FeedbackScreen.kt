@@ -70,7 +70,7 @@ package com.example.ui.screens
       Column(
           modifier = Modifier
               .fillMaxSize()
-              .background(Color(0xFF040D14))
+              .background(Color.Transparent)
               .verticalScroll(rememberScrollState())
               .padding(20.dp)
       ) {
