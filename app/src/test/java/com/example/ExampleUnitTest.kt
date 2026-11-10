@@ -67,14 +67,31 @@ class ExampleUnitTest {
     }
 
     @Test
-    fun libraryLoadsOnlyUniqueDuasAndHadiths() {
+    fun libraryLoadsVerifiedUniqueDuasAndHadithsWithSources() {
         val context = RuntimeEnvironment.getApplication()
         val data = loadLibraryData(context)
+        val duas = data["duas"].orEmpty()
+        val hadiths = data["hadiths"].orEmpty()
 
         assertEquals(setOf("duas", "hadiths"), data.keys)
-        assertEquals(8, data["duas"]?.size)
-        assertEquals(8, data["hadiths"]?.size)
+        assertEquals(17, duas.size)
+        assertEquals(12, hadiths.size)
+
         assertTrue(data.values.flatten().all { it.body.isNotBlank() })
+        assertEquals(duas.size, duas.map { it.body }.distinct().size)
+        assertEquals(hadiths.size, hadiths.map { it.body }.distinct().size)
+
+        assertTrue(duas.all {
+            it.source.isNotBlank() &&
+                it.reference.isNotBlank() &&
+                it.sourceUrl.startsWith("https://")
+        })
+        assertTrue(hadiths.all {
+            it.source.isNotBlank() &&
+                it.reference.isNotBlank() &&
+                it.tag.isNotBlank() &&
+                it.sourceUrl.startsWith("https://")
+        })
     }
 
     @Test
