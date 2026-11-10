@@ -20,7 +20,7 @@ class ExampleInstrumentedTest {
     @Test
     fun useAppContext() {
         val appContext = InstrumentationRegistry.getInstrumentation().targetContext
-        assertEquals("com.asyria.v4", appContext.packageName)
+        assertEquals("com.asyria.v4.preview", appContext.packageName)
     }
 
     @Test

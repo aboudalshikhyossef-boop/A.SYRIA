@@ -1,0 +1,142 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Left crystal wing -->
+    <path
+        android:pathData="M54,18 L24,81.5 Q21.5,88 29,88 L40,88 L54,61 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:type="linear"
+                android:startX="24"
+                android:startY="20"
+                android:endX="51"
+                android:endY="91">
+                <item android:offset="0" android:color="#FFE4FFFC"/>
+                <item android:offset="0.22" android:color="#FF86EAE2"/>
+                <item android:offset="0.55" android:color="#FF2496A2"/>
+                <item android:offset="1" android:color="#FF073B4B"/>
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- Left inner bevel -->
+    <path
+        android:pathData="M54,18 L47,59 L29,86 L25,85 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:type="linear"
+                android:startX="30"
+                android:startY="24"
+                android:endX="52"
+                android:endY="86">
+                <item android:offset="0" android:color="#FFBFFFF7"/>
+                <item android:offset="0.48" android:color="#FF3CAFB7"/>
+                <item android:offset="1" android:color="#FF0A4657"/>
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- Left shadow facet -->
+    <path
+        android:pathData="M47,59 L54,61 L40,88 L29,88 Z"
+        android:fillColor="#FF0B5667"/>
+
+    <!-- Right crystal wing -->
+    <path
+        android:pathData="M54,18 L84,81.5 Q86.5,88 79,88 L68,88 L54,61 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:type="linear"
+                android:startX="57"
+                android:startY="18"
+                android:endX="86"
+                android:endY="91">
+                <item android:offset="0" android:color="#FFD9F8FF"/>
+                <item android:offset="0.24" android:color="#FF70CBEA"/>
+                <item android:offset="0.58" android:color="#FF2869B0"/>
+                <item android:offset="1" android:color="#FF092B57"/>
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- Right inner bevel -->
+    <path
+        android:pathData="M54,18 L61,59 L79,86 L83,85 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:type="linear"
+                android:startX="55"
+                android:startY="22"
+                android:endX="83"
+                android:endY="86">
+                <item android:offset="0" android:color="#FF9EEFFF"/>
+                <item android:offset="0.5" android:color="#FF367DCB"/>
+                <item android:offset="1" android:color="#FF0A315F"/>
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- Right shadow facet -->
+    <path
+        android:pathData="M61,59 L54,61 L68,88 L79,88 Z"
+        android:fillColor="#FF0A356D"/>
+
+    <!-- Inner glass bridge / refraction -->
+    <path
+        android:pathData="M54,43 C47,51 41.5,64 38,81 L54,70 L70,81 C66.5,64 61,51 54,43 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:type="linear"
+                android:startX="43"
+                android:startY="47"
+                android:endX="67"
+                android:endY="82">
+                <item android:offset="0" android:color="#FFB7F9F0"/>
+                <item android:offset="0.42" android:color="#FF3EABB7"/>
+                <item android:offset="1" android:color="#FF0B4B66"/>
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- Inner crystalline facet -->
+    <path
+        android:pathData="M54,48 L54,70 L38,81 Z"
+        android:fillColor="#FF77D9D2"
+        android:fillAlpha="0.55"/>
+
+    <path
+        android:pathData="M54,48 L70,81 L54,70 Z"
+        android:fillColor="#FF5B9FD6"
+        android:fillAlpha="0.7"/>
+
+    <!-- Fine glass edge highlights -->
+    <path
+        android:pathData="M54,19 L25,82"
+        android:fillColor="#00000000"
+        android:strokeColor="#FFDDFEFC"
+        android:strokeAlpha="0.72"
+        android:strokeWidth="0.8"
+        android:strokeLineCap="round"/>
+
+    <path
+        android:pathData="M54,19 L83,82"
+        android:fillColor="#00000000"
+        android:strokeColor="#FFD7F5FF"
+        android:strokeAlpha="0.64"
+        android:strokeWidth="0.8"
+        android:strokeLineCap="round"/>
+
+    <path
+        android:pathData="M29,87 L40,87 L54,61 L68,87 L79,87"
+        android:fillColor="#00000000"
+        android:strokeColor="#FFB9F7F0"
+        android:strokeAlpha="0.58"
+        android:strokeWidth="0.65"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"/>
+</vector>
