@@ -45,6 +45,7 @@ fun SettingsScreen(
     val haptic = LocalHapticFeedback.current
     val isAr by viewModel.isArabic.collectAsState()
     val isStealth by viewModel.isStealthMode.collectAsState()
+    val lockAppOnLaunch by viewModel.lockAppOnLaunch.collectAsState()
     val apiKey by viewModel.customApiKey.collectAsState()
     val operatorName by viewModel.operatorName.collectAsState()
     val neuralRole by viewModel.neuralRole.collectAsState()
@@ -122,6 +123,13 @@ fun SettingsScreen(
                     // ── SECURITY ──────────────────────────────────────────────────────
                     SettingsCard(title = if (isAr) "الحماية والأمان" else "SECURITY CORE", icon = Icons.Default.Security, color = Color(0xFFFF4D6D), glowAlpha = borderGlow) {
                         SettingsToggleRow(label = if (isAr) "وضع التخفي" else "Stealth Mode", checked = isStealth, onCheckedChange = { viewModel.setStealthMode(it) }, icon = Icons.Default.VisibilityOff, color = Color(0xFFFF4D6D))
+                        SettingsToggleRow(label = if (isAr) "قفل التطبيق عند الفتح" else "Lock app on launch", checked = lockAppOnLaunch, onCheckedChange = { viewModel.setLockAppOnLaunch(it) }, icon = Icons.Default.Fingerprint, color = Color(0xFFFF4D6D))
+                        Text(
+                            text = if (isAr) "يستخدم بصمة الجهاز أو PIN أو النمط أو كلمة المرور. عند إلغاء المصادقة سيبقى التطبيق مقفلًا حتى تعيد المحاولة أو تختار المتابعة دون قفل." else "Uses device biometrics, PIN, pattern, or password. Cancelling keeps the app locked until you retry or explicitly continue without the lock.",
+                            color = Color.White.copy(alpha = 0.48f),
+                            fontSize = 10.sp,
+                            lineHeight = 15.sp
+                        )
                         HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = Color.White.copy(alpha = 0.06f))
                         // Biometric lock button
                         Row(modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(Color(0xFFFF4D6D).copy(alpha = 0.07f)).border(1.dp, Color(0xFFFF4D6D).copy(alpha = 0.2f), RoundedCornerShape(10.dp)).clickable { haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress); onLockRequest(if (isAr) "قفل الجلسة" else "Lock Session", if (isAr) "تأكيد الهوية لقفل التطبيق" else "Confirm identity to lock", {}) }.padding(14.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
