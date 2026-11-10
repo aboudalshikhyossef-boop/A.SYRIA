@@ -49,6 +49,7 @@ import com.example.ui.theme.AmberZen
 import com.example.ui.theme.CyberCyan
 import com.example.ui.theme.VoidBlack
 import com.example.ui.brand.AyriaActionButton
+import com.example.ui.brand.AyriaAtmosphere
 import com.example.ui.brand.AyriaArabicFont
 import com.example.ui.brand.AyriaBrandMark
 import com.example.ui.viewmodel.DashboardViewModel
@@ -341,14 +342,10 @@ fun AppPinLockScreen(
     CompositionLocalProvider(
         LocalLayoutDirection provides if (isArabic) LayoutDirection.Rtl else LayoutDirection.Ltr
     ) {
+        AyriaAtmosphere(modifier = Modifier.fillMaxSize()) {
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(
-                    Brush.linearGradient(
-                        listOf(Color(0xFF020817), Color(0xFF071A35), Color(0xFF020612))
-                    )
-                )
                 .clickable(
                     interactionSource = remember { MutableInteractionSource() },
                     indication = null,
@@ -567,6 +564,7 @@ fun AppPinLockScreen(
                     lineHeight = 13.sp
                 )
             }
+        }
         }
     }
 }
