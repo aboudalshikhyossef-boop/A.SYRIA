@@ -40,12 +40,12 @@ fun SettingsScreen(
     onClose: () -> Unit,
     onOpenAbout: () -> Unit,
     onOpenCustomize: () -> Unit = {},
-    onLockRequest: (String, String, () -> Unit) -> Unit
+    onOpenAppLock: () -> Unit = {}
 ) {
     val haptic = LocalHapticFeedback.current
     val isAr by viewModel.isArabic.collectAsState()
     val isStealth by viewModel.isStealthMode.collectAsState()
-    val lockAppOnLaunch by viewModel.lockAppOnLaunch.collectAsState()
+    val appPinEnabled by viewModel.isAppPinEnabled.collectAsState()
     val apiKey by viewModel.customApiKey.collectAsState()
     val operatorName by viewModel.operatorName.collectAsState()
     val neuralRole by viewModel.neuralRole.collectAsState()
@@ -123,23 +123,42 @@ fun SettingsScreen(
                     // ── SECURITY ──────────────────────────────────────────────────────
                     SettingsCard(title = if (isAr) "الحماية والأمان" else "SECURITY CORE", icon = Icons.Default.Security, color = Color(0xFFFF4D6D), glowAlpha = borderGlow) {
                         SettingsToggleRow(label = if (isAr) "وضع التخفي" else "Stealth Mode", checked = isStealth, onCheckedChange = { viewModel.setStealthMode(it) }, icon = Icons.Default.VisibilityOff, color = Color(0xFFFF4D6D))
-                        SettingsToggleRow(label = if (isAr) "قفل التطبيق عند الفتح" else "Lock app on launch", checked = lockAppOnLaunch, onCheckedChange = { viewModel.setLockAppOnLaunch(it) }, icon = Icons.Default.Fingerprint, color = Color(0xFFFF4D6D))
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(Color(0xFFFF4D6D).copy(alpha = 0.07f))
+                                .border(1.dp, Color(0xFFFF4D6D).copy(alpha = 0.22f), RoundedCornerShape(12.dp))
+                                .clickable {
+                                    haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
+                                    onOpenAppLock()
+                                }
+                                .padding(14.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            Icon(Icons.Default.Lock, null, tint = Color(0xFFFF4D6D), modifier = Modifier.size(21.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(if (isAr) "قفل التطبيق" else "App PIN Lock", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                                Text(
+                                    if (isAr) {
+                                        if (appPinEnabled) "مفعّل · رمز محلي مشفّر من 6 أرقام" else "غير مفعّل · أنشئ رمزاً محلياً من 6 أرقام"
+                                    } else {
+                                        if (appPinEnabled) "Enabled · encrypted six-digit local PIN" else "Disabled · create a six-digit local PIN"
+                                    },
+                                    color = Color.White.copy(alpha = 0.48f),
+                                    fontSize = 10.sp,
+                                    lineHeight = 14.sp
+                                )
+                            }
+                            Icon(Icons.Default.ChevronRight, null, tint = Color(0xFFFF4D6D).copy(alpha = 0.7f), modifier = Modifier.size(18.dp))
+                        }
                         Text(
-                            text = if (isAr) "يستخدم بصمة الجهاز أو PIN أو النمط أو كلمة المرور. عند إلغاء المصادقة سيبقى التطبيق مقفلًا حتى تعيد المحاولة أو تختار المتابعة دون قفل." else "Uses device biometrics, PIN, pattern, or password. Cancelling keeps the app locked until you retry or explicitly continue without the lock.",
+                            text = if (isAr) "قفل مستقل داخل A.SYRIA، لا يستخدم بصمة الهاتف أو رمز الشاشة في الاستخدام اليومي. تُستخدم مصادقة الجهاز فقط عند طلب استرداد الرمز المنسي." else "An independent A.SYRIA lock. Daily access never uses the phone's biometrics or screen PIN; device authentication is used only to recover a forgotten app PIN.",
                             color = Color.White.copy(alpha = 0.48f),
                             fontSize = 10.sp,
                             lineHeight = 15.sp
                         )
-                        HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = Color.White.copy(alpha = 0.06f))
-                        // Biometric lock button
-                        Row(modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(Color(0xFFFF4D6D).copy(alpha = 0.07f)).border(1.dp, Color(0xFFFF4D6D).copy(alpha = 0.2f), RoundedCornerShape(10.dp)).clickable { haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress); onLockRequest(if (isAr) "قفل الجلسة" else "Lock Session", if (isAr) "تأكيد الهوية لقفل التطبيق" else "Confirm identity to lock", {}) }.padding(14.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                            Icon(Icons.Default.Fingerprint, null, tint = Color(0xFFFF4D6D), modifier = Modifier.size(20.dp))
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(if (isAr) "قفل الجلسة" else "Lock Session", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
-                                Text(if (isAr) "بصمة الإصبع أو رمز الجهاز" else "Fingerprint or device PIN", color = Color.White.copy(alpha = 0.4f), fontSize = 10.sp)
-                            }
-                            Icon(Icons.Default.ChevronRight, null, tint = Color(0xFFFF4D6D).copy(alpha = 0.6f), modifier = Modifier.size(18.dp))
-                        }
                     }
 
                     // ── CUSTOMIZATION ────────────────────────────────────────────────
