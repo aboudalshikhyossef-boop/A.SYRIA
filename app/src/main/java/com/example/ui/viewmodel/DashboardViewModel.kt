@@ -249,6 +249,19 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
 
     private val _isStealthMode = MutableStateFlow(false)
     val isStealthMode: StateFlow<Boolean> = _isStealthMode.asStateFlow()
+
+    private val _isAppPinSettingsLoaded = MutableStateFlow(false)
+    val isAppPinSettingsLoaded: StateFlow<Boolean> = _isAppPinSettingsLoaded.asStateFlow()
+    private val _hasAppPin = MutableStateFlow(false)
+    val hasAppPin: StateFlow<Boolean> = _hasAppPin.asStateFlow()
+    private val _isAppPinEnabled = MutableStateFlow(false)
+    val isAppPinEnabled: StateFlow<Boolean> = _isAppPinEnabled.asStateFlow()
+    private val _isAppPinUnlocked = MutableStateFlow(false)
+    val isAppPinUnlocked: StateFlow<Boolean> = _isAppPinUnlocked.asStateFlow()
+    private val _appPinFailedAttempts = MutableStateFlow(0)
+    val appPinFailedAttempts: StateFlow<Int> = _appPinFailedAttempts.asStateFlow()
+    private val _appPinLockoutUntilMillis = MutableStateFlow(0L)
+    val appPinLockoutUntilMillis: StateFlow<Long> = _appPinLockoutUntilMillis.asStateFlow()
     private val _lockAppOnLaunch = MutableStateFlow(true)
     val lockAppOnLaunch: StateFlow<Boolean> = _lockAppOnLaunch.asStateFlow()
 
@@ -318,10 +331,67 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
     }
 
     fun setLockAppOnLaunch(enabled: Boolean) {
+        // Legacy compatibility only. Startup biometrics are intentionally disabled.
         viewModelScope.launch {
-            dataStore.saveLockAppOnLaunch(enabled)
-            _lockAppOnLaunch.value = enabled
+            dataStore.saveLockAppOnLaunch(false)
+            _lockAppOnLaunch.value = false
         }
+    }
+
+    fun enableAppPin(pin: String, onResult: (Boolean) -> Unit = {}) {
+        viewModelScope.launch {
+            val saved = runCatching {
+                withContext(Dispatchers.IO) { dataStore.enableAppPin(pin) }
+            }.isSuccess
+            if (saved) {
+                _hasAppPin.value = true
+                _isAppPinEnabled.value = true
+                _isAppPinUnlocked.value = true
+                _appPinFailedAttempts.value = 0
+                _appPinLockoutUntilMillis.value = 0L
+            }
+            onResult(saved)
+        }
+    }
+
+    fun verifyAppPin(pin: String, onResult: (Boolean) -> Unit = {}) {
+        viewModelScope.launch {
+            val settings = dataStore.appPinSettings.first()
+            if (settings.lockoutUntilMillis > System.currentTimeMillis()) {
+                onResult(false)
+                return@launch
+            }
+            val verified = runCatching {
+                withContext(Dispatchers.IO) { dataStore.verifyAppPin(pin) }
+            }.getOrDefault(false)
+            val updated = dataStore.appPinSettings.first()
+            _hasAppPin.value = updated.hasCredential
+            _isAppPinEnabled.value = updated.enabled
+            _appPinFailedAttempts.value = updated.failedAttempts
+            _appPinLockoutUntilMillis.value = updated.lockoutUntilMillis
+            if (verified) _isAppPinUnlocked.value = true
+            onResult(verified)
+        }
+    }
+
+    fun disableAppPin(onResult: (Boolean) -> Unit = {}) {
+        viewModelScope.launch {
+            val disabled = runCatching {
+                withContext(Dispatchers.IO) { dataStore.disableAppPin() }
+            }.isSuccess
+            if (disabled) {
+                _hasAppPin.value = false
+                _isAppPinEnabled.value = false
+                _isAppPinUnlocked.value = false
+                _appPinFailedAttempts.value = 0
+                _appPinLockoutUntilMillis.value = 0L
+            }
+            onResult(disabled)
+        }
+    }
+
+    fun lockAppSession() {
+        if (_isAppPinEnabled.value) _isAppPinUnlocked.value = false
     }
 
     fun updateCustomApiKey(key: String) {
@@ -401,7 +471,16 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
         deviceTelemetry.start()
         viewModelScope.launch { dataStore.isArabic.collect { _isArabic.value = it } }
         viewModelScope.launch { dataStore.stealthMode.collect { _isStealthMode.value = it } }
-        viewModelScope.launch { dataStore.lockAppOnLaunch.collect { _lockAppOnLaunch.value = it } }
+        viewModelScope.launch { dataStore.lockAppOnLaunch.collect { _lockAppOnLaunch.value = false } }
+        viewModelScope.launch {
+            dataStore.appPinSettings.collect { settings ->
+                _hasAppPin.value = settings.hasCredential
+                _isAppPinEnabled.value = settings.enabled
+                _appPinFailedAttempts.value = settings.failedAttempts
+                _appPinLockoutUntilMillis.value = settings.lockoutUntilMillis
+                _isAppPinSettingsLoaded.value = true
+            }
+        }
         viewModelScope.launch { dataStore.cyberScore.collect { _cyberScore.value = it } }
         viewModelScope.launch { dataStore.geminiApiKey.collect { _customApiKey.value = it } }
         viewModelScope.launch { dataStore.projectName.collect { _projectName.value = it } }
@@ -424,7 +503,13 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
         viewModelScope.launch { dataStore.userProfileAnalysis.collect { _userProfileAnalysis.value = it } }
         // Mark data as loaded after critical fields are available
         viewModelScope.launch {
-            _lockAppOnLaunch.value = dataStore.lockAppOnLaunch.first()
+            _lockAppOnLaunch.value = false
+            val pinSettings = dataStore.appPinSettings.first()
+            _hasAppPin.value = pinSettings.hasCredential
+            _isAppPinEnabled.value = pinSettings.enabled
+            _appPinFailedAttempts.value = pinSettings.failedAttempts
+            _appPinLockoutUntilMillis.value = pinSettings.lockoutUntilMillis
+            _isAppPinSettingsLoaded.value = true
             dataStore.onboardingCompleted.first()
             _isDataLoaded.value = true
         }
