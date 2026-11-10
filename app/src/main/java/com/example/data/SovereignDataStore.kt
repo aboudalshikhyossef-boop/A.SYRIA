@@ -11,6 +11,13 @@ import java.time.LocalDate
 
 private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "sovereign_settings")
 
+data class AppPinSettingsSnapshot(
+    val hasCredential: Boolean,
+    val enabled: Boolean,
+    val failedAttempts: Int,
+    val lockoutUntilMillis: Long
+)
+
 class SovereignDataStore(private val context: Context) {
 
     companion object {
@@ -22,7 +29,11 @@ class SovereignDataStore(private val context: Context) {
         val PROJECT_NUMBER      = stringPreferencesKey("project_number")
         val IS_ARABIC           = booleanPreferencesKey("is_arabic")
         val STEALTH_MODE        = booleanPreferencesKey("stealth_mode")
-        val LOCK_APP_ON_LAUNCH  = booleanPreferencesKey("lock_app_on_launch")
+        val LOCK_APP_ON_LAUNCH  = booleanPreferencesKey("lock_app_on_launch") // legacy; no longer used
+        val APP_PIN_CREDENTIAL = stringPreferencesKey("app_pin_credential")
+        val APP_PIN_ENABLED = booleanPreferencesKey("app_pin_enabled")
+        val APP_PIN_FAILED_ATTEMPTS = intPreferencesKey("app_pin_failed_attempts")
+        val APP_PIN_LOCKOUT_UNTIL = longPreferencesKey("app_pin_lockout_until")
         val CYBER_SCORE         = intPreferencesKey("cyber_score")
         val USER_LEVEL          = stringPreferencesKey("user_level")
         val USER_INTERESTS      = stringSetPreferencesKey("user_interests")
@@ -49,7 +60,17 @@ class SovereignDataStore(private val context: Context) {
     val projectNumber: Flow<String> = context.dataStore.data.map { it[PROJECT_NUMBER] ?: "" }
     val isArabic: Flow<Boolean>     = context.dataStore.data.map { it[IS_ARABIC]      ?: true }
     val stealthMode: Flow<Boolean>  = context.dataStore.data.map { it[STEALTH_MODE]   ?: false }
-    val lockAppOnLaunch: Flow<Boolean> = context.dataStore.data.map { it[LOCK_APP_ON_LAUNCH] ?: true }
+    val lockAppOnLaunch: Flow<Boolean> = context.dataStore.data.map { it[LOCK_APP_ON_LAUNCH] ?: false }
+
+    val appPinSettings: Flow<AppPinSettingsSnapshot> = context.dataStore.data.map { preferences ->
+        val hasCredential = !preferences[APP_PIN_CREDENTIAL].isNullOrBlank()
+        AppPinSettingsSnapshot(
+            hasCredential = hasCredential,
+            enabled = hasCredential && (preferences[APP_PIN_ENABLED] ?: false),
+            failedAttempts = preferences[APP_PIN_FAILED_ATTEMPTS] ?: 0,
+            lockoutUntilMillis = preferences[APP_PIN_LOCKOUT_UNTIL] ?: 0L
+        )
+    }
     val cyberScore: Flow<Int>       = context.dataStore.data.map { it[CYBER_SCORE]    ?: 0 }
     val userLevel: Flow<String>     = context.dataStore.data.map { it[USER_LEVEL]     ?: "Beginner" }
     val userInterests: Flow<Set<String>> = context.dataStore.data.map { it[USER_INTERESTS] ?: emptySet() }
@@ -93,6 +114,59 @@ class SovereignDataStore(private val context: Context) {
     suspend fun saveIsArabic(v: Boolean)       { context.dataStore.edit { it[IS_ARABIC]      = v } }
     suspend fun saveStealthMode(v: Boolean)    { context.dataStore.edit { it[STEALTH_MODE]   = v } }
     suspend fun saveLockAppOnLaunch(v: Boolean) { context.dataStore.edit { it[LOCK_APP_ON_LAUNCH] = v } }
+
+    /** Saves only an encrypted, salted verifier; enabling is committed atomically with it. */
+    suspend fun enableAppPin(pin: String) {
+        val encryptedRecord = com.example.data.database.AppPinSecurity.createEncryptedRecord(pin)
+        context.dataStore.edit { preferences ->
+            preferences[APP_PIN_CREDENTIAL] = encryptedRecord
+            preferences[APP_PIN_ENABLED] = true
+            preferences[APP_PIN_FAILED_ATTEMPTS] = 0
+            preferences[APP_PIN_LOCKOUT_UNTIL] = 0L
+        }
+    }
+
+    suspend fun disableAppPin() {
+        context.dataStore.edit { preferences ->
+            preferences.remove(APP_PIN_CREDENTIAL)
+            preferences[APP_PIN_ENABLED] = false
+            preferences[APP_PIN_FAILED_ATTEMPTS] = 0
+            preferences[APP_PIN_LOCKOUT_UNTIL] = 0L
+        }
+    }
+
+    /** Counts failed attempts atomically and applies a persisted 30-second cooldown after five failures. */
+    suspend fun verifyAppPin(pin: String): Boolean {
+        var verified = false
+        val now = System.currentTimeMillis()
+        context.dataStore.edit { preferences ->
+            val lockoutUntil = preferences[APP_PIN_LOCKOUT_UNTIL] ?: 0L
+            if (lockoutUntil > now) return@edit
+
+            if (lockoutUntil != 0L) {
+                preferences[APP_PIN_FAILED_ATTEMPTS] = 0
+                preferences[APP_PIN_LOCKOUT_UNTIL] = 0L
+            }
+
+            val encryptedRecord = preferences[APP_PIN_CREDENTIAL].orEmpty()
+            if (encryptedRecord.isBlank()) return@edit
+
+            verified = com.example.data.database.AppPinSecurity.verify(pin, encryptedRecord)
+            if (verified) {
+                preferences[APP_PIN_FAILED_ATTEMPTS] = 0
+                preferences[APP_PIN_LOCKOUT_UNTIL] = 0L
+            } else {
+                val attempts = (preferences[APP_PIN_FAILED_ATTEMPTS] ?: 0) + 1
+                if (attempts >= 5) {
+                    preferences[APP_PIN_FAILED_ATTEMPTS] = 5
+                    preferences[APP_PIN_LOCKOUT_UNTIL] = now + 30_000L
+                } else {
+                    preferences[APP_PIN_FAILED_ATTEMPTS] = attempts
+                }
+            }
+        }
+        return verified
+    }
     suspend fun saveCyberScore(score: Int)     { context.dataStore.edit { it[CYBER_SCORE]    = score } }
     
     /** Atomic score increment; avoids lost updates from concurrent feature actions. */
