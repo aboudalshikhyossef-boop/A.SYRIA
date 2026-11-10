@@ -272,9 +272,9 @@ internal fun AyriaVerseCard(
                 fontSize = 9.sp,
                 letterSpacing = if (isArabic) 0.sp else 1.6.sp
             )
-            androidx.compose.foundation.layout.Spacer(Modifier.padding(top = 5.dp))
             Text(
                 text = "وَقُل رَّبِّ زِدْنِي عِلْمًا",
+                modifier = Modifier.padding(top = 5.dp),
                 color = AyriaColors.pearl,
                 fontFamily = AyriaArabicFont,
                 fontWeight = FontWeight.Bold,
