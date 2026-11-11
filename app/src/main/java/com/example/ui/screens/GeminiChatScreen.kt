@@ -160,7 +160,7 @@ fun GeminiChatScreen(
             )
             HorizontalDivider(color = Color.White.copy(alpha = 0.07f))
 
-            if (messages.isEmpty() && !isTyping) {
+            if (messages.isEmpty() && !isTyping && lastError == null) {
                 ChatEmptyState(
                     modifier = Modifier.weight(1f),
                     isArabic = isArabic,
