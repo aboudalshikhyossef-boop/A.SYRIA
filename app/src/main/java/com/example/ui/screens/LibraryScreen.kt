@@ -1,6 +1,27 @@
 package com.example.ui.screens
 
 import android.content.Context
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.Dispatchers
+import com.example.ui.design.GlassErrorState
+import com.example.ui.design.GlassLoadingState
+import com.example.ui.design.SectionHeader
+import com.example.ui.design.GlassButton
+import com.example.ui.design.GlassSurface
+import com.example.ui.design.GlassModalBottomSheet
+import com.example.ui.design.GlassLevel
+import com.example.ui.design.GlassChip
+import com.example.ui.design.GlassCard
+import com.example.ui.design.AyriaDesignTokens
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.draw.scale
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.*
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.*
@@ -63,12 +84,27 @@ fun LibraryScreen(
     val nextPrayerProgress by prayerViewModel.nextPrayerProgress.collectAsState()
     val prayerTimes by prayerViewModel.allPrayerTimes.collectAsState()
     val context = LocalContext.current
+    val uriHandler = LocalUriHandler.current
+    val scope = rememberCoroutineScope()
     val layoutDirection = if (isAr) LayoutDirection.Rtl else LayoutDirection.Ltr
-    val allData = remember(context) { loadLibraryData(context) }
-    val tabs = if (isAr) listOf("الأدعية" to "duas", "الأحاديث" to "hadiths")
-        else listOf("Duas" to "duas", "Hadiths" to "hadiths")
+
+    var allData by remember(context) { mutableStateOf<Map<String, List<LibraryItem>>>(emptyMap()) }
+    var isLoading by remember { mutableStateOf(true) }
     var selectedTab by rememberSaveable { mutableStateOf("duas") }
     var searchQuery by rememberSaveable { mutableStateOf("") }
+    var isGrid by rememberSaveable { mutableStateOf(true) }
+    var favorites by remember { mutableStateOf<Set<String>>(emptySet()) }
+    var readItems by remember { mutableStateOf<Set<String>>(emptySet()) }
+    var selectedItem by remember { mutableStateOf<LibraryItem?>(null) }
+
+    fun reloadLibrary() {
+        scope.launch {
+            isLoading = true
+            allData = withContext(Dispatchers.IO) { loadLibraryData(context) }
+            isLoading = false
+        }
+    }
+    LaunchedEffect(context) { reloadLibrary() }
 
     val displayedItems = remember(selectedTab, searchQuery, allData) {
         val source = allData[selectedTab].orEmpty()
@@ -76,204 +112,208 @@ fun LibraryScreen(
         else source.filter { item ->
             item.title.contains(searchQuery, ignoreCase = true) ||
                 item.body.contains(searchQuery, ignoreCase = true) ||
-                item.tag.contains(searchQuery, ignoreCase = true)
+                item.tag.contains(searchQuery, ignoreCase = true) ||
+                item.subtitle.contains(searchQuery, ignoreCase = true)
         }
+    }
+    val libraryKey = { item: LibraryItem -> "${selectedTab}_${item.id}" }
+    val gridRows = remember(displayedItems, isGrid) {
+        displayedItems.chunked(if (isGrid) 2 else 1)
     }
 
     CompositionLocalProvider(LocalLayoutDirection provides layoutDirection) {
         Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .statusBarsPadding()
-                .padding(horizontal = 14.dp, vertical = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
+            modifier = Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 18.dp).padding(top = 18.dp, bottom = 136.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 2.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(11.dp)
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(40.dp)
-                        .background(Color(0x268FC8DE), CircleShape)
-                        .border(0.8.dp, Color(0x558DC9DE), CircleShape)
-                        .clickable { onBack() },
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = if (isAr) "رجوع" else "Back",
-                        tint = Color(0xFFD7EEF6),
-                        modifier = Modifier.size(19.dp)
-                    )
-                }
-                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                    Text(
-                        if (isAr) "مكتبة السكينة" else "QUIET LIBRARY",
-                        color = Color(0xFFE0F3F8),
-                        fontSize = 17.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        fontFamily = if (isAr) AyriaArabicFont else FontFamily.Monospace,
-                        letterSpacing = if (isAr) 0.sp else 1.1.sp
-                    )
-                    Text(
-                        if (isAr) "أدعية وأحاديث ومواقيت الصلاة" else "DUAS · HADITHS · PRAYER TIMES",
-                        color = Color(0xFFA7C8D5).copy(alpha = 0.66f),
-                        fontSize = 8.sp,
-                        fontFamily = FontFamily.Monospace,
-                        letterSpacing = 0.4.sp
-                    )
-                }
-                Text(
-                    displayedItems.size.toString(),
-                    color = Color(0xFFC5E7F0),
-                    fontSize = 11.sp,
-                    fontFamily = FontFamily.Monospace,
-                    modifier = Modifier
-                        .background(Color(0x247BAFC5), CircleShape)
-                        .border(0.7.dp, Color(0x447BAFC5), CircleShape)
-                        .padding(horizontal = 11.dp, vertical = 6.dp)
-                )
-            }
-
-            // Prayer information remains visible in both Duas and Hadiths tabs.
-            DeskFrostPanel(Modifier.fillMaxWidth()) {
+            LibraryEntrance(index = 0) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text(if (isAr) "مكتبة السكينة" else "QUIET LIBRARY", color = AyriaDesignTokens.Colors.pearl, fontSize = 26.sp, fontWeight = FontWeight.Bold)
                         Text(
-                            if (isAr) "مواقيت الصلاة" else "PRAYER TIMES",
-                            color = Color(0xFFD6EEF5),
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            letterSpacing = 1.sp,
-                            fontFamily = if (isAr) AyriaArabicFont else FontFamily.Monospace
-                        )
-                        Text(
-                            if (isAr) "الصلاة القادمة · $nextPrayerName" else "NEXT · $nextPrayerName",
-                            color = Color(0xFFB2D2DF).copy(alpha = 0.76f),
-                            fontSize = 9.sp,
-                            fontFamily = AyriaArabicFont
-                        )
-                        Text(
-                            nextPrayerTime,
-                            color = Color(0xFFE4F5F9),
-                            fontSize = 20.sp,
-                            fontWeight = FontWeight.Light,
-                            fontFamily = FontFamily.Monospace
-                        )
-                        Text(
-                            nextPrayerCountdown,
-                            color = Color(0xFFC3E0EA),
-                            fontSize = 11.sp,
-                            fontFamily = FontFamily.Monospace,
-                            letterSpacing = 0.3.sp
+                            if (isAr) "أدعية وأحاديث ومواقيت الصلاة" else "Duas, hadiths and daily prayer times",
+                            color = AyriaDesignTokens.Colors.muted, fontSize = 12.sp
                         )
                     }
-                    PrayerCountdownWheel(
-                        prayerName = nextPrayerName,
-                        prayerTime = nextPrayerTime,
-                        countdown = nextPrayerCountdown,
-                        progress = nextPrayerProgress,
+                    GlassButton(onClick = onBack, modifier = Modifier.widthIn(min = 66.dp), level = GlassLevel.Standard) {
+                        Text(if (isAr) "رجوع" else "Back", color = AyriaDesignTokens.Colors.glacier, fontSize = 11.sp)
+                    }
+                }
+            }
+
+            LibraryEntrance(index = 1) {
+                GlassCard(modifier = Modifier.fillMaxWidth(), contentPadding = 16.dp) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Text(if (isAr) "مواقيت الصلاة" else "PRAYER TIMES", color = AyriaDesignTokens.Colors.glacier, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+                            Text(
+                                if (isAr) "الصلاة القادمة · $nextPrayerName" else "NEXT · $nextPrayerName",
+                                color = AyriaDesignTokens.Colors.muted, fontSize = 10.sp
+                            )
+                            Text(nextPrayerTime, color = AyriaDesignTokens.Colors.pearl, fontSize = 28.sp, fontWeight = FontWeight.Light)
+                            Text(nextPrayerCountdown, color = AyriaDesignTokens.Colors.glacier, fontSize = 12.sp)
+                        }
+                        PrayerCountdownWheel(
+                            prayerName = nextPrayerName,
+                            prayerTime = nextPrayerTime,
+                            countdown = nextPrayerCountdown,
+                            progress = nextPrayerProgress,
+                            isArabic = isAr,
+                            diameter = 104.dp
+                        )
+                    }
+                    Spacer(Modifier.height(12.dp))
+                    DeskPrayerSchedule(
+                        prayerTimes = prayerTimes,
+                        nextPrayer = nextPrayerName,
                         isArabic = isAr,
-                        diameter = 116.dp
+                        modifier = Modifier.fillMaxWidth()
                     )
                 }
-                Spacer(Modifier.height(9.dp))
-                DeskPrayerSchedule(
-                    prayerTimes = prayerTimes,
-                    nextPrayer = nextPrayerName,
-                    isArabic = isAr,
-                    modifier = Modifier.fillMaxWidth()
+            }
+
+            LibraryEntrance(index = 2) {
+                LibrarySearchField(
+                    value = searchQuery,
+                    onValueChange = { searchQuery = it },
+                    placeholder = if (isAr) "ابحث في الأدعية والأحاديث..." else "Search duas and hadiths...",
+                    onClear = { searchQuery = "" }
                 )
             }
 
-            OutlinedTextField(
-                value = searchQuery,
-                onValueChange = { searchQuery = it },
-                modifier = Modifier.fillMaxWidth(),
-                placeholder = {
-                    Text(
-                        if (isAr) "ابحث في الأدعية والأحاديث..." else "Search duas and hadiths...",
-                        color = Color(0xFFA8C3D0).copy(alpha = 0.55f),
-                        fontSize = 12.sp,
-                        fontFamily = if (isAr) AyriaArabicFont else FontFamily.Default
-                    )
-                },
-                leadingIcon = {
-                    Icon(Icons.Default.Search, null, tint = Color(0xFFB9DDE8), modifier = Modifier.size(18.dp))
-                },
-                trailingIcon = if (searchQuery.isNotEmpty()) {
-                    {
-                        IconButton(onClick = { searchQuery = "" }) {
-                            Icon(Icons.Default.Close, null, tint = Color(0xFFB9DDE8).copy(alpha = 0.7f), modifier = Modifier.size(17.dp))
+            LibraryEntrance(index = 3) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    listOf(
+                        "duas" to (if (isAr) "الأدعية" else "Duas"),
+                        "hadiths" to (if (isAr) "الأحاديث" else "Hadiths")
+                    ).forEach { (key, label) ->
+                        Box(
+                            modifier = Modifier.clip(AyriaDesignTokens.Corners.pill)
+                                .background(if (selectedTab == key) Brush.horizontalGradient(listOf(Color(0xFF28B8D4), Color(0xFF546DDB))) else Brush.horizontalGradient(listOf(Color.Transparent, Color.Transparent)))
+                        ) {
+                            GlassChip(label, selectedTab == key, {
+                                selectedTab = key
+                                searchQuery = ""
+                            }, modifier = Modifier)
                         }
                     }
-                } else null,
-                singleLine = true,
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = Color(0xFF9DCDDE).copy(alpha = 0.68f),
-                    unfocusedBorderColor = Color.White.copy(alpha = 0.12f),
-                    focusedContainerColor = Color(0x66162F43),
-                    unfocusedContainerColor = Color(0x55162F43),
-                    cursorColor = Color(0xFFC9EAF4),
-                    focusedTextColor = Color(0xFFE8F5F9),
-                    unfocusedTextColor = Color(0xFFE8F5F9)
-                ),
-                shape = RoundedCornerShape(17.dp)
-            )
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                tabs.forEach { (label, key) ->
-                    val selected = selectedTab == key
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .clip(RoundedCornerShape(16.dp))
-                            .background(if (selected) Color(0x3A8FC8DE) else Color.White.copy(alpha = 0.035f))
-                            .border(
-                                if (selected) 0.9.dp else 0.6.dp,
-                                if (selected) Color(0x779BD6E6) else Color.White.copy(alpha = 0.10f),
-                                RoundedCornerShape(16.dp)
-                            )
-                            .clickable { selectedTab = key; searchQuery = "" }
-                            .padding(vertical = 11.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            label,
-                            color = if (selected) Color(0xFFE0F4FA) else Color(0xFFABC3CE).copy(alpha = 0.72f),
-                            fontSize = 11.sp,
-                            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
-                            fontFamily = if (isAr) AyriaArabicFont else FontFamily.Monospace
+                    Spacer(Modifier.weight(1f))
+                    IconButton(onClick = { isGrid = !isGrid }) {
+                        Icon(
+                            if (isGrid) Icons.Default.ViewList else Icons.Default.GridView,
+                            contentDescription = if (isGrid) "List view" else "Grid view",
+                            tint = AyriaDesignTokens.Colors.glacier
                         )
                     }
                 }
             }
 
-            LazyColumn(
-                modifier = Modifier.weight(1f).fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(9.dp),
-                contentPadding = PaddingValues(bottom = 112.dp)
-            ) {
-                if (displayedItems.isEmpty()) {
-                    item {
-                        GlassEmptyState(
-                            icon = Icons.Default.SearchOff,
-                            title = if (isAr) "لا توجد نتائج مطابقة" else "No matching entries",
-                            description = if (isAr) "جرّب تغيير عبارة البحث أو اختيار قسم آخر." else "Try another search or choose a different category."
-                        )
+            LibraryEntrance(index = 4) {
+                SectionHeader(
+                    title = if (isAr) "المحتوى" else "LIBRARY CONTENT",
+                    subtitle = if (isAr) "${displayedItems.size} عنصر متاح" else "${displayedItems.size} entries available",
+                    actionLabel = if (isAr) "عرض الكل" else "See all",
+                    onAction = { searchQuery = "" }
+                )
+            }
+
+            when {
+                isLoading -> LibraryEntrance(index = 5) {
+                    GlassLoadingState(
+                        title = if (isAr) "جارٍ تحميل المكتبة" else "Loading your library",
+                        description = if (isAr) "يتم تجهيز الأدعية والأحاديث المحلية." else "Preparing the offline duas and hadith collection."
+                    )
+                }
+                allData.values.sumOf { it.size } == 0 -> LibraryEntrance(index = 5) {
+                    GlassErrorState(
+                        title = if (isAr) "تعذّر تحميل محتوى المكتبة" else "Library content unavailable",
+                        message = if (isAr) "تعذّر العثور على عناصر في ملف المكتبة المحلي." else "The local library asset did not return any entries.",
+                        retryLabel = if (isAr) "إعادة المحاولة" else "Retry",
+                        onRetry = { reloadLibrary() }
+                    )
+                }
+                displayedItems.isEmpty() -> LibraryEntrance(index = 5) {
+                    GlassEmptyState(
+                        icon = Icons.Default.SearchOff,
+                        title = if (isAr) "لا توجد نتائج مطابقة" else "No matching entries",
+                        description = if (isAr) "جرّب تغيير عبارة البحث أو اختيار قسم آخر." else "Try another search or choose the other category."
+                    )
+                }
+                else -> {
+                    gridRows.forEachIndexed { index, rowItems ->
+                        LibraryEntrance(index = 5 + index) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                rowItems.forEach { item ->
+                                    LibraryItemCard(
+                                        item = item,
+                                        category = selectedTab,
+                                        isAr = isAr,
+                                        isFavorite = libraryKey(item) in favorites,
+                                        isRead = libraryKey(item) in readItems,
+                                        modifier = Modifier.weight(1f),
+                                        onFavorite = {
+                                            val key = libraryKey(item)
+                                            favorites = if (key in favorites) favorites - key else favorites + key
+                                        },
+                                        onClick = {
+                                            readItems = readItems + libraryKey(item)
+                                            selectedItem = item
+                                        }
+                                    )
+                                }
+                                if (isGrid && rowItems.size == 1) Spacer(Modifier.weight(1f))
+                            }
+                        }
                     }
-                } else {
-                    items(displayedItems, key = { "${selectedTab}_${it.id}" }) { item ->
-                        LibraryItemCard(item = item, category = selectedTab, isAr = isAr)
+                }
+            }
+        }
+    }
+
+    GlassModalBottomSheet(
+        visible = selectedItem != null,
+        title = selectedItem?.title.orEmpty(),
+        subtitle = selectedItem?.subtitle?.takeIf { it.isNotBlank() },
+        onDismissRequest = { selectedItem = null }
+    ) {
+        selectedItem?.let { item ->
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text(
+                    item.body,
+                    color = AyriaDesignTokens.Colors.pearl,
+                    fontSize = 19.sp,
+                    lineHeight = 34.sp,
+                    textAlign = if (isAr) TextAlign.Right else TextAlign.Start,
+                    fontFamily = AyriaArabicFont
+                )
+                HorizontalDivider(color = AyriaDesignTokens.Colors.line.copy(alpha = 0.6f))
+                if (item.tag.isNotBlank()) Text(item.tag, color = AyriaDesignTokens.Colors.glacier, fontSize = 11.sp)
+                if (item.reference.isNotBlank()) Text(item.reference, color = AyriaDesignTokens.Colors.muted, fontSize = 11.sp)
+                if (item.sourceUrl.isNotBlank()) {
+                    GlassButton(
+                        onClick = { runCatching { uriHandler.openUri(item.sourceUrl) } },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(Icons.Default.OpenInNew, null, tint = AyriaDesignTokens.Colors.glacier, modifier = Modifier.size(16.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text(if (isAr) "فتح المصدر والتحقق" else "Open source & verify", color = AyriaDesignTokens.Colors.glacier)
                     }
                 }
             }
@@ -282,135 +322,112 @@ fun LibraryScreen(
 }
 
 @Composable
-fun LibraryItemCard(item: LibraryItem, category: String, isAr: Boolean) {
-    var expanded by rememberSaveable(item.id, category) { mutableStateOf(false) }
-    val uriHandler = LocalUriHandler.current
-    val accentColor = Color(0xFFB8DDE9)
-    val cardShape = RoundedCornerShape(22.dp)
-
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .animateContentSize()
-            .clip(cardShape)
-            .background(
-                Brush.linearGradient(
-                    listOf(Color(0xCA1A394D), Color(0x9D10283B), Color(0x76182F42))
-                ),
-                cardShape
-            )
-            .border(
-                0.8.dp,
-                Brush.linearGradient(
-                    listOf(Color(0x559BCFE0), Color(0x228BC5D8), Color(0x16FFFFFF))
-                ),
-                cardShape
-            )
-            .clickable { expanded = !expanded }
-            .padding(horizontal = 15.dp, vertical = 13.dp)
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(11.dp)) {
-            Box(
-                modifier = Modifier
-                    .size(39.dp)
-                    .background(Color(0x278FC9DF), CircleShape)
-                    .border(0.8.dp, Color(0x558FC9DF), CircleShape),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(if (category == "duas") "🤲" else "📖", fontSize = 17.sp)
-            }
-            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                Text(
-                    item.title,
-                    color = Color(0xFFE4F4F8),
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    lineHeight = 21.sp,
-                    fontFamily = if (isAr) AyriaArabicFont else FontFamily.Default
+private fun LibrarySearchField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    placeholder: String,
+    onClear: () -> Unit
+) {
+    GlassSurface(modifier = Modifier.fillMaxWidth(), level = GlassLevel.Standard) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Icon(Icons.Default.Search, null, tint = AyriaDesignTokens.Colors.glacier)
+            Box(Modifier.weight(1f)) {
+                if (value.isBlank()) Text(placeholder, color = AyriaDesignTokens.Colors.muted, fontSize = 12.sp)
+                androidx.compose.foundation.text.BasicTextField(
+                    value = value,
+                    onValueChange = onValueChange,
+                    singleLine = true,
+                    textStyle = androidx.compose.ui.text.TextStyle(color = AyriaDesignTokens.Colors.pearl, fontSize = 13.sp),
+                    cursorBrush = SolidColor(AyriaDesignTokens.Colors.glacier),
+                    modifier = Modifier.fillMaxWidth()
                 )
-                if (item.subtitle.isNotBlank()) {
-                    Text(
-                        item.subtitle,
-                        color = accentColor.copy(alpha = 0.68f),
-                        fontSize = 9.sp,
-                        lineHeight = 14.sp,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
             }
-            Icon(
-                if (expanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
-                contentDescription = if (expanded) "Collapse" else "Expand",
-                tint = accentColor.copy(alpha = 0.68f),
-                modifier = Modifier.size(20.dp)
-            )
-        }
-        if (expanded) {
-            Spacer(Modifier.height(12.dp))
-            HorizontalDivider(color = accentColor.copy(alpha = 0.15f))
-            Spacer(Modifier.height(11.dp))
-            Text(
-                item.body,
-                color = Color(0xFFE8F5F8),
-                fontSize = if (category == "duas") 19.sp else 17.sp,
-                lineHeight = if (category == "duas") 34.sp else 30.sp,
-                textAlign = if (isAr) TextAlign.Right else TextAlign.Start,
-                fontFamily = AyriaArabicFont
-            )
-            Spacer(Modifier.height(12.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(7.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                if (item.tag.isNotBlank()) {
-                    Box(
-                        modifier = Modifier
-                            .background(Color(0x1F9ACDDF), RoundedCornerShape(50))
-                            .border(0.7.dp, Color(0x448FC9DF), RoundedCornerShape(50))
-                            .padding(horizontal = 10.dp, vertical = 5.dp)
-                    ) {
-                        Text(
-                            item.tag,
-                            color = Color(0xFFC8E5EE),
-                            fontSize = 9.sp,
-                            fontFamily = if (isAr) AyriaArabicFont else FontFamily.Monospace
-                        )
-                    }
-                }
-                if (item.reference.isNotBlank()) {
-                    Text(
-                        item.reference,
-                        modifier = Modifier.weight(1f, fill = false),
-                        color = Color(0xFFA9C9D5).copy(alpha = 0.75f),
-                        fontSize = 9.sp,
-                        fontFamily = if (isAr) AyriaArabicFont else FontFamily.Monospace
-                    )
-                }
-            }
-            if (item.sourceUrl.isNotBlank()) {
-                Spacer(Modifier.height(8.dp))
-                TextButton(
-                    onClick = { runCatching { uriHandler.openUri(item.sourceUrl) } },
-                    contentPadding = PaddingValues(horizontal = 4.dp, vertical = 2.dp)
-                ) {
-                    Icon(
-                        Icons.Default.OpenInNew,
-                        contentDescription = null,
-                        tint = Color(0xFFB9DFEA),
-                        modifier = Modifier.size(14.dp)
-                    )
-                    Spacer(Modifier.width(6.dp))
-                    Text(
-                        if (isAr) "فتح المصدر والتحقق" else "Open source & verify",
-                        color = Color(0xFFB9DFEA),
-                        fontSize = 10.sp,
-                        fontFamily = if (isAr) AyriaArabicFont else FontFamily.Monospace
-                    )
+            if (value.isNotEmpty()) {
+                IconButton(onClick = onClear) {
+                    Icon(Icons.Default.Close, null, tint = AyriaDesignTokens.Colors.muted)
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun LibraryEntrance(index: Int, content: @Composable () -> Unit) {
+    var visible by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        delay(70L + index * 60L)
+        visible = true
+    }
+    AnimatedVisibility(visible, enter = fadeIn(tween(350)) + slideInVertically(tween(350)) { it / 12 }) {
+        content()
+    }
+}
+
+@Composable
+fun LibraryItemCard(
+    item: LibraryItem,
+    category: String,
+    isAr: Boolean,
+    isFavorite: Boolean = false,
+    isRead: Boolean = false,
+    modifier: Modifier = Modifier,
+    onFavorite: () -> Unit = {},
+    onClick: () -> Unit = {}
+) {
+    val heartScale by animateFloatAsState(if (isFavorite) 1.18f else 1f, label = "library-heart")
+    val accent = AyriaDesignTokens.Colors.glacier
+    GlassCard(
+        modifier = modifier.fillMaxWidth().heightIn(min = 192.dp)
+            .clickable(onClick = onClick),
+        contentPadding = 14.dp
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Box(
+                modifier = Modifier.size(52.dp).background(
+                    Brush.linearGradient(listOf(Color(0xFF2BB9D1).copy(alpha = 0.28f), Color(0xFF7A68E8).copy(alpha = 0.20f))),
+                    RoundedCornerShape(17.dp)
+                ),
+                contentAlignment = Alignment.Center
+            ) { Text(if (category == "duas") "🤲" else "📖", fontSize = 26.sp) }
+            IconButton(onClick = onFavorite, modifier = Modifier.graphicsLayer { scaleX = heartScale; scaleY = heartScale }) {
+                Icon(
+                    if (isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                    contentDescription = if (isFavorite) "Remove from favorites" else "Add to favorites",
+                    tint = if (isFavorite) Color(0xFFFF7EA8) else accent
+                )
+            }
+        }
+        Spacer(Modifier.height(12.dp))
+        Text(item.title, color = AyriaDesignTokens.Colors.pearl, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis)
+        Spacer(Modifier.height(4.dp))
+        Text(
+            item.subtitle.ifBlank { item.tag },
+            color = AyriaDesignTokens.Colors.muted,
+            fontSize = 10.sp,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis
+        )
+        Spacer(Modifier.height(10.dp))
+        if (isRead) {
+            LinearProgressIndicator(
+                progress = { 1f },
+                modifier = Modifier.fillMaxWidth().height(3.dp).clip(CircleShape),
+                color = AyriaDesignTokens.Colors.teal,
+                trackColor = AyriaDesignTokens.Colors.line
+            )
+        } else {
+            Text(if (isAr) "غير مقروء · اضغط للقراءة" else "Not read · Tap to open", color = accent.copy(alpha = 0.8f), fontSize = 9.sp)
+        }
+        Spacer(Modifier.height(7.dp))
+        Text(if (isAr) "اقرأ التفاصيل  ↗" else "READ DETAILS  ↗", color = AyriaDesignTokens.Colors.teal, fontSize = 10.sp, fontWeight = FontWeight.Bold)
     }
 }
 
