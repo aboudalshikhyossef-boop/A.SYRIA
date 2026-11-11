@@ -96,6 +96,7 @@ import com.example.ui.brand.AyriaQuranFont
 import com.example.ui.brand.AyriaColors
 import com.example.ui.brand.AyriaGlassPanel
 import com.example.ui.viewmodel.DashboardViewModel
+import com.example.ui.design.AyriaCryptoWalletDashboard
 import com.example.adaptive.LocalAdaptiveConfig
 import com.example.adaptive.LocalWindowAdaptiveInfo
 import com.example.adaptive.UIConfig
@@ -165,6 +166,12 @@ fun DashboardScreen(
     val ipAddress by viewModel.ipAddress.collectAsState()
     val isNeuralLinkOffline by viewModel.isNeuralLinkOffline.collectAsState()
     val isVaultViewOpen by viewModel.isVaultViewOpen.collectAsState()
+    val isVaultAuthenticated by viewModel.isVaultAuthenticated.collectAsState()
+
+    val cyberScore by viewModel.cyberScore.collectAsState()
+    val cyberRank by viewModel.cyberRank.collectAsState()
+    val cyberProgress by viewModel.cyberProgress.collectAsState()
+    val batteryPercentage by viewModel.batteryPercentage.collectAsState()
 
     val nextPrayerName by prayerViewModel.nextPrayerName.collectAsState()
     val nextPrayerCountdown by prayerViewModel.nextPrayerCountdown.collectAsState()
@@ -174,8 +181,6 @@ fun DashboardScreen(
 
     var isDesktopModeOpen by remember { mutableStateOf(false) }
     var currentVerseIndex by remember { mutableStateOf(0) }
-    val easing = remember { CubicBezierEasing(0.445f, 0.05f, 0.55f, 0.95f) }
-    val accent = if (isStealthMode) Color(0xFF9DB8CC) else AyriaColors.teal
 
     val spiritualVerses = remember(isAr) {
         if (isAr) listOf(
@@ -188,7 +193,7 @@ fun DashboardScreen(
             "Verily, in the remembrance of Allah do hearts find rest",
             "Indeed, with hardship comes ease",
             "And whoever relies upon Allah - then He is sufficient for him",
-            "Allah guides to His light whom He wills",
+            "Allah guides to his light whom He wills",
             "And it was due from Us to aid the believers"
         )
     }
@@ -199,97 +204,51 @@ fun DashboardScreen(
 
     CompositionLocalProvider(LocalLayoutDirection provides if (isAr) LayoutDirection.Rtl else LayoutDirection.Ltr) {
         Box(modifier = Modifier.fillMaxSize()) {
-            Column(
-                modifier = Modifier.fillMaxSize().statusBarsPadding().padding(horizontal = 20.dp, vertical = 14.dp),
-                verticalArrangement = Arrangement.spacedBy(13.dp)
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    DashboardGlassAction(
-                        icon = Icons.Rounded.Lock,
-                        title = if (isAr) "الخزينة" else "Vault",
-                        subtitle = if (isAr) "حفظ مشفّر" else "Encrypted storage",
-                        accent = accent,
-                        modifier = Modifier.weight(1f).height(126.dp),
-                        onClick = {
-                            haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
-                            if (viewModel.isVaultAuthenticated.value) {
+            AyriaCryptoWalletDashboard(
+                isArabic = isAr,
+                cyberScore = cyberScore,
+                cyberRank = cyberRank,
+                cyberProgress = cyberProgress,
+                isStealthMode = isStealthMode,
+                isNetworkOffline = isNeuralLinkOffline,
+                ipAddress = ipAddress,
+                batteryPercentage = batteryPercentage,
+                isVaultAuthenticated = isVaultAuthenticated,
+                verse = spiritualVerses[currentVerseIndex],
+                onOpenVault = {
+                    haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
+                    if (viewModel.isVaultAuthenticated.value) {
+                        viewModel.setVaultViewOpen(true)
+                    } else {
+                        onVaultLockRequest(
+                            if (isAr) "تأكيد الهوية" else "VERIFY IDENTITY",
+                            if (isAr) "يلزم التحقق للوصول إلى الخزينة الآمنة" else "Verification is required to open the secure vault",
+                            {
+                                viewModel.setVaultAuthenticated(true)
                                 viewModel.setVaultViewOpen(true)
-                            } else {
-                                onVaultLockRequest(
-                                    if (isAr) "تأكيد الهوية" else "VERIFY IDENTITY",
-                                    if (isAr) "يلزم التحقق للوصول إلى الخزينة الآمنة" else "Verification is required to open the secure vault",
-                                    {
-                                        viewModel.setVaultAuthenticated(true)
-                                        viewModel.setVaultViewOpen(true)
-                                    }
-                                )
-                            }
-                        }
-                    )
-                    DashboardGlassAction(
-                        icon = Icons.Rounded.Wifi,
-                        title = if (isAr) "عنوان IP" else "Network IP",
-                        subtitle = ipAddress.ifBlank { if (isAr) "بانتظار الشبكة" else "Waiting for network" },
-                        accent = accent,
-                        modifier = Modifier.weight(1f).height(126.dp),
-                        onClick = {
-                            if (ipAddress.isNotBlank()) {
-                                clipboard.setText(androidx.compose.ui.text.AnnotatedString(ipAddress))
-                                haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove)
-                            }
-                        }
-                    )
-                }
-
-                DashboardGlassAction(
-                    icon = Icons.Rounded.Explore,
-                    title = if (isAr) "المصادر والفحص" else "Sources & Scan",
-                    subtitle = if (isAr) "فحص الروابط والملفات" else "Inspect links and files",
-                    accent = accent,
-                    modifier = Modifier.fillMaxWidth().height(94.dp),
-                    horizontal = true,
-                    onClick = {
-                        haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
-                        onNavigateToScanner()
-                    }
-                )
-
-                AyriaGlassPanel(
-                    modifier = Modifier.fillMaxWidth().weight(1f).heightIn(min = 132.dp),
-                    highlighted = true,
-                    shape = RoundedCornerShape(26.dp)
-                ) {
-                    Box(
-                        modifier = Modifier.fillMaxSize().padding(horizontal = 8.dp, vertical = 4.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        NeuralVerseModule(
-                            verse = spiritualVerses[currentVerseIndex],
-                            easing = easing,
-                            onTap = {
-                                haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove)
-                                currentVerseIndex = (currentVerseIndex + 1) % spiritualVerses.size
                             }
                         )
                     }
-                }
-
-                DashboardGlassAction(
-                    icon = Icons.Rounded.DesktopWindows,
-                    title = if (isAr) "وضع المكتب" else "Desktop Mode",
-                    subtitle = if (isAr) "واجهة موسّعة للأدوات" else "Expanded workspace",
-                    accent = accent,
-                    modifier = Modifier.fillMaxWidth().height(76.dp),
-                    horizontal = true,
-                    onClick = {
-                        haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
-                        isDesktopModeOpen = true
+                },
+                onCopyIp = {
+                    if (ipAddress.isNotBlank()) {
+                        clipboard.setText(androidx.compose.ui.text.AnnotatedString(ipAddress))
+                        haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove)
                     }
-                )
-            }
+                },
+                onOpenScanner = {
+                    haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
+                    onNavigateToScanner()
+                },
+                onOpenDesktop = {
+                    haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
+                    isDesktopModeOpen = true
+                },
+                onVerseClick = {
+                    haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove)
+                    currentVerseIndex = (currentVerseIndex + 1) % spiritualVerses.size
+                }
+            )
 
             if (isVaultViewOpen) {
                 SecureVaultScreen(viewModel = viewModel, isArabic = isAr, onClose = { viewModel.setVaultViewOpen(false) })
