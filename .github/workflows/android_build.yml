@@ -2,7 +2,7 @@ name: Android CI
 
 on:
   push:
-    branches: ["main"]
+    branches: ["main", "phase-4-crypto-wallet-dashboard"]
   pull_request:
     branches: ["main"]
 
