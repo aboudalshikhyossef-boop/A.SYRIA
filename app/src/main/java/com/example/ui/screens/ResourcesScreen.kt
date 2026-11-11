@@ -246,7 +246,7 @@ private fun ResourceCard(
     val title = if (isAr) resource.titleAr else resource.titleEn
     val description = if (isAr) resource.descriptionAr else resource.descriptionEn
     GlassCard(
-        modifier = modifier.fillMaxWidth().heightIn(min = 242.dp).testTag("resource-card-${resource.category}")
+        modifier = modifier.fillMaxWidth().heightIn(min = 242.dp).testTag("resource-card")
             .animateContentSize().clickable(onClick = onOpen),
         contentPadding = 14.dp
     ) {
@@ -264,7 +264,7 @@ private fun ResourceCard(
                 ),
                 contentAlignment = Alignment.Center
             ) { Text(resource.icon, fontSize = 28.sp) }
-            IconButton(onClick = onFavorite, modifier = Modifier.scale(heartScale).testTag("resource-favorite-${resource.category}")) {
+            IconButton(onClick = onFavorite, modifier = Modifier.scale(heartScale).testTag("resource-favorite")) {
                 Icon(
                     if (isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
                     contentDescription = if (isFavorite) "Remove from favorites" else "Add to favorites",
