@@ -18,6 +18,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextClearance
 import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.test.performTouchInput
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.example.ui.screens.AcademyScreen
 import com.example.ui.screens.CyberGlossaryScreen
@@ -65,14 +66,14 @@ class Phase5LearningScreensInteractionTest {
         composeRule.onNodeWithTag("academy-language-toggle").performClick()
         composeRule.mainClock.advanceTimeBy(400)
         composeRule.onNodeWithTag("academy-language-toggle").performClick()
-        composeRule.onNodeWithTag("academy-filter-advanced").performClick()
+        composeRule.onNodeWithTag("academy-filter-advanced").performTouchInput { click() }
         composeRule.onNodeWithTag("academy-course-privacy_rights").assertExists()
-        composeRule.onNodeWithTag("academy-filter-all").performClick()
+        composeRule.onNodeWithTag("academy-filter-all").performTouchInput { click() }
         composeRule.onNodeWithTag("academy-open-glossary").performClick()
         composeRule.mainClock.advanceTimeBy(400)
         composeRule.onNodeWithTag("glossary-back").assertExists()
         activeScreen = "academy"
-        composeRule.mainClock.advanceTimeBy(400)
+        composeRule.mainClock.advanceTimeBy(1000)
         composeRule.onNodeWithTag("academy-open-checklist").performClick()
         composeRule.onNodeWithTag("phase5-destination").assertExists()
         activeScreen = "academy"
@@ -82,13 +83,14 @@ class Phase5LearningScreensInteractionTest {
         // Library: category tabs, grid/list, search/clear, favorites and detail sheet.
         activeScreen = "library"
         composeRule.mainClock.advanceTimeBy(650)
-        composeRule.onNodeWithTag("library-tab-hadiths").performClick()
+        composeRule.onNodeWithTag("library-tab-hadiths").performTouchInput { click() }
         composeRule.onNodeWithTag("library-view-toggle").performClick()
         composeRule.onNodeWithTag("library-view-toggle").performClick()
         composeRule.onNodeWithTag("library-search-input").performTextInput("no-such-library-entry")
         composeRule.onNodeWithTag("library-search-clear").performClick()
-        composeRule.onNodeWithTag("library-tab-duas").performClick()
+        composeRule.onNodeWithTag("library-tab-duas").performTouchInput { click() }
         composeRule.mainClock.advanceTimeBy(300)
+        composeRule.onAllNodes(hasTestTag("library-favorite"))[0].performClick()
         composeRule.onAllNodes(hasTestTag("library-item"))[0].performClick()
         composeRule.mainClock.advanceTimeBy(400)
         composeRule.onNodeWithTag("library-detail-sheet").assertExists()
@@ -96,27 +98,28 @@ class Phase5LearningScreensInteractionTest {
         // Glossary: category filters, alphabetized list, definition sheet and search.
         activeScreen = "glossary"
         composeRule.mainClock.advanceTimeBy(650)
-        composeRule.onNodeWithTag("glossary-category-شبكات").performClick()
+        composeRule.onNodeWithTag("glossary-category-شبكات").performTouchInput { click() }
         composeRule.onAllNodes(hasTestTag("glossary-term"))[0].performClick()
         composeRule.mainClock.advanceTimeBy(400)
         composeRule.onNodeWithTag("glossary-definition-sheet").assertExists()
         activeScreen = "glossary"
         composeRule.mainClock.advanceTimeBy(350)
         composeRule.onNodeWithTag("glossary-search").performTextInput("zz-no-match")
-        composeRule.onNodeWithTag("glossary-category-all").performClick()
+        composeRule.onNodeWithTag("glossary-category-all").performTouchInput { click() }
         composeRule.onNodeWithTag("glossary-search").performTextClearance()
 
         // Resources: category filtering, grid/list, favorite heart and back button.
         activeScreen = "resources"
         composeRule.mainClock.advanceTimeBy(650)
-        composeRule.onNodeWithTag("resources-category-leaks").performClick()
+        composeRule.onNodeWithTag("resources-category-leaks").performTouchInput { click() }
         composeRule.onNodeWithTag("resources-view-toggle").performClick()
         composeRule.onNodeWithTag("resources-view-toggle").performClick()
         composeRule.onAllNodes(hasTestTag("resource-card"))[0].assertExists()
         composeRule.onAllNodes(hasTestTag("resource-favorite"))[0].performClick()
         composeRule.onNodeWithTag("resource-open-leaks").assertExists()
-        composeRule.onNodeWithTag("resources-category-all").performClick()
+        composeRule.onNodeWithTag("resources-category-all").performTouchInput { click() }
         composeRule.onNodeWithTag("resources-back").performClick()
+        composeRule.mainClock.advanceTimeBy(300)
         composeRule.onNodeWithTag("academy-language-toggle").assertExists()
     }
 }
