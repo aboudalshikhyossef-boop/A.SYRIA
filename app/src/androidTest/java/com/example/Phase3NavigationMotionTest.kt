@@ -176,7 +176,10 @@ private fun Phase3NavigationHarness(layoutDirection: LayoutDirection) {
                 composable("dashboard") {
                     var activeTab by rememberSaveable { mutableStateOf("home") }
                     Column(
-                        modifier = Modifier.fillMaxSize().padding(12.dp),
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .testTag("phase3-route-dashboard")
+                            .padding(12.dp),
                         verticalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
                         Row(
