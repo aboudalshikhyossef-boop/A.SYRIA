@@ -383,7 +383,7 @@ fun LibraryItemCard(
     val heartScale by animateFloatAsState(if (isFavorite) 1.18f else 1f, label = "library-heart")
     val accent = AyriaDesignTokens.Colors.glacier
     GlassCard(
-        modifier = modifier.fillMaxWidth().heightIn(min = 192.dp)
+        modifier = modifier.fillMaxWidth().heightIn(min = 192.dp).testTag("library-item")
             .clickable(onClick = onClick),
         contentPadding = 14.dp
     ) {
@@ -399,7 +399,7 @@ fun LibraryItemCard(
                 ),
                 contentAlignment = Alignment.Center
             ) { Text(if (category == "duas") "🤲" else "📖", fontSize = 26.sp) }
-            IconButton(onClick = onFavorite, modifier = Modifier.scale(heartScale).testTag("library-favorite-${item.id}")) {
+            IconButton(onClick = onFavorite, modifier = Modifier.scale(heartScale).testTag("library-favorite")) {
                 Icon(
                     if (isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
                     contentDescription = if (isFavorite) "Remove from favorites" else "Add to favorites",
