@@ -12,7 +12,6 @@ import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
-import androidx.compose.animation.using
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Composable
@@ -35,13 +34,15 @@ fun <T> AyriaFadeThrough(
         targetState = targetState,
         modifier = modifier,
         transitionSpec = {
-            (fadeIn(animationSpec = tween(220, delayMillis = 70)) +
-                scaleIn(initialScale = 0.985f, animationSpec = tween(220, delayMillis = 70))) togetherWith
-                (fadeOut(animationSpec = tween(130)) +
-                    scaleOut(targetScale = 0.985f, animationSpec = tween(130)))
-        }.using(
-            SizeTransform(clip = false) { _, _ -> tween(durationMillis = 1) }
-        ),
+            (
+                (fadeIn(animationSpec = tween(220, delayMillis = 70)) +
+                    scaleIn(initialScale = 0.985f, animationSpec = tween(220, delayMillis = 70))) togetherWith
+                    (fadeOut(animationSpec = tween(130)) +
+                        scaleOut(targetScale = 0.985f, animationSpec = tween(130)))
+            ).using(
+                SizeTransform(clip = false) { _, _ -> tween(durationMillis = 1) }
+            )
+        },
         contentAlignment = contentAlignment,
         label = "AyriaFadeThrough",
         content = content
