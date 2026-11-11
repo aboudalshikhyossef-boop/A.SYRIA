@@ -10,6 +10,8 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -618,13 +620,23 @@ fun GlassModalBottomSheet(
         contentColor = AyriaDesignTokens.Colors.pearl,
         scrimColor = Color.Black.copy(alpha = 0.64f),
         tonalElevation = 0.dp,
-        dragHandle = null
+        dragHandle = null,
+        windowInsets = WindowInsets(0, 0, 0, 0)
     ) {
         GlassSheet(
             title = title,
             subtitle = subtitle,
             modifier = Modifier.fillMaxWidth().navigationBarsPadding().imePadding(),
-            content = content
+            content = {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 560.dp)
+                        .verticalScroll(rememberScrollState())
+                ) {
+                    content()
+                }
+            }
         )
     }
 }
