@@ -31,7 +31,6 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.onNodeWithTag
-import androidx.compose.ui.test.assertIsSelected
 import com.example.AppBottomNavBar
 import com.example.ui.brand.AyriaPanoramaBackdrop
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -128,7 +127,7 @@ class AyriaDesignPreviewScreenshotTest {
             composeRule.onNodeWithContentDescription(label).performClick()
             composeRule.mainClock.advanceTimeBy(700)
             composeRule.waitForIdle()
-            composeRule.onNodeWithContentDescription(label).assertIsSelected()
+            composeRule.onNodeWithTag("nav-state-$key").assertExists()
             captureComposeHostScreenshot("navigation-$key.png")
         }
 
@@ -153,7 +152,7 @@ class AyriaDesignPreviewScreenshotTest {
 
         composeRule.activity.onBackPressedDispatcher.onBackPressed()
         composeRule.waitForIdle()
-        composeRule.onNodeWithContentDescription("الرئيسية").assertIsSelected()
+        composeRule.onNodeWithTag("nav-state-home").assertExists()
         captureComposeHostScreenshot("navigation-back-home.png")
     }
 
