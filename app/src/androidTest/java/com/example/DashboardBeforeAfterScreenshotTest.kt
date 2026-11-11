@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
@@ -48,15 +49,17 @@ class DashboardBeforeAfterScreenshotTest {
     fun captureDashboardBeforeOnTwoPhoneSizes() {
         assumeTrue("Dashboard comparison screenshots are captured on API 37.", Build.VERSION.SDK_INT >= 37)
         composeRule.mainClock.autoAdvance = false
-        captureDashboardBaseline(widthDp = 320, heightDp = 560, fileName = "dashboard-before-320x560.png")
-        captureDashboardBaseline(widthDp = 360, heightDp = 640, fileName = "dashboard-before-360x640.png")
-    }
-
-    private fun captureDashboardBaseline(widthDp: Int, heightDp: Int, fileName: String) {
-        val tag = "dashboard-before-${widthDp}x${heightDp}"
+        val viewport = mutableStateOf(
+            DashboardViewport(
+                widthDp = 320,
+                heightDp = 560,
+                tag = "dashboard-before-320x560"
+            )
+        )
         composeRule.setContent {
             val dashboardViewModel: DashboardViewModel = viewModel()
             val prayerViewModel: PrayerViewModel = viewModel()
+            val currentViewport = viewport.value
             CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
                 Box(
                     modifier = Modifier
@@ -66,8 +69,8 @@ class DashboardBeforeAfterScreenshotTest {
                 ) {
                     Box(
                         modifier = Modifier
-                            .size(width = widthDp.dp, height = heightDp.dp)
-                            .testTag(tag)
+                            .size(width = currentViewport.widthDp.dp, height = currentViewport.heightDp.dp)
+                            .testTag(currentViewport.tag)
                     ) {
                         AyriaPanoramaBackdrop(pageIndex = 0, scrimAlpha = 0.18f)
                         DashboardScreen(
@@ -83,7 +86,17 @@ class DashboardBeforeAfterScreenshotTest {
         composeRule.mainClock.advanceTimeByFrame()
         composeRule.mainClock.advanceTimeBy(1_200)
         composeRule.waitForIdle()
-        captureTaggedViewport(tag, fileName)
+        captureTaggedViewport(viewport.value.tag, "dashboard-before-320x560.png")
+
+        viewport.value = DashboardViewport(
+            widthDp = 360,
+            heightDp = 640,
+            tag = "dashboard-before-360x640"
+        )
+        composeRule.mainClock.advanceTimeByFrame()
+        composeRule.mainClock.advanceTimeBy(1_200)
+        composeRule.waitForIdle()
+        captureTaggedViewport(viewport.value.tag, "dashboard-before-360x640.png")
     }
 
     private fun captureTaggedViewport(tag: String, fileName: String) {
@@ -124,3 +137,9 @@ class DashboardBeforeAfterScreenshotTest {
         }
     }
 }
+
+private data class DashboardViewport(
+    val widthDp: Int,
+    val heightDp: Int,
+    val tag: String
+)
