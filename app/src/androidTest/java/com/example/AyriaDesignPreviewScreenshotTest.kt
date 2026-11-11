@@ -1,14 +1,15 @@
 package com.example
 
 import android.graphics.Bitmap
+import android.content.ContentValues
+import android.provider.MediaStore
+import android.os.Environment
 import android.os.Build
 import androidx.activity.ComponentActivity
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.example.ui.design.AyriaDesignSystemPreviewContent
-import java.io.File
-import java.io.FileOutputStream
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -34,16 +35,37 @@ class AyriaDesignPreviewScreenshotTest {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         val bitmap = instrumentation.uiAutomation.takeScreenshot()
         val context = instrumentation.targetContext
-        // Store in the debuggable target app cache; CI retrieves it with adb run-as.
-        val output = File(context.cacheDir, "design-system-preview.png")
-
-        FileOutputStream(output).use { stream ->
-            assertTrue(
-                "Preview screenshot could not be written",
-                bitmap.compress(Bitmap.CompressFormat.PNG, 100, stream)
+        // MediaStore makes the file accessible to adb without depending on the app's private package directory.
+        val values = ContentValues().apply {
+            put(MediaStore.Images.Media.DISPLAY_NAME, "design-system-preview.png")
+            put(MediaStore.Images.Media.MIME_TYPE, "image/png")
+            put(
+                MediaStore.Images.Media.RELATIVE_PATH,
+                Environment.DIRECTORY_PICTURES + "/A.SYRIA"
             )
+            put(MediaStore.Images.Media.IS_PENDING, 1)
         }
+        val resolver = context.contentResolver
+        val uri = checkNotNull(
+            resolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values)
+        ) { "Could not create the Preview screenshot in MediaStore." }
 
-        assertTrue("Preview screenshot is empty", output.exists() && output.length() > 0L)
+        try {
+            val wroteScreenshot = resolver.openOutputStream(uri)?.use { stream ->
+                bitmap.compress(Bitmap.CompressFormat.PNG, 100, stream)
+            } ?: false
+            assertTrue("Preview screenshot could not be written", wroteScreenshot)
+
+            val published = ContentValues().apply {
+                put(MediaStore.Images.Media.IS_PENDING, 0)
+            }
+            assertTrue(
+                "Preview screenshot could not be published",
+                resolver.update(uri, published, null, null) == 1
+            )
+        } catch (error: Throwable) {
+            resolver.delete(uri, null, null)
+            throw error
+        }
     }
 }
