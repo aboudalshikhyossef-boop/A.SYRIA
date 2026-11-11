@@ -287,6 +287,7 @@ fun LibraryScreen(
         }
     }
 
+    CompositionLocalProvider(LocalLayoutDirection provides layoutDirection) {
     GlassModalBottomSheet(
         visible = selectedItem != null,
         title = selectedItem?.title.orEmpty(),
@@ -319,6 +320,7 @@ fun LibraryScreen(
             }
         }
     }
+    }
 }
 
 @Composable
@@ -343,11 +345,11 @@ private fun LibrarySearchField(
                     singleLine = true,
                     textStyle = androidx.compose.ui.text.TextStyle(color = AyriaDesignTokens.Colors.pearl, fontSize = 13.sp),
                     cursorBrush = SolidColor(AyriaDesignTokens.Colors.glacier),
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth().testTag("library-search-input")
                 )
             }
             if (value.isNotEmpty()) {
-                IconButton(onClick = onClear) {
+                IconButton(onClick = onClear, modifier = Modifier.testTag("library-search-clear")) {
                     Icon(Icons.Default.Close, null, tint = AyriaDesignTokens.Colors.muted)
                 }
             }
