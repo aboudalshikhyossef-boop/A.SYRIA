@@ -27,6 +27,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -101,7 +102,7 @@ fun CyberGlossaryScreen(
                         Text(if (isAr) "مصطلحات واضحة لفهم العالم الرقمي" else "Clear definitions for the language of digital security.", color = AyriaDesignTokens.Colors.muted, fontSize = 12.sp)
                     }
                     GlassSurface(
-                        modifier = Modifier.size(44.dp).clickable(onClick = onBack),
+                        modifier = Modifier.size(44.dp).testTag("glossary-back").clickable(onClick = onBack),
                         shape = AyriaDesignTokens.Corners.pill,
                         level = GlassLevel.Standard
                     ) {
@@ -128,7 +129,7 @@ fun CyberGlossaryScreen(
                                 singleLine = true,
                                 textStyle = TextStyle(color = AyriaDesignTokens.Colors.pearl, fontSize = 13.sp),
                                 cursorBrush = SolidColor(AyriaDesignTokens.Colors.glacier),
-                                modifier = Modifier.fillMaxWidth()
+                                modifier = Modifier.fillMaxWidth().testTag("glossary-search")
                             )
                         }
                         if (searchQuery.isNotEmpty()) {
@@ -160,7 +161,8 @@ fun CyberGlossaryScreen(
                                 onClick = {
                                     haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove)
                                     selectedCategory = category
-                                }
+                                },
+                                modifier = Modifier.testTag("glossary-category-$category")
                             )
                         }
                     }
@@ -266,7 +268,7 @@ fun CyberGlossaryScreen(
         onDismissRequest = { selectedTerm = null }
     ) {
         selectedTerm?.let { term ->
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Column(Modifier.testTag("glossary-definition-sheet"), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text(
                     if (isAr) term.termEn else term.termAr,
                     color = AyriaDesignTokens.Colors.glacier,
@@ -298,7 +300,7 @@ private fun GlossaryTermRow(
     onClick: () -> Unit
 ) {
     Row(
-        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick).padding(vertical = 12.dp, horizontal = 8.dp),
+        modifier = Modifier.fillMaxWidth().testTag("glossary-term-${term.termEn}").clickable(onClick = onClick).padding(vertical = 12.dp, horizontal = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
