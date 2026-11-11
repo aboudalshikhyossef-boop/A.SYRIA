@@ -2,10 +2,7 @@ package com.example
 
 import android.graphics.Bitmap
 import androidx.activity.ComponentActivity
-import androidx.compose.ui.graphics.asAndroidBitmap
-import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
-import androidx.compose.ui.test.onRoot
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.example.ui.design.AyriaDesignSystemPreviewContent
@@ -30,8 +27,10 @@ class AyriaDesignPreviewScreenshotTest {
         }
         composeRule.waitForIdle()
 
-        val bitmap = composeRule.onRoot().captureToImage().asAndroidBitmap()
-        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        // UiAutomation captures the real emulator display without Compose PixelCopy's 2s window timeout.
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        val bitmap = instrumentation.uiAutomation.takeScreenshot()
+        val context = instrumentation.targetContext
         // Store in the debuggable target app cache; CI retrieves it with adb run-as.
         val output = File(context.cacheDir, "design-system-preview.png")
 
