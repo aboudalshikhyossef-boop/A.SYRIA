@@ -33,6 +33,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -145,7 +146,7 @@ fun ResourcesScreen(
                         Text(if (isAr) "مصادر الاستخبارات" else "INTELLIGENCE RESOURCES", color = AyriaDesignTokens.Colors.pearl, fontSize = 25.sp, fontWeight = FontWeight.Bold)
                         Text(if (isAr) "أدوات موثوقة للتحقق والتحليل المفتوح OSINT" else "Trusted tools for open-source intelligence and verification.", color = AyriaDesignTokens.Colors.muted, fontSize = 12.sp, lineHeight = 18.sp)
                     }
-                    GlassButton(onClick = onClose, modifier = Modifier.widthIn(min = 66.dp), level = GlassLevel.Standard) {
+                    GlassButton(onClick = onClose, modifier = Modifier.widthIn(min = 66.dp).testTag("resources-back"), level = GlassLevel.Standard) {
                         Text(if (isAr) "رجوع" else "Back", color = AyriaDesignTokens.Colors.glacier, fontSize = 11.sp)
                     }
                 }
@@ -176,11 +177,11 @@ fun ResourcesScreen(
                                 modifier = Modifier.clip(AyriaDesignTokens.Corners.pill)
                                     .background(if (selected) Brush.horizontalGradient(listOf(Color(0xFF25B8D6), Color(0xFF5B69D9))) else Brush.horizontalGradient(listOf(Color.Transparent, Color.Transparent)))
                             ) {
-                                GlassChip(label, selected, { selectedCategory = key })
+                                GlassChip(label, selected, { selectedCategory = key }, modifier = Modifier.testTag("resources-category-$key"))
                             }
                         }
                     }
-                    IconButton(onClick = { isGrid = !isGrid }) {
+                    IconButton(onClick = { isGrid = !isGrid }, modifier = Modifier.testTag("resources-view-toggle")) {
                         Icon(
                             if (isGrid) Icons.Default.ViewList else Icons.Default.GridView,
                             contentDescription = if (isGrid) "List view" else "Grid view",
@@ -245,7 +246,7 @@ private fun ResourceCard(
     val title = if (isAr) resource.titleAr else resource.titleEn
     val description = if (isAr) resource.descriptionAr else resource.descriptionEn
     GlassCard(
-        modifier = modifier.fillMaxWidth().heightIn(min = 242.dp)
+        modifier = modifier.fillMaxWidth().heightIn(min = 242.dp).testTag("resource-card-${resource.category}")
             .animateContentSize().clickable(onClick = onOpen),
         contentPadding = 14.dp
     ) {
@@ -263,7 +264,7 @@ private fun ResourceCard(
                 ),
                 contentAlignment = Alignment.Center
             ) { Text(resource.icon, fontSize = 28.sp) }
-            IconButton(onClick = onFavorite, modifier = Modifier.scale(heartScale)) {
+            IconButton(onClick = onFavorite, modifier = Modifier.scale(heartScale).testTag("resource-favorite-${resource.category}")) {
                 Icon(
                     if (isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
                     contentDescription = if (isFavorite) "Remove from favorites" else "Add to favorites",
