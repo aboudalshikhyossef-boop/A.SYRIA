@@ -168,9 +168,9 @@ fun AcademyScreen(
         )
     }
 
-    val savedModuleId = remember { viewModel.getSavedAcademyModuleId() }
-    val savedScenariosJson = remember { viewModel.getSavedAcademyScenariosJson() }
-    val savedScenarioIndex = remember { viewModel.getSavedAcademyIndex() }
+    val savedModuleId = viewModel.getSavedAcademyModuleId()
+    val savedScenariosJson = viewModel.getSavedAcademyScenariosJson()
+    val savedScenarioIndex = viewModel.getSavedAcademyIndex()
     val savedScenarioCount = remember(savedScenariosJson) {
         runCatching { JSONObject(savedScenariosJson).optJSONArray("scenarios")?.length() ?: 0 }
             .getOrDefault(0)
