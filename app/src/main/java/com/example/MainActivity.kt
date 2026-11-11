@@ -38,6 +38,11 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
 import com.example.ui.design.AyriaDesignTokens
+import com.example.ui.design.AyriaFadeThrough
+import com.example.ui.design.ayriaForwardEnterTransition
+import com.example.ui.design.ayriaForwardExitTransition
+import com.example.ui.design.ayriaPopEnterTransition
+import com.example.ui.design.ayriaPopExitTransition
 import kotlin.math.roundToInt
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -635,7 +640,15 @@ class MainActivity : FragmentActivity() {
                     CompositionLocalProvider(LocalAdaptiveConfig provides uiConfig) {
                         ProvideWindowAdaptiveLayout {
                         Box(modifier = Modifier.fillMaxSize()) {
-                        NavHost(navController = navController, startDestination = "splash", enterTransition = { fadeIn(animationSpec = tween(500)) }, exitTransition = { fadeOut(animationSpec = tween(500)) }) {
+                        val routeLayoutDirection = if (isAr) LayoutDirection.Rtl else LayoutDirection.Ltr
+                        NavHost(
+                            navController = navController,
+                            startDestination = "splash",
+                            enterTransition = { ayriaForwardEnterTransition(routeLayoutDirection) },
+                            exitTransition = { ayriaForwardExitTransition(routeLayoutDirection) },
+                            popEnterTransition = { ayriaPopEnterTransition(routeLayoutDirection) },
+                            popExitTransition = { ayriaPopExitTransition(routeLayoutDirection) }
+                        ) {
                             composable("splash") {
                                 var splashFinished by remember { mutableStateOf(false) }
 
@@ -793,7 +806,12 @@ class MainActivity : FragmentActivity() {
                                                         .widthIn(max = windowInfo.maxContentWidth)
                                                         .fillMaxSize()
                                                 ) {
-                                                    when (activeTab) {
+                                                    AyriaFadeThrough(
+                                                        targetState = activeTab,
+                                                        modifier = Modifier.fillMaxSize(),
+                                                        contentAlignment = Alignment.TopStart
+                                                    ) { targetTab ->
+                                                        when (targetTab) {
                                                         "home"      -> {
                                                             if (!appPinEnabled || appPinUnlocked) {
                                                                 val prayerVm: com.example.ui.viewmodel.PrayerViewModel = viewModel()
@@ -820,6 +838,7 @@ class MainActivity : FragmentActivity() {
                                                             onOpenCustomize = { navController.navigate("adaptive_feedback") },
                                                             onOpenAppLock = { navController.navigate("app_lock") }
                                                         )
+                                                        }
                                                     }
                                                 }
                                             }
