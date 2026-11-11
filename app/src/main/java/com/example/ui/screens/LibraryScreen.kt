@@ -397,7 +397,7 @@ fun LibraryItemCard(
                 ),
                 contentAlignment = Alignment.Center
             ) { Text(if (category == "duas") "🤲" else "📖", fontSize = 26.sp) }
-            IconButton(onClick = onFavorite, modifier = Modifier.graphicsLayer { scaleX = heartScale; scaleY = heartScale }) {
+            IconButton(onClick = onFavorite, modifier = Modifier.scale(heartScale)) {
                 Icon(
                     if (isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
                     contentDescription = if (isFavorite) "Remove from favorites" else "Add to favorites",
@@ -418,7 +418,7 @@ fun LibraryItemCard(
         Spacer(Modifier.height(10.dp))
         if (isRead) {
             LinearProgressIndicator(
-                progress = { 1f },
+                progress = 1f,
                 modifier = Modifier.fillMaxWidth().height(3.dp).clip(CircleShape),
                 color = AyriaDesignTokens.Colors.teal,
                 trackColor = AyriaDesignTokens.Colors.line
