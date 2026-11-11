@@ -1,6 +1,21 @@
 package com.example.ui.screens
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.runtime.saveable.rememberSaveable
+import com.example.ui.design.SectionHeader
+import com.example.ui.design.ProgressRing
+import com.example.ui.design.GlassSurface
+import com.example.ui.design.GlassLevel
+import com.example.ui.design.GlassChip
+import com.example.ui.design.GlassCard
+import com.example.ui.design.GlassButton
+import com.example.ui.design.AyriaDesignTokens
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.TextButton
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.animation.*
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
@@ -31,6 +46,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -110,8 +126,10 @@ fun AcademyScreen(
     val isAr by viewModel.isArabic.collectAsState()
     val layoutDirection = if (isAr) LayoutDirection.Rtl else LayoutDirection.Ltr
     val haptic = LocalHapticFeedback.current
-
     var selectedModule by remember { mutableStateOf<AcademySyllabusModule?>(null) }
+    var selectedLevel by rememberSaveable { mutableStateOf("all") }
+    val academyPoints by viewModel.academyPoints.collectAsState()
+    val academyStreak by viewModel.academyStreak.collectAsState()
 
     val syllabusModules = remember {
         listOf(
@@ -119,192 +137,348 @@ fun AcademyScreen(
                 id = "social_engineering",
                 titleAr = "الهندسة الاجتماعية",
                 titleEn = "Social Engineering",
-                descAr = "طرق التلاعب بالبشر للحصول على معلومات بأساليب احتيال متقدمة.",
-                descEn = "Manipulating humans into revealing confidential credentials with advanced psychological vectors.",
-                icon = "👥"
+                descAr = "تمييز الخداع والتصيد وأساليب التلاعب النفسي وحماية الحسابات.",
+                descEn = "Recognize phishing, manipulation patterns and account-takeover attempts.",
+                icon = "🧠"
             ),
             AcademySyllabusModule(
                 id = "mobile_security",
                 titleAr = "أمن الهواتف",
                 titleEn = "Mobile Security",
-                descAr = "حماية أنظمة iOS و Android من تطبيقات التجسس العميقة.",
-                descEn = "Securing iOS and Android hosts against zero-click kernel spyware.",
+                descAr = "حماية أجهزة Android وiOS والأذونات والملفات التعريفية.",
+                descEn = "Protect Android and iOS devices, permissions and configuration profiles.",
                 icon = "📱"
             ),
             AcademySyllabusModule(
                 id = "network_safety",
                 titleAr = "سلامة الشبكات",
                 titleEn = "Network Safety",
-                descAr = "إحباط هجمات اعتراض البيانات وهجمات الرجل في المنتصف الذكية.",
-                descEn = "Detecting and disabling Wi-Fi interception vectors & Man-in-the-Middle payloads.",
+                descAr = "فهم شبكات Wi-Fi والاتصال الآمن واعتراض البيانات.",
+                descEn = "Understand Wi-Fi risks, secure connections and interception.",
                 icon = "🌐"
             ),
             AcademySyllabusModule(
                 id = "privacy_rights",
                 titleAr = "حقوق الخصوصية",
                 titleEn = "Privacy Rights",
-                descAr = "الاستراتيجيات الرقمية والتشريعية لمقاومة التتبع ومسح البيانات.",
-                descEn = "Tactics and legal models to prevent metadata aggregation & non-consensual scraping.",
-                icon = "⚖"
+                descAr = "إدارة البيانات والموافقة والتشفير والخصوصية الرقمية.",
+                descEn = "Manage data, consent, encryption and digital privacy.",
+                icon = "🛡️"
             )
         )
     }
 
-    BackHandler(enabled = selectedModule != null) {
-        selectedModule = null
+    val savedModuleId = viewModel.getSavedAcademyModuleId()
+    val savedScenariosJson = viewModel.getSavedAcademyScenariosJson()
+    val savedScenarioIndex = viewModel.getSavedAcademyIndex()
+    val savedScenarioCount = remember(savedScenariosJson) {
+        runCatching { JSONObject(savedScenariosJson).optJSONArray("scenarios")?.length() ?: 0 }
+            .getOrDefault(0)
+    }
+    val resumeModule = syllabusModules.firstOrNull { it.id == savedModuleId && savedScenariosJson.isNotBlank() }
+    val resumeProgress = if (savedScenarioCount > 0) {
+        (savedScenarioIndex.toFloat() / savedScenarioCount.toFloat()).coerceIn(0f, 1f)
+    } else 0f
+
+    BackHandler(enabled = selectedModule != null) { selectedModule = null }
+
+    val levelGroups = listOf(
+        "beginner" to (if (isAr) "المستوى التأسيسي" else "FOUNDATION"),
+        "intermediate" to (if (isAr) "المستوى المتوسط" else "INTERMEDIATE"),
+        "advanced" to (if (isAr) "المستوى المتقدم" else "ADVANCED")
+    )
+    fun levelFor(module: AcademySyllabusModule) = when (module.id) {
+        "social_engineering" -> "beginner"
+        "mobile_security", "network_safety" -> "intermediate"
+        else -> "advanced"
     }
 
     CompositionLocalProvider(LocalLayoutDirection provides layoutDirection) {
-        Column(
-            modifier = modifier
-                .fillMaxSize()
-                .background(Color.Transparent)
-                .statusBarsPadding()
-                .navigationBarsPadding()
-                .padding(16.dp)
-        ) {
-            // Header
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column {
-                    Text(
-                        text = if (isAr) "الأكاديمية السيادية" else "SOVEREIGN ACADEMY",
-                        color = CyberCyan,
-                        fontSize = 20.sp,
-                        fontWeight = FontWeight.ExtraBold,
-                        letterSpacing = 2.sp,
-                        fontFamily = FontFamily.Monospace
-                    )
-                    Text(
-                        text = if (isAr) "منهج الدفاع المتقدم والاستخبارات المهنية" else "ADVANCED DEFENSIVE & INTEL CURRICULUM",
-                        color = Color.White.copy(alpha = 0.5f),
-                        fontSize = 8.sp,
-                        fontWeight = FontWeight.Bold,
-                        letterSpacing = 1.sp,
-                        fontFamily = FontFamily.Monospace
-                    )
-                }
-
-                // Quick Language Toggle inside screen
-                Box(
-                    modifier = Modifier
-                        .border(1.dp, CyberCyan.copy(alpha = 0.3f), RoundedCornerShape(8.dp))
-                        .background(Color.White.copy(alpha = 0.05f), RoundedCornerShape(8.dp))
-                        .clickable {
-                            haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
-                            viewModel.setArabic(!isAr)
-                        }
-                        .padding(horizontal = 12.dp, vertical = 6.dp)
+        AnimatedContent(
+            targetState = selectedModule,
+            transitionSpec = {
+                (slideInHorizontally(initialOffsetX = { if (targetState != null) it else -it }) + fadeIn()) togetherWith
+                    (slideOutHorizontally(targetOffsetX = { if (targetState != null) -it else it }) + fadeOut())
+            },
+            label = "academyLearningTransition"
+        ) { module ->
+            if (module != null) {
+                NeuralModuleTestView(
+                    module = module,
+                    viewModel = viewModel,
+                    isAr = isAr,
+                    onBack = { selectedModule = null }
+                )
+            } else {
+                Column(
+                    modifier = modifier
+                        .fillMaxSize()
+                        .background(Color.Transparent)
+                        .statusBarsPadding()
+                        .verticalScroll(rememberScrollState())
+                        .padding(horizontal = 18.dp)
+                        .padding(top = 18.dp, bottom = 136.dp),
+                    verticalArrangement = Arrangement.spacedBy(18.dp)
                 ) {
-                    Text(
-                        text = if (isAr) "EN" else "العربية",
-                        color = CyberCyan,
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Bold,
-                        fontFamily = FontFamily.Monospace
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // Module view switching
-            AnimatedContent(
-                targetState = selectedModule,
-                transitionSpec = {
-                    slideInHorizontally(initialOffsetX = { if (targetState != null) it else -it }) + fadeIn() togetherWith
-                    slideOutHorizontally(targetOffsetX = { if (targetState != null) -it else it }) + fadeOut()
-                },
-                label = "academyTransition"
-            ) { module ->
-                if (module == null) {
-                    // Showcase syllabus modules
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .weight(1f)
-                            .verticalScroll(rememberScrollState())
-                            .padding(bottom = 112.dp)
-                    ) {
-                        Text(
-                            text = if (isAr) "اختر ملف المنهج للبدء بالاختبار العصبي:" else "SELECT A SYLLABUS DIRECTORY FOR NEURAL TESTING:",
-                            color = AmberZen,
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold,
-                            fontFamily = FontFamily.Monospace,
-                            modifier = Modifier.padding(bottom = 12.dp)
-                        )
-
-                        syllabusModules.forEach { item ->
-                            val title = if (isAr) item.titleAr else item.titleEn
-                            val desc = if (isAr) item.descAr else item.descEn
-
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(vertical = 8.dp)
-                                    .border(0.5.dp, CyberCyan.copy(alpha = 0.2f), RoundedCornerShape(12.dp))
-                                    .background(Color.White.copy(alpha = 0.02f), RoundedCornerShape(12.dp))
-                                    .clickable {
-                                        haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove)
-                                        selectedModule = item
-                                    }
-                                    .padding(16.dp)
+                    AcademyEntrance(index = 0) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    if (isAr) "أكاديمية المعرفة" else "LEARNING ACADEMY",
+                                    color = AyriaDesignTokens.Colors.pearl,
+                                    fontSize = 26.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Text(
+                                    if (isAr) "تعلّم مهارات الحماية خطوة بخطوة" else "Build practical cyber-safety skills, one lesson at a time.",
+                                    color = AyriaDesignTokens.Colors.muted,
+                                    fontSize = 12.sp,
+                                    lineHeight = 18.sp
+                                )
+                            }
+                            GlassButton(
+                                onClick = {
+                                    haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
+                                    viewModel.setArabic(!isAr)
+                                },
+                                modifier = Modifier.widthIn(min = 68.dp).testTag("academy-language-toggle"),
+                                level = GlassLevel.Standard
                             ) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(14.dp)
-                                ) {
-                                    Text(
-                                        text = item.icon,
-                                        fontSize = 24.sp,
-                                        modifier = Modifier
-                                            .background(CyberCyan.copy(alpha = 0.1f), RoundedCornerShape(8.dp))
-                                            .padding(8.dp)
+                                Text(if (isAr) "EN" else "عربي", color = AyriaDesignTokens.Colors.glacier, fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    }
+
+                    AcademyEntrance(index = 1) {
+                        GlassSurface(
+                            modifier = Modifier.fillMaxWidth().testTag("academy-resume").clickable {
+                                haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
+                                selectedModule = resumeModule ?: syllabusModules.first()
+                            },
+                            level = GlassLevel.Elevated
+                        ) {
+                            Box(Modifier.matchParentSize().background(
+                                Brush.linearGradient(
+                                    listOf(
+                                        Color(0xFF174D63).copy(alpha = 0.76f),
+                                        Color(0xFF243B70).copy(alpha = 0.64f),
+                                        Color(0xFF17233F).copy(alpha = 0.38f)
                                     )
-
-                                    Column(modifier = Modifier.weight(1f)) {
-                                        Text(
-                                            text = title.uppercase(),
-                                            color = Color.White,
-                                            fontSize = 14.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            fontFamily = FontFamily.Monospace
-                                        )
-                                        Spacer(modifier = Modifier.height(4.dp))
-                                        Text(
-                                            text = desc,
-                                            color = Color.White.copy(alpha = 0.6f),
-                                            fontSize = 11.sp,
-                                            lineHeight = 16.sp
-                                        )
-                                    }
-
+                                )
+                            ))
+                            Row(
+                                modifier = Modifier.fillMaxWidth().padding(20.dp),
+                                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                                     Text(
-                                        text = "🡠",
-                                        color = CyberCyan,
-                                        fontSize = 16.sp,
+                                        if (isAr) "تابع من حيث توقفت" else "CONTINUE LEARNING",
+                                        color = Color.White.copy(alpha = 0.74f),
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        letterSpacing = 1.sp
+                                    )
+                                    Text(
+                                        if (isAr) resumeModule?.titleAr ?: "ابدأ أول دورة لك" else resumeModule?.titleEn ?: "Start your first course",
+                                        color = Color.White,
+                                        fontSize = 20.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        maxLines = 2
+                                    )
+                                    Text(
+                                        if (isAr) {
+                                            if (resumeModule != null) "السؤال التالي جاهز — اضغط للمتابعة" else "اختر مساراً وابدأ أول تحدٍ عملي"
+                                        } else {
+                                            if (resumeModule != null) "Your saved lesson is ready to resume." else "Choose a course and start your first practical challenge."
+                                        },
+                                        color = Color.White.copy(alpha = 0.72f),
+                                        fontSize = 11.sp,
+                                        lineHeight = 16.sp
+                                    )
+                                    Text(
+                                        if (isAr) "متابعة الدرس  →" else "RESUME LESSON  →",
+                                        color = AyriaDesignTokens.Colors.glacier,
+                                        fontSize = 11.sp,
                                         fontWeight = FontWeight.Bold
                                     )
+                                }
+                                ProgressRing(
+                                    progress = resumeProgress,
+                                    size = 74.dp,
+                                    label = if (isAr) "التقدم" else "PROGRESS",
+                                    valueLabel = if (savedScenarioCount > 0) "${(resumeProgress * 100).toInt()}%" else "—"
+                                )
+                            }
+                        }
+                    }
+
+                    AcademyEntrance(index = 2) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            GlassCard(modifier = Modifier.weight(1f), contentPadding = 14.dp) {
+                                Text("⚡", fontSize = 19.sp)
+                                Text("$academyPoints XP", color = AyriaDesignTokens.Colors.pearl, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                                Text(if (isAr) "رصيد التعلم" else "Learning points", color = AyriaDesignTokens.Colors.muted, fontSize = 10.sp)
+                            }
+                            GlassCard(modifier = Modifier.weight(1f), contentPadding = 14.dp) {
+                                Text("🔥", fontSize = 19.sp)
+                                Text("$academyStreak", color = AyriaDesignTokens.Colors.pearl, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                                Text(if (isAr) "أيام متتالية" else "Day streak", color = AyriaDesignTokens.Colors.muted, fontSize = 10.sp)
+                            }
+                        }
+                    }
+
+                    AcademyEntrance(index = 3) {
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            SectionHeader(
+                                title = if (isAr) "استكشف الدورات" else "EXPLORE COURSES",
+                                subtitle = if (isAr) "مسارات قصيرة بمستويات متدرجة" else "Focused learning paths by difficulty",
+                                actionLabel = if (isAr) "عرض الكل" else "See all",
+                                onAction = { selectedLevel = "all" }
+                            )
+                            Row(
+                                modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                listOf(
+                                    "all" to (if (isAr) "الكل" else "All"),
+                                    "beginner" to (if (isAr) "مبتدئ" else "Beginner"),
+                                    "intermediate" to (if (isAr) "متوسط" else "Intermediate"),
+                                    "advanced" to (if (isAr) "متقدم" else "Advanced")
+                                ).forEach { (key, label) ->
+                                    Box(
+                                        modifier = Modifier.clip(AyriaDesignTokens.Corners.pill)
+                                            .background(if (selectedLevel == key) Brush.horizontalGradient(listOf(Color(0xFF26B7D5), Color(0xFF5369D8))) else Brush.horizontalGradient(listOf(Color.Transparent, Color.Transparent)))
+                                    ) {
+                                        GlassChip(label, selectedLevel == key, { selectedLevel = key }, modifier = Modifier.testTag("academy-filter-$key"))
+                                    }
                                 }
                             }
                         }
                     }
-                } else {
-                    // Active neural scenario test for selected syllabus module
-                    NeuralModuleTestView(
-                        module = module,
-                        viewModel = viewModel,
-                        isAr = isAr,
-                        onBack = { selectedModule = null }
-                    )
+
+                    val visibleGroups = levelGroups.filter { selectedLevel == "all" || selectedLevel == it.first }
+                    visibleGroups.forEachIndexed { groupIndex, (level, label) ->
+                        val modules = syllabusModules.filter { levelFor(it) == level }
+                        if (modules.isNotEmpty()) {
+                            AcademyEntrance(index = 4 + groupIndex) {
+                                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                                    SectionHeader(
+                                        title = label,
+                                        subtitle = when (level) {
+                                            "beginner" -> if (isAr) "أساسيات الوعي الرقمي" else "Digital safety fundamentals"
+                                            "intermediate" -> if (isAr) "حماية الأجهزة والشبكات" else "Device and network defense"
+                                            else -> if (isAr) "الخصوصية والقرارات المتقدمة" else "Privacy and advanced judgment"
+                                        },
+                                        actionLabel = if (isAr) "عرض الكل" else "See all",
+                                        onAction = { selectedLevel = level }
+                                    )
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                    ) {
+                                        modules.forEach { item ->
+                                            val title = if (isAr) item.titleAr else item.titleEn
+                                            val description = if (isAr) item.descAr else item.descEn
+                                            Box(
+                                                modifier = Modifier.width(238.dp).testTag("academy-course-${item.id}").clickable {
+                                                    haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove)
+                                                    selectedModule = item
+                                                }
+                                            ) {
+                                                GlassCard(
+                                                    modifier = Modifier.fillMaxWidth().heightIn(min = 190.dp),
+                                                    contentPadding = 16.dp
+                                                ) {
+                                                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                                                        Box(
+                                                            modifier = Modifier.size(56.dp).background(
+                                                                Brush.linearGradient(listOf(Color(0xFF20BBD4).copy(alpha = 0.28f), Color(0xFF655FE2).copy(alpha = 0.20f))),
+                                                                RoundedCornerShape(18.dp)
+                                                            ),
+                                                            contentAlignment = Alignment.Center
+                                                        ) { Text(item.icon, fontSize = 28.sp) }
+                                                        if (savedModuleId == item.id && savedScenarioCount > 0) {
+                                                            ProgressRing(resumeProgress, size = 48.dp, strokeWidth = 4.dp, valueLabel = "${(resumeProgress * 100).toInt()}%")
+                                                        }
+                                                    }
+                                                    Spacer(Modifier.height(14.dp))
+                                                    Text(title, color = AyriaDesignTokens.Colors.pearl, fontSize = 16.sp, fontWeight = FontWeight.Bold, maxLines = 2)
+                                                    Spacer(Modifier.height(5.dp))
+                                                    Text(
+                                                        if (isAr) "مستوى ${when(level) { "beginner" -> "مبتدئ"; "intermediate" -> "متوسط"; else -> "متقدم" }}" else level.uppercase(),
+                                                        color = AyriaDesignTokens.Colors.glacier,
+                                                        fontSize = 10.sp,
+                                                        fontWeight = FontWeight.SemiBold
+                                                    )
+                                                    Spacer(Modifier.height(5.dp))
+                                                    Text(description, color = AyriaDesignTokens.Colors.muted, fontSize = 11.sp, lineHeight = 16.sp, maxLines = 2)
+                                                    Spacer(Modifier.height(10.dp))
+                                                    Text(if (isAr) "ابدأ الدورة  →" else "START COURSE  →", color = AyriaDesignTokens.Colors.teal, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    AcademyEntrance(index = 7) {
+                        GlassSurface(
+                            modifier = Modifier.fillMaxWidth().testTag("academy-daily-challenge").clickable {
+                                haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
+                                selectedModule = syllabusModules.first { it.id == "network_safety" }
+                            },
+                            level = GlassLevel.Elevated
+                        ) {
+                            Box(Modifier.matchParentSize().background(Brush.linearGradient(listOf(Color(0xFF4F3C91).copy(alpha = 0.70f), Color(0xFF1B7185).copy(alpha = 0.42f)))))
+                            Column(Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                                Text(if (isAr) "تحدّي اليوم" else "DAILY CHALLENGE", color = Color(0xFFFFD68A), fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.4.sp)
+                                Text(if (isAr) "اختبر قراراتك في أمان الشبكات" else "Test your network-safety instincts", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                                Text(if (isAr) "سيناريو عملي من أسئلة الأكاديمية مع تقييم وتفسير لإجابتك." else "A practical scenario from the academy, with answer scoring and feedback.", color = Color.White.copy(alpha = 0.72f), fontSize = 11.sp, lineHeight = 16.sp)
+                                Text(if (isAr) "ابدأ التحدي  ↗" else "START TODAY'S CHALLENGE  ↗", color = Color(0xFFFFD68A), fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    }
+
+                    AcademyEntrance(index = 8) {
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            SectionHeader(title = if (isAr) "مراجع إضافية" else "MORE TO EXPLORE")
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                GlassButton(onClick = onNavigateToGlossary, modifier = Modifier.weight(1f).testTag("academy-open-glossary")) {
+                                    Text(if (isAr) "قاموس المصطلحات" else "Glossary", color = AyriaDesignTokens.Colors.glacier, fontSize = 11.sp)
+                                }
+                                GlassButton(onClick = onNavigateToChecklist, modifier = Modifier.weight(1f).testTag("academy-open-checklist")) {
+                                    Text(if (isAr) "قائمة التحقق" else "Checklist", color = AyriaDesignTokens.Colors.glacier, fontSize = 11.sp)
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }
     }
+}
+
+@Composable
+private fun AcademyEntrance(index: Int, content: @Composable () -> Unit) {
+    var visible by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        delay(70L + index * 65L)
+        visible = true
+    }
+    AnimatedVisibility(
+        visible = visible,
+        enter = fadeIn(tween(360)) + slideInVertically(tween(360)) { it / 12 }
+    ) { content() }
 }
 
 @Composable
