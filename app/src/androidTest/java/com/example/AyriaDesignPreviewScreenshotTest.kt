@@ -9,6 +9,7 @@ import android.os.Environment
 import android.os.Build
 import androidx.activity.ComponentActivity
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.junit4.StateRestorationTester
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.onNodeWithText
 import androidx.activity.compose.BackHandler
@@ -109,7 +110,8 @@ class AyriaDesignPreviewScreenshotTest {
     fun captureBottomNavigationStatesAndVerifyBackAndSavedSelection() {
         assumeTrue("Navigation emulator captures are generated on API 37.", Build.VERSION.SDK_INT >= 37)
         composeRule.mainClock.autoAdvance = false
-        composeRule.setContent { BottomNavigationAcceptanceHarness() }
+        val restorationTester = StateRestorationTester(composeRule)
+        restorationTester.setContent { BottomNavigationAcceptanceHarness() }
         composeRule.mainClock.advanceTimeByFrame()
         composeRule.waitForIdle()
 
@@ -138,7 +140,9 @@ class AyriaDesignPreviewScreenshotTest {
         composeRule.onNodeWithContentDescription("المكتبة").performClick()
         composeRule.mainClock.advanceTimeBy(700)
         composeRule.waitForIdle()
-        composeRule.activityRule.scenario.recreate()
+        // Simulate Android saved-instance-state restoration without replacing the
+        // activity that owns the Compose test rule.
+        restorationTester.emulateSavedInstanceStateRestore()
         composeRule.waitForIdle()
         composeRule.onNodeWithContentDescription("المكتبة").assertIsSelected()
         captureComposeHostScreenshot("navigation-state-restored.png")
