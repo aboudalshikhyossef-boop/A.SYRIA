@@ -35,6 +35,7 @@ import androidx.compose.ui.unit.sp
 import com.example.ui.theme.*
 import com.example.ui.brand.AyriaArabicFont
 import com.example.ui.viewmodel.DashboardViewModel
+import com.example.ui.design.GlassEmptyState
 import org.json.JSONObject
 import org.json.JSONArray
 
@@ -264,18 +265,11 @@ fun LibraryScreen(
             ) {
                 if (displayedItems.isEmpty()) {
                     item {
-                        Column(
-                            modifier = Modifier.fillMaxWidth().padding(vertical = 38.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            Icon(Icons.Default.SearchOff, null, tint = Color(0xFFA8C9D5).copy(alpha = 0.42f), modifier = Modifier.size(34.dp))
-                            Text(
-                                if (isAr) "لا توجد نتائج مطابقة" else "No matching entries",
-                                color = Color(0xFFB7D1DA).copy(alpha = 0.66f),
-                                fontSize = 12.sp
-                            )
-                        }
+                        GlassEmptyState(
+                            icon = Icons.Default.SearchOff,
+                            title = if (isAr) "لا توجد نتائج مطابقة" else "No matching entries",
+                            description = if (isAr) "جرّب تغيير عبارة البحث أو اختيار قسم آخر." else "Try another search or choose a different category."
+                        )
                     }
                 } else {
                     items(displayedItems, key = { "${selectedTab}_${it.id}" }) { item ->
