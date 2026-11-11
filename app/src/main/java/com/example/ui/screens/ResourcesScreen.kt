@@ -279,8 +279,13 @@ private fun ResourceCard(
         Spacer(Modifier.height(10.dp))
         Text(resource.url.removePrefix("https://"), color = AyriaDesignTokens.Colors.glacier.copy(alpha = 0.78f), fontSize = 9.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
         Spacer(Modifier.height(8.dp))
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        GlassButton(
+            onClick = onOpen,
+            modifier = Modifier.fillMaxWidth().testTag("resource-open-${resource.category}"),
+            level = GlassLevel.Subtle
+        ) {
             Icon(Icons.Default.OpenInNew, null, tint = resource.color, modifier = Modifier.size(14.dp))
+            Spacer(Modifier.width(7.dp))
             Text(if (isAr) "زيارة الرابط" else "OPEN RESOURCE", color = resource.color, fontSize = 10.sp, fontWeight = FontWeight.Bold)
         }
     }
