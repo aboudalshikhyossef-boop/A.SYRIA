@@ -42,6 +42,8 @@ import com.example.ui.theme.CyberCyan
 import com.example.ui.theme.GlassWhite
 import com.example.ui.theme.VoidBlack
 import com.example.ui.viewmodel.DashboardViewModel
+import com.example.ui.design.GlassErrorState
+import com.example.ui.design.GlassLoadingState
 import org.json.JSONObject
 import org.json.JSONArray
 import kotlinx.coroutines.delay
@@ -314,6 +316,7 @@ fun NeuralModuleTestView(
 ) {
     val haptic = LocalHapticFeedback.current
     var isGeneratingScenarios by remember { mutableStateOf(false) }
+    var generationError by remember(module.id) { mutableStateOf<String?>(null) }
 
     // Restore scenarios from ViewModel if same module (survives tab navigation)
     val savedJson = remember(module.id) { viewModel.getSavedAcademyScenariosJson() }
@@ -709,6 +712,7 @@ fun NeuralModuleTestView(
         if (cooldownTimer > 0) return
         cooldownTimer = 5 // Phase 25: 5s Cooldown Shield
         isGeneratingScenarios = true
+        generationError = null
         scenariosList = emptyList() // Ensure old questions are cleared
         currentScenarioIndex = 0
         selectedOptionIndex = null
@@ -727,6 +731,7 @@ fun NeuralModuleTestView(
             useArabic = isAr,
             usedTopics = usedTopicSnippets,
             onSuccess = { jsonString ->
+                generationError = null
                 try {
                     val root = JSONObject(jsonString)
                     val array = root.getJSONArray("scenarios")
@@ -763,6 +768,7 @@ fun NeuralModuleTestView(
             onFailure = { error ->
                 // Force a notification to the user that we are in offline mode
                 val errorMsg = error.message ?: "Unknown Connection Error"
+                generationError = errorMsg.take(180)
                 println("Academy Generation Failed: $errorMsg")
                 
                 // Still show some questions so the app doesn't break, but clear the used list to refresh
@@ -891,30 +897,21 @@ fun NeuralModuleTestView(
           }
 
           if (isGeneratingScenarios) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 80.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center
-            ) {
-                Text(
-                    text = if (isAr) "جاري استدعاء العقل الاصطناعي..." else "DYNAMIC COMPILING VIA GEMINI COGNITION...",
-                    color = CyberCyan,
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Bold,
-                    fontFamily = FontFamily.Monospace,
-                    textAlign = TextAlign.Center
-                )
-                Spacer(modifier = Modifier.height(10.dp))
-                Text(
-                    text = if (isAr) "تحليل حوادث الاختراقات الواقعية وبناء السيناريو الفعلي..." else "Synthesizing educational simulations targeting historical breaches...",
-                    color = Color.White.copy(alpha = 0.5f),
-                    fontSize = 11.sp,
-                    textAlign = TextAlign.Center
+            GlassLoadingState(
+                title = if (isAr) "جاري استدعاء العقل الاصطناعي..." else "DYNAMIC COMPILING VIA GEMINI COGNITION...",
+                description = if (isAr) "تحليل حوادث الاختراقات الواقعية وبناء السيناريو الفعلي..." else "Synthesizing educational simulations targeting historical breaches...",
+                modifier = Modifier.fillMaxWidth().padding(vertical = 64.dp)
+            )
+        } else if (scenariosList.isNotEmpty()) {
+            generationError?.let { error ->
+                GlassErrorState(
+                    title = if (isAr) "تعذّر الاتصال بالعقل الاصطناعي" else "AI generation unavailable",
+                    message = if (isAr) "نُعرض أسئلة احتياطية. $error" else "Offline questions are available. $error",
+                    retryLabel = if (isAr) "إعادة المحاولة" else "Retry",
+                    onRetry = { triggerQuestionGeneration() },
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp)
                 )
             }
-        } else if (scenariosList.isNotEmpty()) {
             val currentScenario = scenariosList[currentScenarioIndex]
 
             // Question Header
