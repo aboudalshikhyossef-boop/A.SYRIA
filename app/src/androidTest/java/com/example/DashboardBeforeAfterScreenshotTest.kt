@@ -35,9 +35,9 @@ import org.junit.Test
 import org.junit.runner.RunWith
 
 /**
- * Captures the unmodified phase-3 DashboardScreen at two explicit phone viewports.
+ * Captures the redesigned phase-4 DashboardScreen at two explicit phone viewports.
  * These baseline images are kept in the GitHub Actions artifact for comparison
- * against the post-redesign captures in Phase 4.
+ * against the baseline captures from the phase-3 branch.
  */
 @RunWith(AndroidJUnit4::class)
 class DashboardBeforeAfterScreenshotTest {
@@ -45,15 +45,15 @@ class DashboardBeforeAfterScreenshotTest {
     val composeRule = createAndroidComposeRule<ComponentActivity>()
 
     @Test
-    fun captureDashboardBeforeOnTwoPhoneSizes() {
+    fun captureDashboardAfterOnTwoPhoneSizes() {
         assumeTrue("Dashboard comparison screenshots are captured on API 37.", Build.VERSION.SDK_INT >= 37)
         composeRule.mainClock.autoAdvance = false
-        captureDashboardBaseline(widthDp = 320, heightDp = 560, fileName = "dashboard-before-320x560.png")
-        captureDashboardBaseline(widthDp = 360, heightDp = 640, fileName = "dashboard-before-360x640.png")
+        captureDashboardAfter(widthDp = 320, heightDp = 560, fileName = "dashboard-after-320x560.png")
+        captureDashboardAfter(widthDp = 360, heightDp = 640, fileName = "dashboard-after-360x640.png")
     }
 
-    private fun captureDashboardBaseline(widthDp: Int, heightDp: Int, fileName: String) {
-        val tag = "dashboard-before-${widthDp}x${heightDp}"
+    private fun captureDashboardAfter(widthDp: Int, heightDp: Int, fileName: String) {
+        val tag = "dashboard-after-${widthDp}x${heightDp}"
         composeRule.setContent {
             val dashboardViewModel: DashboardViewModel = viewModel()
             val prayerViewModel: PrayerViewModel = viewModel()
