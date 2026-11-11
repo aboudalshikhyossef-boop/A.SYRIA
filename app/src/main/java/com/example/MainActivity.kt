@@ -22,6 +22,22 @@ import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.ui.draw.graphicsLayer
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.outlined.*
+import com.example.ui.design.AyriaDesignTokens
+import kotlin.math.roundToInt
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.shape.CircleShape
@@ -752,22 +768,13 @@ class MainActivity : FragmentActivity() {
                                         modifier = Modifier.fillMaxSize().nestedScroll(nestedScrollConnection),
                                         containerColor = Color.Transparent,
                                         contentWindowInsets = WindowInsets(0, 0, 0, 0),
-                                        bottomBar = {
-                                            if (!windowInfo.usesNavigationRail) {
-                                                AnimatedVisibility(visible = navBarVisible, enter = slideInVertically { it } + fadeIn(), exit = slideOutVertically { it } + fadeOut()) {
-                                                    AppBottomNavBar(isArabic = isArLocal, activeTab = activeTab) { tab ->
-                                                        activeTab = tab
-                                                        vm.setSettingsOpen(tab == "settings")
-                                                    }
-                                                }
-                                            }
-                                        }
                                     ) { innerPadding ->
                                         Row(
                                             modifier = Modifier
                                                 .fillMaxSize()
                                                 .padding(innerPadding)
                                                 .consumeWindowInsets(innerPadding)
+                                                .padding(bottom = if (!windowInfo.usesNavigationRail) 96.dp else 0.dp)
                                         ) {
                                             if (windowInfo.usesNavigationRail) {
                                                 AppNavigationRail(isArabic = isArLocal, activeTab = activeTab) { tab ->
@@ -815,6 +822,34 @@ class MainActivity : FragmentActivity() {
                                                     }
                                                 }
                                             }
+                                        }
+                                    }
+                                    if (!windowInfo.usesNavigationRail) {
+                                        AnimatedVisibility(
+                                            visible = navBarVisible,
+                                            modifier = Modifier
+                                                .align(Alignment.BottomCenter)
+                                                .fillMaxWidth()
+                                                .navigationBarsPadding()
+                                                .padding(horizontal = 16.dp)
+                                                .padding(bottom = 16.dp),
+                                            enter = slideInVertically { it } + fadeIn(),
+                                            exit = slideOutVertically { it } + fadeOut()
+                                        ) {
+                                            AppBottomNavBar(
+                                                isArabic = isArLocal,
+                                                activeTab = activeTab,
+                                                onTabSelected = { tab ->
+                                                    if (activeTab != tab) {
+                                                        activeTab = tab
+                                                        vm.setSettingsOpen(tab == "settings")
+                                                    }
+                                                },
+                                                onOpenScanner = {
+                                                    navController.navigate("link_scanner") { launchSingleTop = true }
+                                                },
+                                                modifier = Modifier.fillMaxWidth()
+                                            )
                                         }
                                     }
                                     }
@@ -931,6 +966,14 @@ private fun NavTab.icon() = when (key) {
     else -> Icons.Rounded.Settings
 }
 
+private fun NavTab.icon(selected: Boolean) = when (key) {
+    "home" -> if (selected) Icons.Filled.Home else Icons.Outlined.Home
+    "academy" -> if (selected) Icons.Filled.School else Icons.Outlined.School
+    "chat" -> if (selected) Icons.Filled.SmartToy else Icons.Outlined.SmartToy
+    "library" -> if (selected) Icons.Filled.AutoStories else Icons.Outlined.AutoStories
+    else -> if (selected) Icons.Filled.Settings else Icons.Outlined.Settings
+}
+
 private fun NavTab.accentColor() = when (key) {
     "home" -> CyberCyan
     "academy" -> Color(0xFF00FF88)
@@ -939,17 +982,11 @@ private fun NavTab.accentColor() = when (key) {
     "library" -> Color(0xFFAA77FF)
     else -> Color(0xFFFF6B35)
 }
-
 private fun NavTab.label(isArabic: Boolean) = if (isArabic) labelAr else labelEn
 
 @Composable
-private fun AppNavigationRail(
-    isArabic: Boolean,
-    activeTab: String,
-    onTabSelected: (String) -> Unit
-) {
+private fun AppNavigationRail(isArabic: Boolean, activeTab: String, onTabSelected: (String) -> Unit) {
     val haptic = LocalHapticFeedback.current
-
     NavigationRail(containerColor = Color(0xFF02050D).copy(alpha = 0.98f)) {
         Spacer(Modifier.height(12.dp))
         appNavigationTabs.forEach { tab ->
@@ -958,10 +995,10 @@ private fun AppNavigationRail(
             NavigationRailItem(
                 selected = selected,
                 onClick = {
-                    haptic.performHapticFeedback(
-                        androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove
-                    )
-                    onTabSelected(tab.key)
+                    if (!selected) {
+                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        onTabSelected(tab.key)
+                    }
                 },
                 icon = {
                     Icon(
@@ -986,47 +1023,244 @@ private fun AppNavigationRail(
 }
 
 @Composable
-private fun AppBottomNavBar(isArabic: Boolean, activeTab: String, onTabSelected: (String) -> Unit) {
+internal fun AppBottomNavBar(
+    isArabic: Boolean,
+    activeTab: String,
+    onTabSelected: (String) -> Unit,
+    onOpenScanner: () -> Unit,
+    modifier: Modifier = Modifier
+) {
     val haptic = LocalHapticFeedback.current
+    val density = LocalDensity.current
+    val selectedIndex = appNavigationTabs.indexOfFirst { it.key == activeTab }.coerceAtLeast(0)
+    val capsuleShape = RoundedCornerShape(38.dp)
+    val actionWidth = 62.dp
+    val horizontalInset = 6.dp
 
-    Row(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 8.dp),
-        horizontalArrangement = Arrangement.SpaceEvenly,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        appNavigationTabs.forEach { tab ->
-            val selected = activeTab == tab.key
-            val accent = tab.accentColor()
-            Box(
-                modifier = Modifier.size(50.dp).clip(CircleShape)
-                    .background(
-                        brush = if (selected) Brush.linearGradient(
-                            listOf(Color(0x8865C8E8), Color(0x555D9FC4), Color(0x33234D70))
-                        ) else Brush.linearGradient(listOf(Color(0x442B5876), Color(0x22213B56))),
-                        shape = CircleShape
-                    )
-                    .border(
-                        width = if (selected) 1.15.dp else 0.7.dp,
-                        brush = Brush.linearGradient(
-                            listOf(
-                                Color.White.copy(alpha = if (selected) 0.52f else 0.22f),
-                                accent.copy(alpha = if (selected) 0.66f else 0.18f),
-                                Color.White.copy(alpha = 0.08f)
+    CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
+        BoxWithConstraints(
+            modifier = modifier
+                .widthIn(max = 440.dp)
+                .height(76.dp)
+                .shadow(22.dp, capsuleShape, clip = false)
+                .clip(capsuleShape)
+                .background(
+                    Brush.verticalGradient(listOf(Color(0xE51A3653), Color(0xF20A1C31), Color(0xEA071629)))
+                )
+                .border(
+                    1.dp,
+                    Brush.verticalGradient(
+                        listOf(
+                            Color.White.copy(alpha = 0.34f),
+                            AyriaDesignTokens.Colors.glacier.copy(alpha = 0.18f),
+                            Color.White.copy(alpha = 0.07f)
+                        )
+                    ),
+                    capsuleShape
+                )
+        ) {
+            val availableWidth = maxWidth - horizontalInset * 2
+            val slotWidth = ((availableWidth - actionWidth) / 5f).coerceAtLeast(1.dp)
+            val leftGroupCount = if (isArabic) 2 else 3
+            val physicalSlot = if (isArabic) 4 - selectedIndex else selectedIndex
+            val centerX = if (physicalSlot < leftGroupCount) {
+                (physicalSlot + 0.5f) * slotWidth
+            } else {
+                leftGroupCount * slotWidth + actionWidth + (physicalSlot - leftGroupCount + 0.5f) * slotWidth
+            }
+            val indicatorWidth = (slotWidth * 1.78f).coerceIn(72.dp, 104.dp)
+            val targetOffsetPx = with(density) { (centerX - indicatorWidth / 2f).toPx() }
+            val indicatorOffset = remember { Animatable(targetOffsetPx) }
+            val indicatorScale = remember { Animatable(1f) }
+            var indicatorPlaced by remember { mutableStateOf(false) }
+
+            LaunchedEffect(activeTab, targetOffsetPx) {
+                if (!indicatorPlaced) {
+                    indicatorOffset.snapTo(targetOffsetPx)
+                    indicatorPlaced = true
+                } else {
+                    kotlinx.coroutines.coroutineScope {
+                        launch {
+                            indicatorOffset.animateTo(
+                                targetOffsetPx,
+                                spring(dampingRatio = 0.78f, stiffness = 480f)
                             )
-                        ),
-                        shape = CircleShape
-                    )
-                    .clickable {
-                        haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove)
-                        onTabSelected(tab.key)
-                    },
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = tab.icon(),
-                    contentDescription = tab.label(isArabic),
-                    tint = if (selected) Color(0xFFE8FBFF) else Color(0xFFB6D0E2).copy(alpha = 0.76f),
-                    modifier = Modifier.size(if (selected) 23.dp else 21.dp)
+                        }
+                        launch {
+                            indicatorScale.snapTo(0.94f)
+                            indicatorScale.animateTo(1.08f, spring(dampingRatio = 0.55f, stiffness = 420f))
+                            indicatorScale.animateTo(1f, spring(dampingRatio = 0.78f, stiffness = 520f))
+                        }
+                    }
+                }
+            }
+
+            val pulse = rememberInfiniteTransition(label = "shield_pulse")
+            val ringScale by pulse.animateFloat(
+                initialValue = 0.88f, targetValue = 1.15f,
+                animationSpec = infiniteRepeatable(tween(2800, easing = FastOutSlowInEasing), RepeatMode.Reverse),
+                label = "shield_ring_scale"
+            )
+            val ringAlpha by pulse.animateFloat(
+                initialValue = 0.34f, targetValue = 0.08f,
+                animationSpec = infiniteRepeatable(tween(2800, easing = FastOutSlowInEasing), RepeatMode.Reverse),
+                label = "shield_ring_alpha"
+            )
+
+            Box(Modifier.fillMaxSize().padding(horizontal = horizontalInset, vertical = 6.dp)) {
+                Box(
+                    modifier = Modifier
+                        .offset { IntOffset(indicatorOffset.value.roundToInt(), 0) }
+                        .width(indicatorWidth)
+                        .height(64.dp)
+                        .align(Alignment.CenterStart)
+                        .graphicsLayer { scaleX = indicatorScale.value; scaleY = 1f }
+                        .shadow(8.dp, RoundedCornerShape(30.dp), clip = false)
+                        .clip(RoundedCornerShape(30.dp))
+                        .background(Brush.verticalGradient(listOf(Color(0xAA8AD9F4), Color(0x664B9CC5), Color(0x33214B70))))
+                        .border(
+                            1.dp,
+                            Brush.verticalGradient(
+                                listOf(
+                                    Color.White.copy(alpha = 0.52f),
+                                    AyriaDesignTokens.Colors.glacier.copy(alpha = 0.24f),
+                                    Color.White.copy(alpha = 0.08f)
+                                )
+                            ),
+                            RoundedCornerShape(30.dp)
+                        )
+                )
+
+                Row(Modifier.fillMaxSize(), verticalAlignment = Alignment.CenterVertically) {
+                    val leftTabs = if (isArabic) appNavigationTabs.drop(3).reversed() else appNavigationTabs.take(3)
+                    val rightTabs = if (isArabic) appNavigationTabs.take(3).reversed() else appNavigationTabs.drop(3)
+
+                    Row(
+                        Modifier.weight(leftTabs.size.toFloat()).fillMaxHeight(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        leftTabs.forEach { tab ->
+                            GlassNavigationItem(
+                                tab, isArabic, activeTab == tab.key,
+                                Modifier.weight(1f).fillMaxHeight()
+                            ) {
+                                if (activeTab != tab.key) {
+                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                    onTabSelected(tab.key)
+                                }
+                            }
+                        }
+                    }
+
+                    Box(
+                        modifier = Modifier
+                            .width(actionWidth)
+                            .fillMaxHeight()
+                            .semantics {
+                                contentDescription = if (isArabic) "فحص المصادر والحماية" else "Security scan"
+                            }
+                            .clickable {
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                onOpenScanner()
+                            },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Box(
+                            Modifier.size(62.dp).background(
+                                Brush.radialGradient(
+                                    listOf(
+                                        AyriaDesignTokens.Colors.teal.copy(alpha = 0.28f),
+                                        AyriaDesignTokens.Colors.ion.copy(alpha = 0.10f),
+                                        Color.Transparent
+                                    )
+                                ),
+                                CircleShape
+                            )
+                        )
+                        Canvas(Modifier.size(60.dp).graphicsLayer {
+                            scaleX = ringScale; scaleY = ringScale; alpha = ringAlpha
+                        }) {
+                            drawCircle(
+                                color = AyriaDesignTokens.Colors.glacier,
+                                radius = size.minDimension / 2f - 1.dp.toPx(),
+                                style = Stroke(width = 1.2.dp.toPx(), cap = StrokeCap.Round)
+                            )
+                        }
+                        Box(
+                            Modifier
+                                .size(48.dp)
+                                .shadow(12.dp, CircleShape, clip = false)
+                                .clip(CircleShape)
+                                .background(Brush.linearGradient(listOf(Color(0xFF8DEBFF), Color(0xFF2D9BC9), Color(0xFF164F83))))
+                                .border(
+                                    1.dp,
+                                    Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.80f), Color.White.copy(alpha = 0.16f))),
+                                    CircleShape
+                                ),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(Icons.Filled.Security, contentDescription = null, tint = Color(0xFFF3FCFF), modifier = Modifier.size(27.dp))
+                        }
+                    }
+
+                    Row(
+                        Modifier.weight(rightTabs.size.toFloat()).fillMaxHeight(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        rightTabs.forEach { tab ->
+                            GlassNavigationItem(
+                                tab, isArabic, activeTab == tab.key,
+                                Modifier.weight(1f).fillMaxHeight()
+                            ) {
+                                if (activeTab != tab.key) {
+                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                    onTabSelected(tab.key)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun GlassNavigationItem(
+    tab: NavTab,
+    isArabic: Boolean,
+    selected: Boolean,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
+) {
+    val label = tab.label(isArabic)
+    CompositionLocalProvider(LocalLayoutDirection provides if (isArabic) LayoutDirection.Rtl else LayoutDirection.Ltr) {
+        Row(
+            modifier = modifier
+                .selectable(selected = selected, role = Role.Tab, onClick = onClick)
+                .semantics(mergeDescendants = true) {
+                    contentDescription = label
+                    this.selected = selected
+                }
+                .padding(horizontal = 2.dp),
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                imageVector = tab.icon(selected),
+                contentDescription = null,
+                tint = if (selected) Color(0xFFF0FCFF) else Color(0xFFB7D0E2).copy(alpha = 0.76f),
+                modifier = Modifier.size(if (selected) 21.dp else 23.dp)
+            )
+            if (selected) {
+                Spacer(Modifier.width(4.dp))
+                Text(
+                    text = label,
+                    color = Color(0xFFF0FCFF),
+                    fontFamily = AyriaArabicFont,
+                    fontSize = 9.5.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1
                 )
             }
         }
