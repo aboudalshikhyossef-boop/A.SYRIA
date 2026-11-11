@@ -20,6 +20,7 @@ import androidx.compose.material.icons.filled.SearchOff
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -261,6 +262,7 @@ fun CyberGlossaryScreen(
         }
     }
 
+    CompositionLocalProvider(LocalLayoutDirection provides layoutDirection) {
     GlassModalBottomSheet(
         visible = selectedTerm != null,
         title = selectedTerm?.let { if (isAr) it.termAr else it.termEn }.orEmpty(),
@@ -290,6 +292,7 @@ fun CyberGlossaryScreen(
                 )
             }
         }
+    }
     }
 }
 
