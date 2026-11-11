@@ -225,6 +225,7 @@ fun AcademyScreen(
                             .fillMaxWidth()
                             .weight(1f)
                             .verticalScroll(rememberScrollState())
+                            .padding(bottom = 112.dp)
                     ) {
                         Text(
                             text = if (isAr) "اختر ملف المنهج للبدء بالاختبار العصبي:" else "SELECT A SYLLABUS DIRECTORY FOR NEURAL TESTING:",
@@ -829,6 +830,7 @@ fun NeuralModuleTestView(
             modifier = Modifier
                 .fillMaxWidth()
                 .verticalScroll(rememberScrollState())
+                .padding(bottom = 112.dp)
         ) {
         // Back Button
         Row(

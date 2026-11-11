@@ -260,7 +260,7 @@ fun LibraryScreen(
             LazyColumn(
                 modifier = Modifier.weight(1f).fillMaxWidth(),
                 verticalArrangement = Arrangement.spacedBy(9.dp),
-                contentPadding = PaddingValues(bottom = 20.dp)
+                contentPadding = PaddingValues(bottom = 112.dp)
             ) {
                 if (displayedItems.isEmpty()) {
                     item {

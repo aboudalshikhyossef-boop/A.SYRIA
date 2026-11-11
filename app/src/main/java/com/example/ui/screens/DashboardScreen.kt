@@ -1553,6 +1553,7 @@ fun DesktopModeScreen(
                 .statusBarsPadding()
                 .navigationBarsPadding()
                 .verticalScroll(rememberScrollState())
+                .padding(bottom = 112.dp)
                 .padding(horizontal = if (isLandscape) 28.dp else 18.dp, vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {

@@ -775,7 +775,7 @@ class MainActivity : FragmentActivity() {
                                                 .fillMaxSize()
                                                 .padding(innerPadding)
                                                 .consumeWindowInsets(innerPadding)
-                                                .padding(bottom = if (!windowInfo.usesNavigationRail) 96.dp else 0.dp)
+                                                .padding(bottom = 0.dp)
                                         ) {
                                             if (windowInfo.usesNavigationRail) {
                                                 AppNavigationRail(isArabic = isArLocal, activeTab = activeTab) { tab ->
