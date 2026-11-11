@@ -87,9 +87,11 @@ fun GeminiChatScreen(
     )
 
     LaunchedEffect(Unit) { viewModel.runBackgroundAnalysis(uiConfig) }
-    LaunchedEffect(messages.size, isTyping) {
-        val target = if (isTyping) messages.size else maxOf(0, messages.size - 1)
-        if (messages.isNotEmpty() || isTyping) scope.launch { listState.animateScrollToItem(target) }
+    LaunchedEffect(messages.size, isTyping, lastError) {
+        val target = if (isTyping || lastError != null) messages.size else maxOf(0, messages.size - 1)
+        if (messages.isNotEmpty() || isTyping || lastError != null) {
+            scope.launch { listState.animateScrollToItem(target) }
+        }
     }
 
     GlassModalBottomSheet(
