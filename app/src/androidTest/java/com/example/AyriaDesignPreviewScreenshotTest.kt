@@ -150,7 +150,9 @@ class AyriaDesignPreviewScreenshotTest {
         composeRule.onNodeWithTag("nav-state-library").assertExists()
         captureComposeHostScreenshot("navigation-state-restored.png")
 
-        composeRule.activity.onBackPressedDispatcher.onBackPressed()
+        InstrumentationRegistry.getInstrumentation().runOnMainSync {
+            composeRule.activity.onBackPressedDispatcher.onBackPressed()
+        }
         composeRule.waitForIdle()
         composeRule.onNodeWithTag("nav-state-home").assertExists()
         captureComposeHostScreenshot("navigation-back-home.png")
