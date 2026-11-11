@@ -24,7 +24,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.selection.selectable
-import androidx.compose.ui.draw.graphicsLayer
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -33,6 +33,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
@@ -1059,14 +1060,14 @@ internal fun AppBottomNavBar(
                     capsuleShape
                 )
         ) {
-            val availableWidth = maxWidth - horizontalInset * 2
+            val availableWidth = maxWidth - horizontalInset * 2f
             val slotWidth = ((availableWidth - actionWidth) / 5f).coerceAtLeast(1.dp)
             val leftGroupCount = if (isArabic) 2 else 3
             val physicalSlot = if (isArabic) 4 - selectedIndex else selectedIndex
             val centerX = if (physicalSlot < leftGroupCount) {
-                (physicalSlot + 0.5f) * slotWidth
+                slotWidth * (physicalSlot.toFloat() + 0.5f)
             } else {
-                leftGroupCount * slotWidth + actionWidth + (physicalSlot - leftGroupCount + 0.5f) * slotWidth
+                slotWidth * leftGroupCount.toFloat() + actionWidth + slotWidth * (physicalSlot - leftGroupCount + 0.5f)
             }
             val indicatorWidth = (slotWidth * 1.78f).coerceIn(72.dp, 104.dp)
             val targetOffsetPx = with(density) { (centerX - indicatorWidth / 2f).toPx() }
