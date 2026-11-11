@@ -29,7 +29,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.performClick
-import androidx.compose.ui.test.testTag
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.assertIsSelected
 import com.example.AppBottomNavBar
