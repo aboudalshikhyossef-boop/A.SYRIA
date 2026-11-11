@@ -141,7 +141,7 @@ fun LibraryScreen(
                             color = AyriaDesignTokens.Colors.muted, fontSize = 12.sp
                         )
                     }
-                    GlassButton(onClick = onBack, modifier = Modifier.widthIn(min = 66.dp), level = GlassLevel.Standard) {
+                    GlassButton(onClick = onBack, modifier = Modifier.widthIn(min = 66.dp).testTag("library-back"), level = GlassLevel.Standard) {
                         Text(if (isAr) "رجوع" else "Back", color = AyriaDesignTokens.Colors.glacier, fontSize = 11.sp)
                     }
                 }
@@ -208,11 +208,11 @@ fun LibraryScreen(
                             GlassChip(label, selectedTab == key, {
                                 selectedTab = key
                                 searchQuery = ""
-                            }, modifier = Modifier)
+                            }, modifier = Modifier.testTag("library-tab-$key"))
                         }
                     }
                     Spacer(Modifier.weight(1f))
-                    IconButton(onClick = { isGrid = !isGrid }) {
+                    IconButton(onClick = { isGrid = !isGrid }, modifier = Modifier.testTag("library-view-toggle")) {
                         Icon(
                             if (isGrid) Icons.Default.ViewList else Icons.Default.GridView,
                             contentDescription = if (isGrid) "List view" else "Grid view",
@@ -267,7 +267,7 @@ fun LibraryScreen(
                                         isAr = isAr,
                                         isFavorite = libraryKey(item) in favorites,
                                         isRead = libraryKey(item) in readItems,
-                                        modifier = Modifier.weight(1f),
+                                        modifier = Modifier.weight(1f).testTag("library-item-${libraryKey(item)}"),
                                         onFavorite = {
                                             val key = libraryKey(item)
                                             favorites = if (key in favorites) favorites - key else favorites + key
@@ -309,7 +309,7 @@ fun LibraryScreen(
                 if (item.sourceUrl.isNotBlank()) {
                     GlassButton(
                         onClick = { runCatching { uriHandler.openUri(item.sourceUrl) } },
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier.fillMaxWidth().testTag("library-open-source")
                     ) {
                         Icon(Icons.Default.OpenInNew, null, tint = AyriaDesignTokens.Colors.glacier, modifier = Modifier.size(16.dp))
                         Spacer(Modifier.width(8.dp))
@@ -328,7 +328,7 @@ private fun LibrarySearchField(
     placeholder: String,
     onClear: () -> Unit
 ) {
-    GlassSurface(modifier = Modifier.fillMaxWidth(), level = GlassLevel.Standard) {
+    GlassSurface(modifier = Modifier.fillMaxWidth().testTag("library-search"), level = GlassLevel.Standard) {
         Row(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -397,7 +397,7 @@ fun LibraryItemCard(
                 ),
                 contentAlignment = Alignment.Center
             ) { Text(if (category == "duas") "🤲" else "📖", fontSize = 26.sp) }
-            IconButton(onClick = onFavorite, modifier = Modifier.scale(heartScale)) {
+            IconButton(onClick = onFavorite, modifier = Modifier.scale(heartScale).testTag("library-favorite-${item.id}")) {
                 Icon(
                     if (isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
                     contentDescription = if (isFavorite) "Remove from favorites" else "Add to favorites",
