@@ -270,62 +270,6 @@ fun DashboardScreen(
     }
 }
 
-@Composable
-private fun DashboardGlassAction(
-    icon: ImageVector,
-    title: String,
-    subtitle: String,
-    accent: Color,
-    modifier: Modifier = Modifier,
-    horizontal: Boolean = false,
-    onClick: () -> Unit
-) {
-    AyriaGlassPanel(
-        modifier = modifier.clickable(onClick = onClick),
-        highlighted = true,
-        shape = RoundedCornerShape(24.dp)
-    ) {
-        if (horizontal) {
-            Row(
-                modifier = Modifier.fillMaxSize().padding(horizontal = 18.dp, vertical = 12.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(14.dp)
-            ) {
-                Box(
-                    modifier = Modifier.size(46.dp)
-                        .background(Brush.linearGradient(listOf(accent.copy(alpha = 0.25f), Color(0x1EFFFFFF))), CircleShape)
-                        .border(0.8.dp, accent.copy(alpha = 0.35f), CircleShape),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(icon, contentDescription = title, tint = AyriaColors.glacier, modifier = Modifier.size(23.dp))
-                }
-                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text(title, color = AyriaColors.pearl, fontSize = 14.sp, fontWeight = FontWeight.Bold, fontFamily = AyriaArabicFont)
-                    Text(subtitle, color = AyriaColors.muted, fontSize = 10.sp, fontFamily = AyriaArabicFont, maxLines = 1)
-                }
-                Icon(Icons.Rounded.ChevronLeft, null, tint = accent.copy(alpha = 0.8f), modifier = Modifier.size(18.dp))
-            }
-        } else {
-            Column(
-                modifier = Modifier.fillMaxSize().padding(horizontal = 10.dp, vertical = 12.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center
-            ) {
-                Box(
-                    modifier = Modifier.size(42.dp)
-                        .background(Brush.linearGradient(listOf(accent.copy(alpha = 0.25f), Color(0x1EFFFFFF))), CircleShape)
-                        .border(0.8.dp, accent.copy(alpha = 0.35f), CircleShape),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(icon, contentDescription = title, tint = AyriaColors.glacier, modifier = Modifier.size(22.dp))
-                }
-                Spacer(Modifier.height(7.dp))
-                Text(title, color = AyriaColors.pearl, fontSize = 12.sp, fontWeight = FontWeight.Bold, fontFamily = AyriaArabicFont, maxLines = 1)
-                Text(subtitle, color = AyriaColors.muted, fontSize = 9.sp, fontFamily = AyriaArabicFont, maxLines = 1)
-            }
-        }
-    }
-}
 
 
 // ==========================================
