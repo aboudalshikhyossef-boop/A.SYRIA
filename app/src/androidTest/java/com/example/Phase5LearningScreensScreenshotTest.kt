@@ -22,6 +22,8 @@ import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onAllNodes
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.fetchSemanticsNode
 import androidx.compose.ui.test.junit4.ComposeContentTestRule
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -84,6 +86,12 @@ class Phase5LearningScreensScreenshotTest {
                 activeScreen.value = screen
                 composeRule.mainClock.advanceTimeBy(2200)
                 composeRule.waitForIdle()
+                if (screen == "library") {
+                    composeRule.waitUntil(10_000) {
+                        composeRule.onAllNodes(hasText("شرح الصدر وتيسير الأمر"))
+                            .fetchSemanticsNodes().isNotEmpty()
+                    }
+                }
                 val name = "phase5-after-$screen-${size.width}x${size.height}.png"
                 captureComposeViewport(composeRule, name)
             }
