@@ -1,6 +1,7 @@
 package com.example
 
 import android.graphics.Bitmap
+import android.os.Build
 import androidx.activity.ComponentActivity
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -11,6 +12,7 @@ import java.io.FileOutputStream
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
+import org.junit.Assume.assumeTrue
 import org.junit.runner.RunWith
 
 @RunWith(AndroidJUnit4::class)
@@ -20,6 +22,7 @@ class AyriaDesignPreviewScreenshotTest {
 
     @Test
     fun captureDesignSystemPreview() {
+        assumeTrue("The captured Preview artifact is generated on API 37.", Build.VERSION.SDK_INT >= 37)
         // The panorama has an intentional infinite shimmer; freeze the test clock for a deterministic capture.
         composeRule.mainClock.autoAdvance = false
         composeRule.setContent {
