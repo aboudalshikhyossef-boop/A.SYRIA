@@ -1,6 +1,20 @@
 package com.example.ui.design
 
 import android.os.Build
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -24,6 +38,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
@@ -425,5 +440,199 @@ fun GlassSheet(
             Spacer(Modifier.height(AyriaDesignTokens.Spacing.md))
             content()
         }
+    }
+}
+
+
+/** Glass shimmer block used for loading placeholders. */
+@Composable
+fun GlassShimmerBlock(
+    modifier: Modifier = Modifier,
+    height: Dp = 13.dp
+) {
+    val transition = rememberInfiniteTransition(label = "glass-shimmer")
+    val offset by transition.animateFloat(
+        initialValue = -260f,
+        targetValue = 780f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 1450, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "glass-shimmer-offset"
+    )
+    val shimmer = Brush.linearGradient(
+        colors = listOf(
+            AyriaDesignTokens.Colors.glacier.copy(alpha = 0.035f),
+            AyriaDesignTokens.Colors.pearl.copy(alpha = 0.22f),
+            AyriaDesignTokens.Colors.glacier.copy(alpha = 0.045f)
+        ),
+        start = Offset(offset, 0f),
+        end = Offset(offset + 210f, 0f)
+    )
+
+    Box(
+        modifier = modifier
+            .height(height)
+            .clip(RoundedCornerShape(10.dp))
+            .background(AyriaDesignTokens.Colors.panel.copy(alpha = 0.62f))
+            .background(shimmer)
+    )
+}
+
+/** Shared glass loading state with low-contrast skeleton rows. */
+@Composable
+fun GlassLoadingState(
+    title: String,
+    description: String? = null,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = AyriaDesignTokens.Spacing.lg, vertical = AyriaDesignTokens.Spacing.md),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(AyriaDesignTokens.Spacing.sm)
+    ) {
+        Text(
+            text = title,
+            color = AyriaDesignTokens.Colors.pearl,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.SemiBold,
+            textAlign = TextAlign.Center
+        )
+        if (!description.isNullOrBlank()) {
+            Text(
+                text = description,
+                color = AyriaDesignTokens.Colors.muted,
+                fontSize = 11.sp,
+                lineHeight = 17.sp,
+                textAlign = TextAlign.Center
+            )
+        }
+        Spacer(Modifier.height(2.dp))
+        GlassShimmerBlock(Modifier.fillMaxWidth(0.92f), 13.dp)
+        GlassShimmerBlock(Modifier.fillMaxWidth(0.76f), 13.dp)
+        GlassShimmerBlock(Modifier.fillMaxWidth(0.56f), 13.dp)
+    }
+}
+
+/** Consistent icon-led empty state for glass surfaces. */
+@Composable
+fun GlassEmptyState(
+    icon: ImageVector,
+    title: String,
+    description: String? = null,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = AyriaDesignTokens.Spacing.xl, vertical = 30.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(AyriaDesignTokens.Spacing.sm)
+    ) {
+        Box(
+            modifier = Modifier
+                .size(58.dp)
+                .clip(CircleShape)
+                .background(AyriaDesignTokens.Colors.glacier.copy(alpha = 0.09f))
+                .border(1.dp, AyriaDesignTokens.Colors.glacier.copy(alpha = 0.18f), CircleShape),
+            contentAlignment = Alignment.Center
+        ) {
+            androidx.compose.material3.Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = AyriaDesignTokens.Colors.glacier.copy(alpha = 0.82f),
+                modifier = Modifier.size(27.dp)
+            )
+        }
+        Text(
+            text = title,
+            color = AyriaDesignTokens.Colors.pearl,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.SemiBold,
+            textAlign = TextAlign.Center
+        )
+        if (!description.isNullOrBlank()) {
+            Text(
+                text = description,
+                color = AyriaDesignTokens.Colors.muted,
+                fontSize = 11.sp,
+                lineHeight = 17.sp,
+                textAlign = TextAlign.Center
+            )
+        }
+    }
+}
+
+/** Visible error feedback with an explicit retry action. */
+@Composable
+fun GlassErrorState(
+    title: String,
+    message: String,
+    retryLabel: String,
+    onRetry: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    GlassSurface(
+        modifier = modifier.fillMaxWidth(),
+        level = GlassLevel.Elevated,
+        shape = RoundedCornerShape(20.dp)
+    ) {
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(AyriaDesignTokens.Spacing.md),
+            verticalArrangement = Arrangement.spacedBy(AyriaDesignTokens.Spacing.sm)
+        ) {
+            Text(title, color = Color(0xFFFFC7BD), fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+            Text(message, color = AyriaDesignTokens.Colors.muted, fontSize = 11.sp, lineHeight = 17.sp)
+            TextButton(onClick = onRetry) {
+                Text(retryLabel, color = AyriaDesignTokens.Colors.glacier, fontWeight = FontWeight.SemiBold)
+            }
+        }
+    }
+}
+
+/**
+ * Modal host for GlassSheet. Material's sheet owns modal semantics, the scrim and
+ * drag gesture; GlassSheet supplies the frosted surface and its visible grab handle.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun GlassModalBottomSheet(
+    visible: Boolean,
+    title: String,
+    onDismissRequest: () -> Unit,
+    modifier: Modifier = Modifier,
+    subtitle: String? = null,
+    content: @Composable ColumnScope.() -> Unit
+) {
+    if (!visible) return
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    ModalBottomSheet(
+        onDismissRequest = onDismissRequest,
+        modifier = modifier,
+        sheetState = sheetState,
+        shape = RoundedCornerShape(topStart = 30.dp, topEnd = 30.dp),
+        containerColor = Color.Transparent,
+        contentColor = AyriaDesignTokens.Colors.pearl,
+        scrimColor = Color.Black.copy(alpha = 0.64f),
+        tonalElevation = 0.dp,
+        dragHandle = null,
+    ) {
+        GlassSheet(
+            title = title,
+            subtitle = subtitle,
+            modifier = Modifier.fillMaxWidth(),
+            content = {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 560.dp)
+                        .verticalScroll(rememberScrollState())
+                ) {
+                    content()
+                }
+            }
+        )
     }
 }

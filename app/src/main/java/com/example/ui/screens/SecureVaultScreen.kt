@@ -34,6 +34,11 @@ import androidx.compose.ui.unit.sp
 import com.example.data.database.InventorIdea
 import com.example.data.database.VaultItem
 import com.example.ui.theme.VoidBlack
+import com.example.ui.design.GlassEmptyState
+import com.example.ui.design.GlassLoadingState
+import com.example.ui.design.GlassModalBottomSheet
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.LockOpen
 import com.example.ui.viewmodel.DashboardViewModel
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
@@ -228,11 +233,11 @@ fun SecureVaultScreen(viewModel: DashboardViewModel, isArabic: Boolean, onClose:
             LazyColumn(Modifier.weight(1f).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 if (vaultItems.isEmpty() && legacyIdeas.isEmpty()) {
                     item {
-                        Column(Modifier.fillMaxWidth().padding(vertical = 45.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text("🔐", fontSize = 42.sp)
-                            Text(if (isArabic) "الخزينة فارغة" else "THE VAULT IS EMPTY", color = Color.White, fontWeight = FontWeight.Bold)
-                            Text(if (isArabic) "أضف صورة أو ملفاً أو نصاً ليُحفظ مشفّراً داخل التطبيق." else "Add an image, any file, or a text note to store it encrypted.", color = Color.White.copy(alpha = 0.55f), fontSize = 10.sp)
-                        }
+                        GlassEmptyState(
+                            icon = Icons.Rounded.LockOpen,
+                            title = if (isArabic) "الخزينة فارغة" else "THE VAULT IS EMPTY",
+                            description = if (isArabic) "أضف صورة أو ملفاً أو نصاً ليُحفظ مشفّراً داخل التطبيق." else "Add an image, any file, or a text note to store it encrypted."
+                        )
                     }
                 }
                 if (vaultItems.isNotEmpty()) {
@@ -258,139 +263,238 @@ fun SecureVaultScreen(viewModel: DashboardViewModel, isArabic: Boolean, onClose:
             }
         }
         }
-        if (busy) Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.52f)), contentAlignment = Alignment.Center) {
-            CircularProgressIndicator(color = Color(0xFFB8E4F0))
+        if (busy) Box(
+            Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.58f)),
+            contentAlignment = Alignment.Center
+        ) {
+            GlassLoadingState(
+                title = if (isArabic) "جارٍ تأمين البيانات..." else "SECURING YOUR DATA...",
+                description = if (isArabic) "تشفير محلي والتحقق من سلامة الملف" else "Encrypting locally and verifying file integrity",
+                modifier = Modifier.fillMaxWidth(0.82f)
+            )
         }
     }
 
-    if (showAddMenu) AlertDialog(
-        onDismissRequest = { showAddMenu = false },
-        containerColor = Color(0xF20D2033), shape = RoundedCornerShape(24.dp),
-        title = { Text(if (isArabic) "ماذا تريد حفظه؟" else "WHAT TO SAVE?", color = Color(0xFFB7E3F0)) },
-        text = {
-            Column {
-                TextButton(onClick = { imagePicker.launch(arrayOf("image/*")) }) { Text(if (isArabic) "اختيار صورة" else "Choose image", color = Color.White) }
-                TextButton(onClick = { anyFilePicker.launch(arrayOf("*/*")) }) { Text(if (isArabic) "اختيار أي ملف" else "Choose any file", color = Color.White) }
-                TextButton(onClick = { showAddMenu = false; showTextEditor = true }) { Text(if (isArabic) "كتابة نص أو ملاحظة" else "Write text or note", color = Color.White) }
+    GlassModalBottomSheet(
+        visible = showAddMenu,
+        title = if (isArabic) "ماذا تريد حفظه؟" else "WHAT TO SAVE?",
+        onDismissRequest = { showAddMenu = false }
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            TextButton(onClick = { showAddMenu = false; imagePicker.launch(arrayOf("image/*")) }) {
+                Text(if (isArabic) "اختيار صورة" else "Choose image", color = Color.White)
             }
-        },
-        confirmButton = { TextButton(onClick = { showAddMenu = false }) { Text(if (isArabic) "إلغاء" else "CANCEL") } }
-    )
-
-    if (showTextEditor) AlertDialog(
-        onDismissRequest = { showTextEditor = false },
-        containerColor = Color(0xF20D2033), shape = RoundedCornerShape(24.dp),
-        title = { Text(if (isArabic) "حفظ نص مشفّر" else "SAVE ENCRYPTED TEXT", color = Color(0xFFB7E3F0)) },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedTextField(
-                    value = noteTitle, onValueChange = { noteTitle = it }, singleLine = true,
-                    label = { Text(if (isArabic) "اسم النص" else "Title") },
-                    colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White, focusedBorderColor = Color(0xFFB7E3F0), unfocusedBorderColor = Color(0xFFB7E3F0).copy(alpha = 0.4f))
-                )
-                OutlinedTextField(
-                    value = noteText, onValueChange = { noteText = it }, minLines = 4, maxLines = 8,
-                    label = { Text(if (isArabic) "النص" else "Text") },
-                    colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White, focusedBorderColor = Color(0xFFB7E3F0), unfocusedBorderColor = Color(0xFFB7E3F0).copy(alpha = 0.4f))
-                )
+            TextButton(onClick = { showAddMenu = false; anyFilePicker.launch(arrayOf("*/*")) }) {
+                Text(if (isArabic) "اختيار أي ملف" else "Choose any file", color = Color.White)
             }
-        },
-        confirmButton = {
-            TextButton(enabled = noteTitle.isNotBlank() && noteText.isNotBlank() && !busy, onClick = {
-                showTextEditor = false
-                scope.launch {
-                    busy = true
-                    try {
-                        viewModel.saveVaultText(noteTitle, noteText)
-                        noteTitle = ""
-                        noteText = ""
-                        message = if (isArabic) "حُفظ النص مشفّراً داخل الخزينة." else "The text was encrypted and saved."
-                    } catch (cancelled: CancellationException) {
-                        throw cancelled
-                    } catch (error: Exception) {
-                        message = (if (isArabic) "فشل حفظ النص: " else "Save failed: ") + (error.message ?: "")
-                    } finally { busy = false }
-                }
-            }) { Text(if (isArabic) "حفظ مشفّر" else "SAVE ENCRYPTED", color = Color(0xFFB7E3F0)) }
-        },
-        dismissButton = { TextButton(onClick = { showTextEditor = false }) { Text(if (isArabic) "إلغاء" else "CANCEL", color = Color.White) } }
-    )
-
-    if (showImportChoice && pendingUri != null) AlertDialog(
-        onDismissRequest = { showImportChoice = false; pendingUri = null },
-        containerColor = Color(0xF20D2033), shape = RoundedCornerShape(24.dp),
-        title = { Text(if (isArabic) "طريقة الحفظ" else "SAVE MODE", color = Color(0xFFB7E3F0)) },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(pendingName, color = Color.White, fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                Text(
-                    if (isArabic) "يمكنك حفظ نسخة مشفّرة مع إبقاء الأصل، أو نقل الأصل بعد نجاح التشفير. قد يطلب Android موافقتك على الحذف."
-                    else "Keep the original and store an encrypted copy, or move the original after encryption. Android may ask you to approve deletion.",
-                    color = Color.White.copy(alpha = 0.7f), fontSize = 11.sp
-                )
+            TextButton(onClick = { showAddMenu = false; showTextEditor = true }) {
+                Text(if (isArabic) "كتابة نص أو ملاحظة" else "Write text or note", color = Color.White)
             }
-        },
-        confirmButton = { TextButton(onClick = { importSelected(true) }) { Text(if (isArabic) "نقل الأصل للخزينة" else "MOVE ORIGINAL", color = Color(0xFFB7E3F0)) } },
-        dismissButton = {
-            Row {
-                TextButton(onClick = { importSelected(false) }) { Text(if (isArabic) "حفظ نسخة" else "KEEP A COPY", color = Color.White) }
-                TextButton(onClick = { showImportChoice = false; pendingUri = null }) { Text(if (isArabic) "إلغاء" else "CANCEL", color = Color.White.copy(alpha = 0.65f)) }
+            TextButton(onClick = { showAddMenu = false }) {
+                Text(if (isArabic) "إلغاء" else "CANCEL", color = Color.White.copy(alpha = 0.68f))
             }
         }
-    )
+    }
 
-    deleteItem?.let { item -> AlertDialog(
-        onDismissRequest = { deleteItem = null }, containerColor = Color(0xF20D2033), shape = RoundedCornerShape(24.dp),
-        title = { Text(if (isArabic) "حذف من الخزينة؟" else "DELETE FROM VAULT?", color = Color.Red) },
-        text = { Text(if (isArabic) "سيُحذف الملف المشفّر من التطبيق فقط. لن يتأثر أي أصل بقي خارج الخزينة." else "Only the encrypted vault copy will be deleted; external originals are unaffected.", color = Color.White) },
-        confirmButton = { TextButton(onClick = {
-            deleteItem = null
-            scope.launch {
-                busy = true
-                try {
-                    viewModel.deleteVaultItem(item.id)
-                    message = if (isArabic) "حُذف العنصر من الخزينة." else "Item deleted from the vault."
-                } catch (cancelled: CancellationException) { throw cancelled }
-                catch (error: Exception) { message = error.message ?: "Delete failed" }
-                finally { busy = false }
+    GlassModalBottomSheet(
+        visible = showTextEditor,
+        title = if (isArabic) "حفظ نص مشفّر" else "SAVE ENCRYPTED TEXT",
+        onDismissRequest = { showTextEditor = false }
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            OutlinedTextField(
+                value = noteTitle,
+                onValueChange = { noteTitle = it },
+                singleLine = true,
+                label = { Text(if (isArabic) "اسم النص" else "Title") },
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedTextColor = Color.White,
+                    unfocusedTextColor = Color.White,
+                    focusedBorderColor = Color(0xFFB7E3F0),
+                    unfocusedBorderColor = Color(0xFFB7E3F0).copy(alpha = 0.4f)
+                )
+            )
+            OutlinedTextField(
+                value = noteText,
+                onValueChange = { noteText = it },
+                minLines = 4,
+                maxLines = 8,
+                label = { Text(if (isArabic) "النص" else "Text") },
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedTextColor = Color.White,
+                    unfocusedTextColor = Color.White,
+                    focusedBorderColor = Color(0xFFB7E3F0),
+                    unfocusedBorderColor = Color(0xFFB7E3F0).copy(alpha = 0.4f)
+                )
+            )
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                TextButton(onClick = { showTextEditor = false }) {
+                    Text(if (isArabic) "إلغاء" else "CANCEL", color = Color.White)
+                }
+                TextButton(
+                    enabled = noteTitle.isNotBlank() && noteText.isNotBlank() && !busy,
+                    onClick = {
+                        showTextEditor = false
+                        scope.launch {
+                            busy = true
+                            try {
+                                viewModel.saveVaultText(noteTitle, noteText)
+                                noteTitle = ""
+                                noteText = ""
+                                message = if (isArabic) "حُفظ النص مشفّراً داخل الخزينة." else "The text was encrypted and saved."
+                            } catch (cancelled: CancellationException) {
+                                throw cancelled
+                            } catch (error: Exception) {
+                                message = (if (isArabic) "فشل حفظ النص: " else "Save failed: ") + (error.message ?: "")
+                            } finally {
+                                busy = false
+                            }
+                        }
+                    }
+                ) {
+                    Text(if (isArabic) "حفظ مشفّر" else "SAVE ENCRYPTED", color = Color(0xFFB7E3F0))
+                }
             }
-        }) { Text(if (isArabic) "حذف" else "DELETE", color = Color.Red) } },
-        dismissButton = { TextButton(onClick = { deleteItem = null }) { Text(if (isArabic) "إلغاء" else "CANCEL", color = Color.White) } }
-    ) }
+        }
+    }
 
-    selectedIdea?.let { idea -> AlertDialog(
-        onDismissRequest = { selectedIdea = null }, containerColor = Color(0xF20D2033), shape = RoundedCornerShape(24.dp),
-        title = { Text(idea.getDecryptedTitle(), color = Color(0xFFB7E3F0), fontWeight = FontWeight.Bold) },
-        text = { SelectionContainer {
-            Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
-                Text(idea.getDecryptedCategory(), color = Color(0xFFB7E3F0), fontSize = 10.sp)
-                Text(idea.getDecryptedOriginalIdea(), color = Color.White, fontSize = 12.sp)
-                HorizontalDivider(color = Color(0xFFB7E3F0).copy(alpha = 0.2f))
-                Text(idea.getDecryptedGeminiBlueprint(), color = Color.White.copy(alpha = 0.8f), fontSize = 11.sp)
+    GlassModalBottomSheet(
+        visible = showImportChoice && pendingUri != null,
+        title = if (isArabic) "طريقة الحفظ" else "SAVE MODE",
+        onDismissRequest = { showImportChoice = false; pendingUri = null }
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(
+                pendingName,
+                color = Color.White,
+                fontWeight = FontWeight.Bold,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
+            )
+            Text(
+                if (isArabic) "يمكنك حفظ نسخة مشفّرة مع إبقاء الأصل، أو نقل الأصل بعد نجاح التشفير. قد يطلب Android موافقتك على الحذف."
+                else "Keep the original and store an encrypted copy, or move the original after encryption. Android may ask you to approve deletion.",
+                color = Color.White.copy(alpha = 0.7f),
+                fontSize = 11.sp
+            )
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                TextButton(onClick = { showImportChoice = false; pendingUri = null }) {
+                    Text(if (isArabic) "إلغاء" else "CANCEL", color = Color.White.copy(alpha = 0.65f))
+                }
+                TextButton(onClick = { importSelected(false) }) {
+                    Text(if (isArabic) "حفظ نسخة" else "KEEP A COPY", color = Color.White)
+                }
+                TextButton(onClick = { importSelected(true) }) {
+                    Text(if (isArabic) "نقل الأصل" else "MOVE ORIGINAL", color = Color(0xFFB7E3F0))
+                }
             }
-        } },
-        confirmButton = { TextButton(onClick = { viewModel.deleteIdea(idea.id); selectedIdea = null }) { Text(if (isArabic) "حذف" else "DELETE", color = Color.Red) } },
-        dismissButton = { TextButton(onClick = { selectedIdea = null }) { Text(if (isArabic) "إغلاق" else "CLOSE", color = Color(0xFFB7E3F0)) } }
-    ) }
+        }
+    }
 
-    if (showWipeConfirmation) AlertDialog(
-        onDismissRequest = { showWipeConfirmation = false }, containerColor = Color(0xF20D2033), shape = RoundedCornerShape(24.dp),
-        title = { Text(if (isArabic) "مسح الخزينة بالكامل؟" else "WIPE THE VAULT?", color = Color.Red) },
-        text = { Text(if (isArabic) "سيُحذف المحتوى المشفّر والمخططات القديمة من هذا الجهاز. لا يمكن التراجع." else "All encrypted files and legacy blueprints on this device will be deleted. This cannot be undone.", color = Color.White) },
-        confirmButton = { TextButton(onClick = {
-            showWipeConfirmation = false
-            scope.launch {
-                busy = true
-                try {
-                    viewModel.wipeVault()
-                    message = if (isArabic) "تم مسح محتويات الخزينة." else "The vault was cleared."
-                } catch (cancelled: CancellationException) { throw cancelled }
-                catch (error: Exception) { message = error.message ?: "Vault wipe failed" }
-                finally { busy = false }
+    val itemPendingDelete = deleteItem
+    GlassModalBottomSheet(
+        visible = itemPendingDelete != null,
+        title = if (isArabic) "حذف من الخزينة؟" else "DELETE FROM VAULT?",
+        onDismissRequest = { deleteItem = null }
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Text(
+                if (isArabic) "سيُحذف الملف المشفّر من التطبيق فقط. لن يتأثر أي أصل بقي خارج الخزينة."
+                else "Only the encrypted vault copy will be deleted; external originals are unaffected.",
+                color = Color.White
+            )
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                TextButton(onClick = { deleteItem = null }) {
+                    Text(if (isArabic) "إلغاء" else "CANCEL", color = Color.White)
+                }
+                TextButton(onClick = {
+                    val item = itemPendingDelete
+                    deleteItem = null
+                    if (item != null) scope.launch {
+                        busy = true
+                        try {
+                            viewModel.deleteVaultItem(item.id)
+                            message = if (isArabic) "حُذف العنصر من الخزينة." else "Item deleted from the vault."
+                        } catch (cancelled: CancellationException) {
+                            throw cancelled
+                        } catch (error: Exception) {
+                            message = error.message ?: "Delete failed"
+                        } finally {
+                            busy = false
+                        }
+                    }
+                }) {
+                    Text(if (isArabic) "حذف" else "DELETE", color = Color(0xFFFF7777))
+                }
             }
-        }) { Text(if (isArabic) "تأكيد المسح" else "CONFIRM WIPE", color = Color.Red) } },
-        dismissButton = { TextButton(onClick = { showWipeConfirmation = false }) { Text(if (isArabic) "إلغاء" else "CANCEL", color = Color.White) } }
-    )
+        }
+    }
+
+    val ideaToPreview = selectedIdea
+    GlassModalBottomSheet(
+        visible = ideaToPreview != null,
+        title = ideaToPreview?.getDecryptedTitle().orEmpty(),
+        onDismissRequest = { selectedIdea = null }
+    ) {
+        ideaToPreview?.let { idea ->
+            SelectionContainer {
+                Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
+                    Text(idea.getDecryptedCategory(), color = Color(0xFFB7E3F0), fontSize = 10.sp)
+                    Text(idea.getDecryptedOriginalIdea(), color = Color.White, fontSize = 12.sp)
+                    HorizontalDivider(color = Color(0xFFB7E3F0).copy(alpha = 0.2f))
+                    Text(idea.getDecryptedGeminiBlueprint(), color = Color.White.copy(alpha = 0.8f), fontSize = 11.sp)
+                }
+            }
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                TextButton(onClick = { selectedIdea = null }) {
+                    Text(if (isArabic) "إغلاق" else "CLOSE", color = Color(0xFFB7E3F0))
+                }
+                TextButton(onClick = {
+                    viewModel.deleteIdea(idea.id)
+                    selectedIdea = null
+                }) {
+                    Text(if (isArabic) "حذف" else "DELETE", color = Color(0xFFFF7777))
+                }
+            }
+        }
+    }
+
+    GlassModalBottomSheet(
+        visible = showWipeConfirmation,
+        title = if (isArabic) "مسح الخزينة بالكامل؟" else "WIPE THE VAULT?",
+        onDismissRequest = { showWipeConfirmation = false }
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Text(
+                if (isArabic) "سيُحذف المحتوى المشفّر والمخططات القديمة من هذا الجهاز. لا يمكن التراجع."
+                else "All encrypted files and legacy blueprints on this device will be deleted. This cannot be undone.",
+                color = Color.White
+            )
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                TextButton(onClick = { showWipeConfirmation = false }) {
+                    Text(if (isArabic) "إلغاء" else "CANCEL", color = Color.White)
+                }
+                TextButton(onClick = {
+                    showWipeConfirmation = false
+                    scope.launch {
+                        busy = true
+                        try {
+                            viewModel.wipeVault()
+                            message = if (isArabic) "تم مسح محتويات الخزينة." else "The vault was cleared."
+                        } catch (cancelled: CancellationException) {
+                            throw cancelled
+                        } catch (error: Exception) {
+                            message = error.message ?: "Vault wipe failed"
+                        } finally {
+                            busy = false
+                        }
+                    }
+                }) {
+                    Text(if (isArabic) "تأكيد المسح" else "CONFIRM WIPE", color = Color(0xFFFF7777))
+                }
+            }
+        }
+    }
 }
 
 @Composable

@@ -33,6 +33,11 @@ package com.example.ui.viewmodel
       private val _isTyping = MutableStateFlow(false)
       val isTyping: StateFlow<Boolean> = _isTyping.asStateFlow()
 
+      private val _lastError = MutableStateFlow<String?>(null)
+      val lastError: StateFlow<String?> = _lastError.asStateFlow()
+
+      private var lastFailedPrompt: String? = null
+
       private val _geminiKey = MutableStateFlow("")
 
       private var analysisJob: Job? = null
@@ -47,15 +52,32 @@ package com.example.ui.viewmodel
       }
 
       fun sendMessage(text: String, uiConfig: UIConfig? = null) {
+          dispatchMessage(text, uiConfig, persistUserMessage = true)
+      }
+
+      /** Retry the last failed prompt without inserting a duplicate user message. */
+      fun retryLastMessage(uiConfig: UIConfig? = null) {
+          val prompt = lastFailedPrompt ?: return
+          dispatchMessage(prompt, uiConfig, persistUserMessage = false)
+      }
+
+      private fun dispatchMessage(
+          text: String,
+          uiConfig: UIConfig?,
+          persistUserMessage: Boolean
+      ) {
           val trimmed = text.trim()
           if (trimmed.isBlank() || isClearingHistory || _isTyping.value) return
 
-          // Set this synchronously on the caller thread so two rapid taps cannot start
-          // overlapping conversations whose replies would be inserted out of order.
           _isTyping.value = true
+          _lastError.value = null
+          if (persistUserMessage) lastFailedPrompt = trimmed
+
           sendJob = viewModelScope.launch(Dispatchers.IO) {
               try {
-                  dao.insert(ChatMessage(role = "user", content = trimmed))
+                  if (persistUserMessage) {
+                      dao.insert(ChatMessage(role = "user", content = trimmed))
+                  }
 
                   val key = dataStore.geminiApiKey.first().also { _geminiKey.value = it }
                   if (key.isBlank()) {
@@ -63,6 +85,7 @@ package com.example.ui.viewmodel
                           role = "assistant",
                           content = "No Gemini API key detected. Head to Settings and add your key to activate me."
                       ))
+                      lastFailedPrompt = null
                       return@launch
                   }
 
@@ -77,13 +100,12 @@ package com.example.ui.viewmodel
                       apiKey = key
                   )
                   dao.insert(ChatMessage(role = "assistant", content = reply))
+                  lastFailedPrompt = null
               } catch (cancelled: CancellationException) {
                   throw cancelled
               } catch (error: Exception) {
-                  dao.insert(ChatMessage(
-                      role = "assistant",
-                      content = "Connection error — ${error.message?.take(90) ?: "unknown"}"
-                  ))
+                  _lastError.value = error.message?.take(180)
+                      ?: "The request could not be completed. Please try again."
               } finally {
                   _isTyping.value = false
               }
@@ -124,6 +146,8 @@ package com.example.ui.viewmodel
       fun clearHistory() {
           if (isClearingHistory) return
           isClearingHistory = true
+          _lastError.value = null
+          lastFailedPrompt = null
           val pendingSend = sendJob
           val pendingAnalysis = analysisJob
           sendJob = null

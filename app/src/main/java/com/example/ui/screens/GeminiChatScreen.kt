@@ -48,6 +48,8 @@ import com.example.ui.theme.SurfaceCard
 import com.example.ui.theme.SurfaceDark
 import com.example.ui.theme.TextMuted
 import com.example.ui.viewmodel.GeminiChatViewModel
+import com.example.ui.design.GlassErrorState
+import com.example.ui.design.GlassModalBottomSheet
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -70,6 +72,7 @@ fun GeminiChatScreen(
 ) {
     val messages by viewModel.messages.collectAsState()
     val isTyping by viewModel.isTyping.collectAsState()
+    val lastError by viewModel.lastError.collectAsState()
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
     var inputText by remember { mutableStateOf("") }
@@ -84,44 +87,38 @@ fun GeminiChatScreen(
     )
 
     LaunchedEffect(Unit) { viewModel.runBackgroundAnalysis(uiConfig) }
-    LaunchedEffect(messages.size, isTyping) {
-        val target = if (isTyping) messages.size else maxOf(0, messages.size - 1)
-        if (messages.isNotEmpty() || isTyping) scope.launch { listState.animateScrollToItem(target) }
+    LaunchedEffect(messages.size, isTyping, lastError) {
+        val target = if (isTyping || lastError != null) messages.size else maxOf(0, messages.size - 1)
+        if (messages.isNotEmpty() || isTyping || lastError != null) {
+            scope.launch { listState.animateScrollToItem(target) }
+        }
     }
 
-    if (showClearDialog) {
-        AlertDialog(
-            onDismissRequest = { showClearDialog = false },
-            title = {
-                Text(
-                    if (isArabic) "مسح المحادثة" else "Clear conversation",
-                    color = ChatIce,
-                    fontWeight = FontWeight.SemiBold
-                )
-            },
-            text = {
-                Text(
-                    if (isArabic) "سيتم حذف الرسائل المحفوظة في سجل المحادثة. هل تريد المتابعة؟"
-                    else "This will clear the saved conversation history. Continue?",
-                    color = Color(0xFFC6DDE6),
-                    fontSize = 13.sp,
-                    lineHeight = 19.sp
-                )
-            },
-            confirmButton = {
-                TextButton(onClick = { viewModel.clearHistory(); showClearDialog = false }) {
-                    Text(if (isArabic) "مسح" else "Clear", color = Color(0xFFE4B9B9))
-                }
-            },
-            dismissButton = {
+    GlassModalBottomSheet(
+        visible = showClearDialog,
+        title = if (isArabic) "مسح المحادثة" else "Clear conversation",
+        onDismissRequest = { showClearDialog = false }
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Text(
+                if (isArabic) "سيتم حذف الرسائل المحفوظة في سجل المحادثة. هل تريد المتابعة؟"
+                else "This will clear the saved conversation history. Continue?",
+                color = Color(0xFFC6DDE6),
+                fontSize = 13.sp,
+                lineHeight = 19.sp
+            )
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                 TextButton(onClick = { showClearDialog = false }) {
                     Text(if (isArabic) "إلغاء" else "Cancel", color = ChatIce)
                 }
-            },
-            containerColor = Color(0xF20D2033),
-            titleContentColor = ChatIce,
-            shape = RoundedCornerShape(26.dp)
-        )
+                TextButton(onClick = {
+                    viewModel.clearHistory()
+                    showClearDialog = false
+                }) {
+                    Text(if (isArabic) "مسح" else "Clear", color = Color(0xFFE4B9B9))
+                }
+            }
+        }
     }
 
     Box(
@@ -163,7 +160,7 @@ fun GeminiChatScreen(
             )
             HorizontalDivider(color = Color.White.copy(alpha = 0.07f))
 
-            if (messages.isEmpty() && !isTyping) {
+            if (messages.isEmpty() && !isTyping && lastError == null) {
                 ChatEmptyState(
                     modifier = Modifier.weight(1f),
                     isArabic = isArabic,
@@ -178,6 +175,16 @@ fun GeminiChatScreen(
                 ) {
                     items(messages, key = { it.id }) { message ->
                         ChatMessageBubble(message = message, isArabic = isArabic)
+                    }
+                    lastError?.let { error ->
+                        item(key = "chat-error-retry") {
+                            GlassErrorState(
+                                title = if (isArabic) "تعذّر الاتصال" else "Connection failed",
+                                message = error,
+                                retryLabel = if (isArabic) "إعادة المحاولة" else "Retry",
+                                onRetry = { viewModel.retryLastMessage(uiConfig) }
+                            )
+                        }
                     }
                     if (isTyping) item(key = "typing") { TypingIndicatorRow() }
                 }

@@ -2,6 +2,7 @@ package com.example.ui.screens
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.*
+import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -255,6 +256,7 @@ private fun CyberTermCard(
 
     Box(
         modifier = Modifier.fillMaxWidth()
+            .animateContentSize()
             .padding(horizontal = 16.dp, vertical = 4.dp)
             .border(
                 width = if (isExpanded) 0.8.dp else 0.4.dp,
