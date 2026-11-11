@@ -361,7 +361,7 @@ private fun LibrarySearchField(
 private fun LibraryEntrance(index: Int, content: @Composable () -> Unit) {
     var visible by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) {
-        delay(70L + index * 60L)
+        delay(70L + index.coerceAtMost(10) * 60L)
         visible = true
     }
     AnimatedVisibility(visible, enter = fadeIn(tween(350)) + slideInVertically(tween(350)) { it / 12 }) {
