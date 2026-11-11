@@ -1,6 +1,8 @@
 package com.example
 
 import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.view.View
 import android.content.ContentValues
 import android.provider.MediaStore
 import android.os.Environment
@@ -37,10 +39,17 @@ class AyriaDesignPreviewScreenshotTest {
         composeRule.waitForIdle()
         composeRule.onNodeWithText("نظام التصميم").assertIsDisplayed()
 
-        // UiAutomation captures the real emulator display without Compose PixelCopy's 2s window timeout.
+        // Draw the actual Compose host view into a bitmap. This avoids a system screenshot
+        // of the underlying window background and does not depend on PixelCopy.
         val instrumentation = InstrumentationRegistry.getInstrumentation()
-        instrumentation.waitForIdleSync()
-        val bitmap = instrumentation.uiAutomation.takeScreenshot()
+        val composeHost = composeRule.activity.findViewById<View>(android.R.id.content)
+        val width = composeHost.width
+        val height = composeHost.height
+        assertTrue("Compose host has no laid-out size ($width x $height)", width > 0 && height > 0)
+        val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+        instrumentation.runOnMainSync {
+            composeHost.draw(Canvas(bitmap))
+        }
         val context = instrumentation.targetContext
         // MediaStore makes the file accessible to adb without depending on the app's private package directory.
         val values = ContentValues().apply {
