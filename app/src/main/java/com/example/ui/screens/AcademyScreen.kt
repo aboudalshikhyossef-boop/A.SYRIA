@@ -243,7 +243,7 @@ fun AcademyScreen(
                                     haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
                                     viewModel.setArabic(!isAr)
                                 },
-                                modifier = Modifier.widthIn(min = 68.dp),
+                                modifier = Modifier.widthIn(min = 68.dp).testTag("academy-language-toggle"),
                                 level = GlassLevel.Standard
                             ) {
                                 Text(if (isAr) "EN" else "عربي", color = AyriaDesignTokens.Colors.glacier, fontWeight = FontWeight.Bold)
@@ -253,7 +253,7 @@ fun AcademyScreen(
 
                     AcademyEntrance(index = 1) {
                         GlassSurface(
-                            modifier = Modifier.fillMaxWidth().clickable {
+                            modifier = Modifier.fillMaxWidth().testTag("academy-resume").clickable {
                                 haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
                                 selectedModule = resumeModule ?: syllabusModules.first()
                             },
@@ -355,7 +355,7 @@ fun AcademyScreen(
                                         modifier = Modifier.clip(AyriaDesignTokens.Corners.pill)
                                             .background(if (selectedLevel == key) Brush.horizontalGradient(listOf(Color(0xFF26B7D5), Color(0xFF5369D8))) else Brush.horizontalGradient(listOf(Color.Transparent, Color.Transparent)))
                                     ) {
-                                        GlassChip(label, selectedLevel == key, { selectedLevel = key })
+                                        GlassChip(label, selectedLevel == key, { selectedLevel = key }, modifier = Modifier.testTag("academy-filter-$key"))
                                     }
                                 }
                             }
@@ -386,7 +386,7 @@ fun AcademyScreen(
                                             val title = if (isAr) item.titleAr else item.titleEn
                                             val description = if (isAr) item.descAr else item.descEn
                                             Box(
-                                                modifier = Modifier.width(238.dp).clickable {
+                                                modifier = Modifier.width(238.dp).testTag("academy-course-${item.id}").clickable {
                                                     haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove)
                                                     selectedModule = item
                                                 }
@@ -431,7 +431,7 @@ fun AcademyScreen(
 
                     AcademyEntrance(index = 7) {
                         GlassSurface(
-                            modifier = Modifier.fillMaxWidth().clickable {
+                            modifier = Modifier.fillMaxWidth().testTag("academy-daily-challenge").clickable {
                                 haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
                                 selectedModule = syllabusModules.first { it.id == "network_safety" }
                             },
@@ -451,10 +451,10 @@ fun AcademyScreen(
                         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             SectionHeader(title = if (isAr) "مراجع إضافية" else "MORE TO EXPLORE")
                             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                GlassButton(onClick = onNavigateToGlossary, modifier = Modifier.weight(1f)) {
+                                GlassButton(onClick = onNavigateToGlossary, modifier = Modifier.weight(1f).testTag("academy-open-glossary")) {
                                     Text(if (isAr) "قاموس المصطلحات" else "Glossary", color = AyriaDesignTokens.Colors.glacier, fontSize = 11.sp)
                                 }
-                                GlassButton(onClick = onNavigateToChecklist, modifier = Modifier.weight(1f)) {
+                                GlassButton(onClick = onNavigateToChecklist, modifier = Modifier.weight(1f).testTag("academy-open-checklist")) {
                                     Text(if (isAr) "قائمة التحقق" else "Checklist", color = AyriaDesignTokens.Colors.glacier, fontSize = 11.sp)
                                 }
                             }
