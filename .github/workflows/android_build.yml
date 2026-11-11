@@ -216,7 +216,13 @@ jobs:
           emulator-boot-timeout: 900
           disable-animations: true
           pre-emulator-launch-script: 'grep -E "^(target|image.sysdir.1|hw.ramSize|disk.dataPartition.size)=" "$ANDROID_AVD_HOME/test.avd/config.ini"'
-          script: 'sh scripts/ci/wait-for-android-package-manager.sh ./gradlew connectedDebugAndroidTest --no-configuration-cache --stacktrace --build-cache && mkdir -p "$RUNNER_TEMP/design-preview" && adb pull /sdcard/Android/data/com.asyria.v4.preview/files/design-system-preview.png "$RUNNER_TEMP/design-preview/design-system-preview.png"'
+          script: 'sh scripts/ci/wait-for-android-package-manager.sh ./gradlew connectedDebugAndroidTest --no-configuration-cache --stacktrace --build-cache'
+
+      - name: Download design system preview screenshot
+        if: matrix.api-level == '36'
+        run: |
+          mkdir -p "$RUNNER_TEMP/design-preview"
+          adb pull /sdcard/Android/data/com.asyria.v4.preview/files/design-system-preview.png "$RUNNER_TEMP/design-preview/design-system-preview.png"
 
       - name: Upload design system preview screenshot
         if: matrix.api-level == '36'
