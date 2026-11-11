@@ -7,12 +7,8 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.imePadding
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ModalBottomSheet
@@ -42,6 +38,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
@@ -621,12 +618,11 @@ fun GlassModalBottomSheet(
         scrimColor = Color.Black.copy(alpha = 0.64f),
         tonalElevation = 0.dp,
         dragHandle = null,
-        windowInsets = WindowInsets(0, 0, 0, 0)
     ) {
         GlassSheet(
             title = title,
             subtitle = subtitle,
-            modifier = Modifier.fillMaxWidth().navigationBarsPadding().imePadding(),
+            modifier = Modifier.fillMaxWidth(),
             content = {
                 Column(
                     modifier = Modifier
