@@ -32,8 +32,8 @@ class AyriaDesignPreviewScreenshotTest {
 
         val bitmap = composeRule.onRoot().captureToImage().asAndroidBitmap()
         val context = InstrumentationRegistry.getInstrumentation().targetContext
-        val directory = checkNotNull(context.getExternalFilesDir(null))
-        val output = File(directory, "design-system-preview.png")
+        // Store in the debuggable target app cache; CI retrieves it with adb run-as.
+        val output = File(context.cacheDir, "design-system-preview.png")
 
         FileOutputStream(output).use { stream ->
             assertTrue(
