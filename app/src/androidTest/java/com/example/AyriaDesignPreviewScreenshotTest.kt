@@ -156,6 +156,7 @@ class AyriaDesignPreviewScreenshotTest {
         // The test clock is frozen to keep the animated backdrop deterministic.
         // Advance one frame so the BackHandler state change is recomposed before asserting it.
         composeRule.mainClock.advanceTimeByFrame()
+        composeRule.mainClock.advanceTimeBy(700)
         composeRule.waitForIdle()
         composeRule.onNodeWithTag("nav-state-home").assertExists()
         captureComposeHostScreenshot("navigation-back-home.png")
