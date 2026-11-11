@@ -7,6 +7,8 @@ import android.os.Environment
 import android.os.Build
 import androidx.activity.ComponentActivity
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.onNodeWithText
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.example.ui.design.AyriaDesignSystemPreviewContent
@@ -29,10 +31,15 @@ class AyriaDesignPreviewScreenshotTest {
         composeRule.setContent {
             AyriaDesignSystemPreviewContent()
         }
+        // The clock is frozen to stop the panorama shimmer, but Compose still needs
+        // one frame to perform its first measure/layout/draw pass.
+        composeRule.mainClock.advanceTimeByFrame()
         composeRule.waitForIdle()
+        composeRule.onNodeWithText("نظام التصميم").assertIsDisplayed()
 
         // UiAutomation captures the real emulator display without Compose PixelCopy's 2s window timeout.
         val instrumentation = InstrumentationRegistry.getInstrumentation()
+        instrumentation.waitForIdleSync()
         val bitmap = instrumentation.uiAutomation.takeScreenshot()
         val context = instrumentation.targetContext
         // MediaStore makes the file accessible to adb without depending on the app's private package directory.
