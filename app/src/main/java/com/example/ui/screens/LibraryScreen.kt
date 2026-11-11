@@ -295,7 +295,7 @@ fun LibraryScreen(
         onDismissRequest = { selectedItem = null }
     ) {
         selectedItem?.let { item ->
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Column(Modifier.testTag("library-detail-sheet"), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text(
                     item.body,
                     color = AyriaDesignTokens.Colors.pearl,
