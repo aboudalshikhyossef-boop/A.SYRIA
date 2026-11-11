@@ -1,43 +1,50 @@
 package com.example.ui.screens
 
 import androidx.activity.compose.BackHandler
-import androidx.compose.animation.core.*
-import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardActions
-import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.SearchOff
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalLayoutDirection
-import androidx.compose.ui.platform.LocalSoftwareKeyboardController
-import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.CyberGlossaryData
 import com.example.data.CyberTerm
-import com.example.ui.theme.AmberZen
-import com.example.ui.theme.CyberCyan
-import com.example.ui.theme.VoidBlack
+import com.example.ui.design.AyriaDesignTokens
+import com.example.ui.design.GlassCard
+import com.example.ui.design.GlassChip
+import com.example.ui.design.GlassErrorState
+import com.example.ui.design.GlassLevel
+import com.example.ui.design.GlassModalBottomSheet
+import com.example.ui.design.GlassSurface
+import com.example.ui.design.SectionHeader
 import com.example.ui.viewmodel.DashboardViewModel
+import kotlinx.coroutines.delay
 
 @Composable
 fun CyberGlossaryScreen(
@@ -46,293 +53,293 @@ fun CyberGlossaryScreen(
 ) {
     val isAr by viewModel.isArabic.collectAsState()
     val haptic = LocalHapticFeedback.current
-    val keyboardController = LocalSoftwareKeyboardController.current
     val layoutDirection = if (isAr) LayoutDirection.Rtl else LayoutDirection.Ltr
-    var searchQuery by remember { mutableStateOf("") }
-    var selectedCategory by remember { mutableStateOf("الكل") }
-    var expandedTermId by remember { mutableStateOf<String?>(null) }
+    var searchQuery by rememberSaveable { mutableStateOf("") }
+    var selectedCategory by rememberSaveable { mutableStateOf("all") }
+    var selectedTerm by remember { mutableStateOf<CyberTerm?>(null) }
 
-    BackHandler { onBack() }
-
-    val allCategories = remember(isAr) {
-        val base = if (isAr) listOf("الكل") else listOf("All")
-        base + CyberGlossaryData.categories
+    BackHandler {
+        if (selectedTerm != null) selectedTerm = null else onBack()
     }
 
+    val allCategories = remember(isAr) {
+        listOf("all") + CyberGlossaryData.categories
+    }
     val filteredTerms = remember(searchQuery, selectedCategory) {
         CyberGlossaryData.terms.filter { term ->
-            val matchesSearch = if (searchQuery.isBlank()) true else {
+            val matchesSearch = searchQuery.isBlank() ||
                 term.termAr.contains(searchQuery, ignoreCase = true) ||
                 term.termEn.contains(searchQuery, ignoreCase = true) ||
                 term.definitionAr.contains(searchQuery, ignoreCase = true) ||
                 term.definitionEn.contains(searchQuery, ignoreCase = true)
-            }
-            val matchesCategory = selectedCategory == "الكل" || selectedCategory == "All" ||
-                    term.category == selectedCategory
+            val matchesCategory = selectedCategory == "all" || term.category == selectedCategory
             matchesSearch && matchesCategory
         }
     }
-
-    val infiniteTransition = rememberInfiniteTransition(label = "glow")
-    val glowAlpha by infiniteTransition.animateFloat(
-        0.2f, 0.6f,
-        animationSpec = infiniteRepeatable(tween(2500, easing = LinearEasing), RepeatMode.Reverse),
-        label = "ga"
-    )
+    val groupedTerms = remember(filteredTerms, isAr) {
+        filteredTerms
+            .sortedBy { (if (isAr) it.termAr else it.termEn).firstOrNull()?.uppercaseChar() ?: '#' }
+            .groupBy { (if (isAr) it.termAr else it.termEn).firstOrNull()?.uppercaseChar()?.toString() ?: "#" }
+            .toSortedMap()
+    }
 
     CompositionLocalProvider(LocalLayoutDirection provides layoutDirection) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .statusBarsPadding()
-                .navigationBarsPadding()
-                .background(Color.Transparent)
+        Column(
+            modifier = Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 18.dp).padding(top = 18.dp, bottom = 136.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            LazyColumn(
-                modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(bottom = 32.dp)
-            ) {
-                item {
-                    Box(
-                        modifier = Modifier.fillMaxWidth()
-                            .background(Color(0xFF020A14))
-                            .padding(top = 16.dp, bottom = 12.dp, start = 8.dp, end = 8.dp)
+            GlossaryEntrance(index = 0) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text(if (isAr) "قاموس الأمن السيبراني" else "CYBER GLOSSARY", color = AyriaDesignTokens.Colors.pearl, fontSize = 25.sp, fontWeight = FontWeight.Bold)
+                        Text(if (isAr) "مصطلحات واضحة لفهم العالم الرقمي" else "Clear definitions for the language of digital security.", color = AyriaDesignTokens.Colors.muted, fontSize = 12.sp)
+                    }
+                    GlassSurface(
+                        modifier = Modifier.size(44.dp).clickable(onClick = onBack),
+                        shape = AyriaDesignTokens.Corners.pill,
+                        level = GlassLevel.Standard
                     ) {
-                        Column {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                IconButton(onClick = onBack) {
-                                    Icon(Icons.AutoMirrored.Filled.ArrowBack, null, tint = CyberCyan)
-                                }
-                                Text(
-                                    text = if (isAr) "قاموس الأمن السيبراني" else "CYBER SECURITY GLOSSARY",
-                                    color = CyberCyan,
-                                    fontSize = 15.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    fontFamily = FontFamily.Monospace,
-                                    modifier = Modifier.weight(1f),
-                                    textAlign = TextAlign.Center
-                                )
-                                Box(
-                                    modifier = Modifier
-                                        .border(0.5.dp, CyberCyan.copy(alpha = 0.4f), RoundedCornerShape(6.dp))
-                                        .background(CyberCyan.copy(alpha = 0.08f), RoundedCornerShape(6.dp))
-                                        .padding(horizontal = 8.dp, vertical = 4.dp)
-                                ) {
-                                    Text(
-                                        text = "${filteredTerms.size}",
-                                        color = CyberCyan,
-                                        fontSize = 11.sp,
-                                        fontFamily = FontFamily.Monospace,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                }
-                            }
-                            Spacer(Modifier.height(8.dp))
-                            OutlinedTextField(
+                        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = if (isAr) "رجوع" else "Back", tint = AyriaDesignTokens.Colors.glacier)
+                        }
+                    }
+                }
+            }
+
+            GlossaryEntrance(index = 1) {
+                GlassSurface(modifier = Modifier.fillMaxWidth(), level = GlassLevel.Standard) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Icon(Icons.Default.Search, null, tint = AyriaDesignTokens.Colors.glacier)
+                        Box(Modifier.weight(1f)) {
+                            if (searchQuery.isBlank()) Text(if (isAr) "ابحث عن مصطلح..." else "Search terms...", color = AyriaDesignTokens.Colors.muted, fontSize = 12.sp)
+                            BasicTextField(
                                 value = searchQuery,
                                 onValueChange = { searchQuery = it },
-                                modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
-                                placeholder = {
-                                    Text(
-                                        if (isAr) "ابحث عن مصطلح..." else "Search terms...",
-                                        color = Color.White.copy(alpha = 0.3f),
-                                        fontFamily = FontFamily.Monospace,
-                                        fontSize = 12.sp
-                                    )
-                                },
-                                leadingIcon = { Icon(Icons.Default.Search, null, tint = CyberCyan.copy(alpha = 0.6f)) },
-                                trailingIcon = {
-                                    if (searchQuery.isNotEmpty()) {
-                                        IconButton(onClick = { searchQuery = "" }) {
-                                            Icon(Icons.Default.Clear, null, tint = Color.White.copy(alpha = 0.4f))
-                                        }
-                                    }
-                                },
-                                colors = OutlinedTextFieldDefaults.colors(
-                                    focusedBorderColor = CyberCyan,
-                                    unfocusedBorderColor = CyberCyan.copy(alpha = 0.2f),
-                                    focusedTextColor = Color.White,
-                                    unfocusedTextColor = Color.White,
-                                    cursorColor = CyberCyan
-                                ),
-                                shape = RoundedCornerShape(10.dp),
                                 singleLine = true,
-                                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                                keyboardActions = KeyboardActions(onSearch = { keyboardController?.hide() })
+                                textStyle = TextStyle(color = AyriaDesignTokens.Colors.pearl, fontSize = 13.sp),
+                                cursorBrush = SolidColor(AyriaDesignTokens.Colors.glacier),
+                                modifier = Modifier.fillMaxWidth()
                             )
                         }
-                    }
-                }
-                item {
-                    LazyRow(
-                        modifier = Modifier.padding(vertical = 8.dp),
-                        contentPadding = PaddingValues(horizontal = 16.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        items(allCategories) { cat ->
-                            val isSelected = cat == selectedCategory
-                            Box(
-                                modifier = Modifier
-                                    .border(
-                                        0.8.dp,
-                                        if (isSelected) CyberCyan else CyberCyan.copy(alpha = 0.2f),
-                                        RoundedCornerShape(20.dp)
-                                    )
-                                    .background(
-                                        if (isSelected) CyberCyan.copy(alpha = 0.15f) else Color.Transparent,
-                                        RoundedCornerShape(20.dp)
-                                    )
-                                    .clickable {
-                                        haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove)
-                                        selectedCategory = cat
-                                    }
-                                    .padding(horizontal = 14.dp, vertical = 6.dp)
-                            ) {
-                                Text(
-                                    text = cat,
-                                    color = if (isSelected) CyberCyan else Color.White.copy(alpha = 0.4f),
-                                    fontSize = 11.sp,
-                                    fontFamily = FontFamily.Monospace,
-                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
-                                )
+                        if (searchQuery.isNotEmpty()) {
+                            IconButton(onClick = { searchQuery = "" }) {
+                                Icon(Icons.Default.Clear, null, tint = AyriaDesignTokens.Colors.muted)
                             }
                         }
                     }
                 }
-                if (filteredTerms.isEmpty()) {
-                    item {
+            }
+
+            GlossaryEntrance(index = 2) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    allCategories.forEach { category ->
+                        val selected = selectedCategory == category
+                        val label = if (category == "all") {
+                            if (isAr) "الكل" else "All"
+                        } else category
                         Box(
-                            modifier = Modifier.fillMaxWidth().padding(64.dp),
-                            contentAlignment = Alignment.Center
+                            modifier = Modifier.clip(AyriaDesignTokens.Corners.pill)
+                                .background(if (selected) Brush.horizontalGradient(listOf(Color(0xFF24B9D5), Color(0xFF5969D8))) else Brush.horizontalGradient(listOf(Color.Transparent, Color.Transparent)))
                         ) {
-                            Text(
-                                text = if (isAr) "لا توجد نتائج لـ \"$searchQuery\"" else "No results for \"$searchQuery\"",
-                                color = Color.White.copy(alpha = 0.3f),
-                                fontFamily = FontFamily.Monospace,
-                                textAlign = TextAlign.Center
+                            GlassChip(
+                                label = label,
+                                selected = selected,
+                                onClick = {
+                                    haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove)
+                                    selectedCategory = category
+                                }
                             )
                         }
                     }
-                } else {
-                    items(filteredTerms, key = { it.termEn }) { term ->
-                        CyberTermCard(
-                            term = term,
-                            isAr = isAr,
-                            isExpanded = expandedTermId == term.termEn,
-                            glowAlpha = glowAlpha,
-                            onClick = {
-                                haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
-                                expandedTermId = if (expandedTermId == term.termEn) null else term.termEn
-                            }
+                }
+            }
+
+            GlossaryEntrance(index = 3) {
+                SectionHeader(
+                    title = if (isAr) "المصطلحات" else "TERMS",
+                    subtitle = if (isAr) "${filteredTerms.size} مصطلحاً · مرتّبة أبجدياً" else "${filteredTerms.size} terms · alphabetically grouped",
+                    actionLabel = if (isAr) "عرض الكل" else "See all",
+                    onAction = { selectedCategory = "all"; searchQuery = "" }
+                )
+            }
+
+            when {
+                CyberGlossaryData.terms.isEmpty() -> GlossaryEntrance(index = 4) {
+                    GlassErrorState(
+                        title = if (isAr) "القاموس غير متاح" else "Glossary unavailable",
+                        message = if (isAr) "لم يتم تحميل قائمة المصطلحات المحلية." else "The local glossary did not provide any terms.",
+                        retryLabel = if (isAr) "إعادة ضبط البحث" else "Reset filters",
+                        onRetry = { searchQuery = ""; selectedCategory = "all" }
+                    )
+                }
+                filteredTerms.isEmpty() -> GlossaryEntrance(index = 4) {
+                    GlassCard(contentPadding = 8.dp) {
+                        androidx.compose.material3.Icon(
+                            Icons.Default.SearchOff, null,
+                            tint = AyriaDesignTokens.Colors.glacier,
+                            modifier = Modifier.size(28.dp).align(Alignment.CenterHorizontally)
+                        )
+                        androidx.compose.foundation.layout.Spacer(Modifier.height(8.dp))
+                        Text(
+                            if (isAr) "لا توجد نتائج لـ «$searchQuery»" else "No results for “$searchQuery”",
+                            color = AyriaDesignTokens.Colors.pearl,
+                            fontSize = 13.sp,
+                            modifier = Modifier.align(Alignment.CenterHorizontally)
+                        )
+                        Text(
+                            if (isAr) "جرّب مصطلحاً أو تصنيفاً آخر." else "Try another search term or category.",
+                            color = AyriaDesignTokens.Colors.muted,
+                            fontSize = 11.sp,
+                            modifier = Modifier.align(Alignment.CenterHorizontally)
                         )
                     }
                 }
+                else -> {
+                    var entranceIndex = 4
+                    groupedTerms.forEach { (letter, terms) ->
+                        val sectionIndex = entranceIndex++
+                        GlossaryEntrance(index = sectionIndex) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                Box(
+                                    modifier = Modifier.size(34.dp).background(
+                                        Brush.linearGradient(listOf(Color(0xFF25B9D4).copy(alpha = 0.28f), Color(0xFF6769D8).copy(alpha = 0.18f))),
+                                        RoundedCornerShape(12.dp)
+                                    ),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(letter, color = AyriaDesignTokens.Colors.glacier, fontSize = 15.sp, fontWeight = FontWeight.Bold)
+                                }
+                                Text(letter, color = AyriaDesignTokens.Colors.muted, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                HorizontalDivider(modifier = Modifier.weight(1f), color = AyriaDesignTokens.Colors.line.copy(alpha = 0.48f))
+                                Text("${terms.size}", color = AyriaDesignTokens.Colors.muted, fontSize = 10.sp)
+                            }
+                        }
+                        terms.forEachIndexed { termIndex, term ->
+                            val itemEntrance = entranceIndex++
+                            GlossaryEntrance(index = itemEntrance) {
+                                Column {
+                                    GlossaryTermRow(
+                                        term = term,
+                                        isAr = isAr,
+                                        onClick = {
+                                            haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
+                                            selectedTerm = term
+                                        }
+                                    )
+                                    if (termIndex < terms.lastIndex) {
+                                        HorizontalDivider(
+                                            modifier = Modifier.padding(start = 18.dp, end = 12.dp),
+                                            color = AyriaDesignTokens.Colors.line.copy(alpha = 0.32f),
+                                            thickness = 0.7.dp
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    GlassModalBottomSheet(
+        visible = selectedTerm != null,
+        title = selectedTerm?.let { if (isAr) it.termAr else it.termEn }.orEmpty(),
+        subtitle = selectedTerm?.category,
+        onDismissRequest = { selectedTerm = null }
+    ) {
+        selectedTerm?.let { term ->
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text(
+                    if (isAr) term.termEn else term.termAr,
+                    color = AyriaDesignTokens.Colors.glacier,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
+                HorizontalDivider(color = AyriaDesignTokens.Colors.line.copy(alpha = 0.56f))
+                Text(
+                    if (isAr) term.definitionAr else term.definitionEn,
+                    color = AyriaDesignTokens.Colors.pearl,
+                    fontSize = 14.sp,
+                    lineHeight = 23.sp
+                )
+                Text(
+                    if (isAr) term.definitionEn else term.definitionAr,
+                    color = AyriaDesignTokens.Colors.muted,
+                    fontSize = 11.sp,
+                    lineHeight = 18.sp
+                )
             }
         }
     }
 }
 
 @Composable
-private fun CyberTermCard(
+private fun GlossaryTermRow(
     term: CyberTerm,
     isAr: Boolean,
-    isExpanded: Boolean,
-    glowAlpha: Float,
     onClick: () -> Unit
 ) {
-    val categoryColor = when (term.category) {
-        "هجمات" -> Color(0xFFFF4444)
-        "برمجيات خبيثة" -> Color(0xFFFF6B35)
-        "تشفير" -> Color(0xFF7B61FF)
-        "مصادقة" -> Color(0xFF00BFA5)
-        "خصوصية" -> Color(0xFFFF9800)
-        "شبكات" -> CyberCyan
-        "دفاع" -> Color(0xFF69F0AE)
-        "أمن الجوال" -> Color(0xFF40C4FF)
-        "سحابة" -> Color(0xFF80D8FF)
-        "أخلاقيات" -> AmberZen
-        else -> Color.White.copy(alpha = 0.5f)
-    }
-
-    Box(
-        modifier = Modifier.fillMaxWidth()
-            .animateContentSize()
-            .padding(horizontal = 16.dp, vertical = 4.dp)
-            .border(
-                width = if (isExpanded) 0.8.dp else 0.4.dp,
-                color = if (isExpanded) categoryColor.copy(alpha = 0.6f) else Color.White.copy(alpha = 0.08f),
-                shape = RoundedCornerShape(10.dp)
-            )
-            .background(
-                if (isExpanded) categoryColor.copy(alpha = 0.05f) else Color.Black.copy(alpha = 0.2f),
-                RoundedCornerShape(10.dp)
-            )
-            .clickable(onClick = onClick)
-            .padding(14.dp)
+    Row(
+        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick).padding(vertical = 12.dp, horizontal = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        Column {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = if (isAr) term.termAr else term.termEn,
-                        color = if (isExpanded) categoryColor else Color.White,
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                    if (!isAr) {
-                        Text(
-                            text = term.termAr,
-                            color = Color.White.copy(alpha = 0.3f),
-                            fontSize = 10.sp,
-                            fontFamily = FontFamily.Monospace
-                        )
-                    } else {
-                        Text(
-                            text = term.termEn,
-                            color = Color.White.copy(alpha = 0.3f),
-                            fontSize = 10.sp,
-                            fontFamily = FontFamily.Monospace
-                        )
-                    }
-                }
-                Box(
-                    modifier = Modifier
-                        .border(0.5.dp, categoryColor.copy(alpha = 0.4f), RoundedCornerShape(6.dp))
-                        .background(categoryColor.copy(alpha = 0.1f), RoundedCornerShape(6.dp))
-                        .padding(horizontal = 6.dp, vertical = 3.dp)
-                ) {
-                    Text(
-                        text = term.category,
-                        color = categoryColor,
-                        fontSize = 8.sp,
-                        fontFamily = FontFamily.Monospace
-                    )
-                }
-            }
-            if (isExpanded) {
-                Spacer(Modifier.height(10.dp))
-                HorizontalDivider(color = categoryColor.copy(alpha = 0.2f))
-                Spacer(Modifier.height(10.dp))
-                Text(
-                    text = if (isAr) term.definitionAr else term.definitionEn,
-                    color = Color.White.copy(alpha = 0.8f),
-                    fontSize = 12.sp,
-                    lineHeight = 20.sp
-                )
-                if (isAr) {
-                    Spacer(Modifier.height(8.dp))
-                    Text(
-                        text = "[ ${term.termEn} ]",
-                        color = categoryColor.copy(alpha = 0.5f),
-                        fontSize = 9.sp,
-                        fontFamily = FontFamily.Monospace
-                    )
-                }
-            }
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+            Text(if (isAr) term.termAr else term.termEn, color = AyriaDesignTokens.Colors.pearl, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
+            Text(if (isAr) term.termEn else term.termAr, color = AyriaDesignTokens.Colors.muted, fontSize = 10.sp, maxLines = 1)
         }
+        Box(
+            modifier = Modifier.clip(AyriaDesignTokens.Corners.pill)
+                .background(categoryColor(term.category).copy(alpha = 0.12f))
+                .border(0.7.dp, categoryColor(term.category).copy(alpha = 0.28f), AyriaDesignTokens.Corners.pill)
+                .padding(horizontal = 10.dp, vertical = 5.dp)
+        ) {
+            Text(term.category, color = categoryColor(term.category), fontSize = 9.sp, fontWeight = FontWeight.Medium)
+        }
+        Text("›", color = AyriaDesignTokens.Colors.glacier, fontSize = 20.sp)
+    }
+}
+
+private fun categoryColor(category: String): Color = when (category) {
+    "هجمات" -> Color(0xFFFF6D7E)
+    "برمجيات خبيثة" -> Color(0xFFFF9864)
+    "تشفير" -> Color(0xFF9B8BFF)
+    "مصادقة" -> Color(0xFF5ED6BC)
+    "خصوصية" -> Color(0xFFFFC16F)
+    "شبكات" -> Color(0xFF63CBE6)
+    "دفاع" -> Color(0xFF73DFA8)
+    "أمن الجوال" -> Color(0xFF78C7FF)
+    "سحابة" -> Color(0xFF8AD8FF)
+    "أخلاقيات" -> Color(0xFFFFD68A)
+    else -> AyriaDesignTokens.Colors.glacier
+}
+
+@Composable
+private fun GlossaryEntrance(index: Int, content: @Composable () -> Unit) {
+    var visible by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        delay(65L + index.coerceAtMost(10) * 45L)
+        visible = true
+    }
+    AnimatedVisibility(visible, enter = fadeIn(tween(350)) + slideInVertically(tween(350)) { it / 14 }) {
+        content()
     }
 }
