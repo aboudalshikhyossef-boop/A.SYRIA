@@ -23,6 +23,8 @@ class AyriaDesignPreviewScreenshotTest {
 
     @Test
     fun captureDesignSystemPreview() {
+        // The panorama has an intentional infinite shimmer; freeze the test clock for a deterministic capture.
+        composeRule.mainClock.autoAdvance = false
         composeRule.setContent {
             AyriaDesignSystemPreviewContent()
         }
